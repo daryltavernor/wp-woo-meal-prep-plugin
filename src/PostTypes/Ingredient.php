@@ -16,6 +16,49 @@ final class Ingredient {
 		add_action( 'add_meta_boxes', [ $this, 'add_meta_boxes' ] );
 		add_action( 'save_post_' . self::POST_TYPE, [ $this, 'save_meta' ], 10, 2 );
 		add_action( 'rest_api_init', [ $this, 'register_rest_fields' ] );
+		add_filter( 'manage_' . self::POST_TYPE . '_posts_columns', [ $this, 'list_columns' ] );
+		add_action( 'manage_' . self::POST_TYPE . '_posts_custom_column', [ $this, 'list_column_content' ], 10, 2 );
+	}
+
+	public function list_columns( array $columns ): array {
+		$new = [];
+		foreach ( $columns as $key => $label ) {
+			$new[ $key ] = $label;
+			if ( 'title' === $key ) {
+				$new['fn_type']   = __( 'Type', 'fastnutrition-mealprep' );
+				$new['fn_macros'] = __( 'Macros (kcal · P/C/F)', 'fastnutrition-mealprep' );
+			}
+		}
+		return $new;
+	}
+
+	public function list_column_content( string $column, int $post_id ): void {
+		if ( 'fn_type' === $column ) {
+			$slug  = self::get_type_slug( $post_id );
+			$map   = [
+				'protein'  => __( 'Protein', 'fastnutrition-mealprep' ),
+				'carb'     => __( 'Carb', 'fastnutrition-mealprep' ),
+				'greens'   => __( 'Greens', 'fastnutrition-mealprep' ),
+				'set_meal' => __( 'Set Meal', 'fastnutrition-mealprep' ),
+			];
+			$label = $map[ $slug ] ?? '—';
+			$color = [
+				'protein'  => '#b34b00',
+				'carb'     => '#2271b1',
+				'greens'   => '#006400',
+				'set_meal' => '#7c3aed',
+			][ $slug ] ?? '#666';
+			printf( '<span style="display:inline-block;padding:2px 8px;border-radius:999px;background:%s;color:#fff;font-size:11px;font-weight:600">%s</span>', esc_attr( $color ), esc_html( $label ) );
+		} elseif ( 'fn_macros' === $column ) {
+			$m = self::get_macros( $post_id );
+			printf(
+				'%s · %sg / %sg / %sg',
+				esc_html( number_format( $m['kcal'], 0 ) ),
+				esc_html( number_format( $m['protein_g'], 1 ) ),
+				esc_html( number_format( $m['carbs_g'], 1 ) ),
+				esc_html( number_format( $m['fat_g'], 1 ) )
+			);
+		}
 	}
 
 	public function register_post_type(): void {
@@ -128,11 +171,40 @@ final class Ingredient {
 		$price_delta = get_post_meta( $post->ID, '_fn_price_delta', true ) ?: 0;
 		$active      = get_post_meta( $post->ID, '_fn_active', true );
 		$active      = '' === $active ? true : (bool) $active;
+		$current_type = self::get_type_slug( $post->ID );
 
 		echo '<div style="background:#f0f6fc;border-left:4px solid #2271b1;padding:8px 12px;margin-bottom:12px;">';
 		echo '<p style="margin:0"><strong>' . esc_html__( 'What is this for?', 'fastnutrition-mealprep' ) . '</strong> ';
-		echo esc_html__( 'Ingredients are the building blocks for the meal builder. Use the "Ingredient Type" taxonomy (right sidebar) to mark each one as a Protein, Carb, Greens, or Set Meal. Set Meals are complete pre-made meals that customers can pick instead of building from components.', 'fastnutrition-mealprep' );
+		echo esc_html__( 'Ingredients are the building blocks for the meal builder. Pick the Type below: Protein, Carb, and Greens are components of a built meal. Set Meals are complete pre-made meals customers can pick instead of building from components. Customers may also pick 2 Greens instead of a Carb if the product allows "double greens".', 'fastnutrition-mealprep' );
 		echo '</p></div>';
+
+		// Prominent type selector.
+		$types = [
+			'protein'  => [ __( 'Protein', 'fastnutrition-mealprep' ), __( 'A single protein (chicken breast, tofu, salmon…). Exactly one is chosen per built meal.', 'fastnutrition-mealprep' ) ],
+			'carb'     => [ __( 'Carb', 'fastnutrition-mealprep' ), __( 'A single carb (rice, sweet potato…). Optional — customers can swap it for a 2nd Greens if the meal allows.', 'fastnutrition-mealprep' ) ],
+			'greens'   => [ __( 'Greens', 'fastnutrition-mealprep' ), __( 'A vegetable side. Customers can pick 1, or 2 different Greens instead of a carb.', 'fastnutrition-mealprep' ) ],
+			'set_meal' => [ __( 'Set Meal', 'fastnutrition-mealprep' ), __( 'A complete pre-made meal. Chosen instead of building from components.', 'fastnutrition-mealprep' ) ],
+		];
+		echo '<h3 style="margin:4px 0">' . esc_html__( 'Type (required)', 'fastnutrition-mealprep' ) . '</h3>';
+		echo '<p class="description" style="margin-top:0">' . esc_html__( 'Pick one. This controls which dropdown the ingredient appears in on the product page.', 'fastnutrition-mealprep' ) . '</p>';
+		echo '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px;margin-bottom:16px">';
+		foreach ( $types as $slug => $row ) {
+			$checked = checked( $current_type, $slug, false );
+			$active_style = '' !== $checked ? 'background:#e6f3e6;border-color:#006400;' : '';
+			printf(
+				'<label style="display:block;padding:10px;border:2px solid #ccc;border-radius:6px;cursor:pointer;%s">
+					<input type="radio" name="fn_ingredient_type" value="%s" %s style="margin-right:6px" />
+					<strong>%s</strong>
+					<br><small style="color:#555">%s</small>
+				</label>',
+				esc_attr( $active_style ),
+				esc_attr( $slug ),
+				$checked,
+				esc_html( $row[0] ),
+				esc_html( $row[1] )
+			);
+		}
+		echo '</div>';
 
 		$fields      = [
 			'kcal'      => __( 'Calories (kcal)', 'fastnutrition-mealprep' ),
@@ -172,6 +244,28 @@ final class Ingredient {
 			esc_html__( 'Available for customers to select', 'fastnutrition-mealprep' )
 		);
 		echo '</tbody></table>';
+		?>
+		<script>
+		(function(){
+			const radios = document.querySelectorAll('input[name="fn_ingredient_type"]');
+			const update = () => {
+				radios.forEach((r) => {
+					const lbl = r.closest('label');
+					if (!lbl) return;
+					if (r.checked) {
+						lbl.style.background = '#e6f3e6';
+						lbl.style.borderColor = '#006400';
+					} else {
+						lbl.style.background = '';
+						lbl.style.borderColor = '#ccc';
+					}
+				});
+			};
+			radios.forEach((r) => r.addEventListener('change', update));
+			update();
+		})();
+		</script>
+		<?php
 	}
 
 	public function save_meta( int $post_id, WP_Post $post ): void {
@@ -202,6 +296,28 @@ final class Ingredient {
 		update_post_meta( $post_id, '_fn_price_delta', $price_delta );
 
 		update_post_meta( $post_id, '_fn_active', ! empty( $_POST['fn_active'] ) );
+
+		if ( isset( $_POST['fn_ingredient_type'] ) ) {
+			$type_slug = sanitize_key( wp_unslash( (string) $_POST['fn_ingredient_type'] ) );
+			if ( in_array( $type_slug, [ 'protein', 'carb', 'greens', 'set_meal' ], true ) ) {
+				$term = get_term_by( 'slug', $type_slug, IngredientType::TAXONOMY );
+				if ( ! $term ) {
+					$labels  = [
+						'protein'  => __( 'Protein', 'fastnutrition-mealprep' ),
+						'carb'     => __( 'Carb', 'fastnutrition-mealprep' ),
+						'greens'   => __( 'Greens', 'fastnutrition-mealprep' ),
+						'set_meal' => __( 'Set Meal', 'fastnutrition-mealprep' ),
+					];
+					$created = wp_insert_term( $labels[ $type_slug ], IngredientType::TAXONOMY, [ 'slug' => $type_slug ] );
+					if ( ! is_wp_error( $created ) ) {
+						$term = get_term( $created['term_id'], IngredientType::TAXONOMY );
+					}
+				}
+				if ( $term && ! is_wp_error( $term ) ) {
+					wp_set_object_terms( $post_id, [ (int) $term->term_id ], IngredientType::TAXONOMY, false );
+				}
+			}
+		}
 	}
 
 	public function register_rest_fields(): void {

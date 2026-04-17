@@ -3,12 +3,15 @@ declare( strict_types=1 );
 
 namespace FastNutrition\MealPrep\Install;
 
+use FastNutrition\MealPrep\Taxonomies\Allergen;
 use FastNutrition\MealPrep\Taxonomies\IngredientType;
 
 final class Activator {
 
 	public static function activate(): void {
 		self::create_tables();
+		( new IngredientType() )->register_taxonomy();
+		( new Allergen() )->register_taxonomy();
 		self::seed_ingredient_types();
 		flush_rewrite_rules();
 	}
@@ -83,5 +86,6 @@ final class Activator {
 				wp_insert_term( $name, IngredientType::TAXONOMY, [ 'slug' => $slug ] );
 			}
 		}
+		update_option( 'fn_ingredient_types_seeded', 1, false );
 	}
 }
