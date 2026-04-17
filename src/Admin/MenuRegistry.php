@@ -31,14 +31,7 @@ final class MenuRegistry {
 		add_submenu_page( self::SLUG, __( 'Prep Dashboard', 'fastnutrition-mealprep' ), __( 'Prep Dashboard', 'fastnutrition-mealprep' ), 'manage_woocommerce', self::SLUG, [ PrepDashboard::class, 'render_static' ] );
 		add_submenu_page( self::SLUG, __( 'Printable Prep Sheet', 'fastnutrition-mealprep' ), __( 'Prep Sheet', 'fastnutrition-mealprep' ), 'manage_woocommerce', 'fn-prep-sheet', [ PrepSheet::class, 'render_static' ] );
 
-		// Catalogue.
-		add_submenu_page(
-			self::SLUG,
-			__( 'Ingredients & Set Meals', 'fastnutrition-mealprep' ),
-			__( 'Ingredients', 'fastnutrition-mealprep' ),
-			'edit_products',
-			'edit.php?post_type=' . Ingredient::POST_TYPE
-		);
+		// Ingredients (the CPT's show_in_menu auto-adds "Ingredients" itself — we only add filtered shortcuts here).
 		add_submenu_page(
 			self::SLUG,
 			__( 'Set Meals', 'fastnutrition-mealprep' ),
