@@ -52,6 +52,11 @@ final class ProfileAdmin {
 				}
 			}
 
+			$zone_ids = [];
+			foreach ( (array) ( $_POST['zone_ids'] ?? [] ) as $zid ) {
+				$zone_ids[] = (int) $zid;
+			}
+
 			Profile::save(
 				[
 					'id'        => isset( $_POST['profile_id'] ) ? (int) $_POST['profile_id'] : 0,
@@ -60,6 +65,7 @@ final class ProfileAdmin {
 					'days'      => $days,
 					'slots'     => $slots,
 					'postcodes' => $postcodes,
+					'zone_ids'  => $zone_ids,
 					'priority'  => isset( $_POST['priority'] ) ? (int) $_POST['priority'] : 10,
 					'active'    => ! empty( $_POST['active'] ),
 				]
@@ -97,7 +103,7 @@ final class ProfileAdmin {
 		echo '<table class="widefat striped"><thead><tr>';
 		echo '<th>' . esc_html__( 'Name', 'fastnutrition-mealprep' ) . '</th>';
 		echo '<th>' . esc_html__( 'Method', 'fastnutrition-mealprep' ) . '</th>';
-		echo '<th>' . esc_html__( 'Postcodes', 'fastnutrition-mealprep' ) . '</th>';
+		echo '<th>' . esc_html__( 'Coverage', 'fastnutrition-mealprep' ) . '</th>';
 		echo '<th>' . esc_html__( 'Days', 'fastnutrition-mealprep' ) . '</th>';
 		echo '<th>' . esc_html__( 'Slots', 'fastnutrition-mealprep' ) . '</th>';
 		echo '<th>' . esc_html__( 'Active', 'fastnutrition-mealprep' ) . '</th>';
@@ -109,7 +115,24 @@ final class ProfileAdmin {
 			echo '<tr>';
 			echo '<td>' . esc_html( $p['name'] ) . '</td>';
 			echo '<td>' . esc_html( $p['method'] ) . '</td>';
-			echo '<td><code>' . esc_html( implode( ', ', $p['postcodes'] ) ) . '</code></td>';
+			$zone_parts = [];
+			if ( class_exists( \WC_Shipping_Zones::class ) ) {
+				foreach ( (array) ( $p['zone_ids'] ?? [] ) as $zid ) {
+					$z = \WC_Shipping_Zones::get_zone( (int) $zid );
+					if ( $z ) {
+						$zone_parts[] = $z->get_zone_name();
+					}
+				}
+			}
+			$manual = count( (array) ( $p['postcodes'] ?? [] ) );
+			$parts  = [];
+			if ( ! empty( $zone_parts ) ) {
+				$parts[] = sprintf( '<em>%s:</em> %s', esc_html__( 'Zones', 'fastnutrition-mealprep' ), esc_html( implode( ', ', $zone_parts ) ) );
+			}
+			if ( $manual ) {
+				$parts[] = sprintf( '%d %s', $manual, esc_html__( 'manual postcodes', 'fastnutrition-mealprep' ) );
+			}
+			echo '<td>' . ( $parts ? wp_kses_post( implode( '<br>', $parts ) ) : '—' ) . '</td>';
 			echo '<td>' . esc_html( self::days_label( (int) $p['days'] ) ) . '</td>';
 			echo '<td>' . esc_html( count( $p['slots'] ) . ' ' . _n( 'slot', 'slots', count( $p['slots'] ), 'fastnutrition-mealprep' ) ) . '</td>';
 			echo '<td>' . ( $p['active'] ? '✓' : '—' ) . '</td>';
@@ -195,11 +218,57 @@ final class ProfileAdmin {
 		echo '</tbody></table>';
 		echo '<p><button type="button" class="button" id="fn-slot-add">' . esc_html__( 'Add slot', 'fastnutrition-mealprep' ) . '</button></p></td></tr>';
 
-		printf( '<tr><th><label for="fn_postcodes">%s</label></th><td><textarea id="fn_postcodes" name="postcodes" rows="5" cols="40" placeholder="%s">%s</textarea><p class="description">%s</p></td></tr>',
-			esc_html__( 'Postcodes', 'fastnutrition-mealprep' ),
+		// WooCommerce shipping zones multi-select.
+		$selected_zones = array_map( 'intval', (array) ( $p['zone_ids'] ?? [] ) );
+		echo '<tr><th>' . esc_html__( 'WooCommerce shipping zones', 'fastnutrition-mealprep' ) . '</th><td>';
+		if ( class_exists( \WC_Shipping_Zones::class ) ) {
+			$zones = \WC_Shipping_Zones::get_zones();
+			if ( empty( $zones ) ) {
+				echo '<p class="description">' . esc_html__( 'No shipping zones configured yet. Add zones under WooCommerce → Settings → Shipping.', 'fastnutrition-mealprep' ) . '</p>';
+			} else {
+				echo '<p class="description" style="margin-top:0">' . esc_html__( 'Tick one or more zones to automatically inherit their postcodes. Useful when you already maintain postcodes in shipping zones — you do not need to duplicate them below.', 'fastnutrition-mealprep' ) . '</p>';
+				echo '<div style="max-height:260px;overflow:auto;border:1px solid #ccc;padding:8px;max-width:600px">';
+				foreach ( $zones as $zone ) {
+					$zone_id   = (int) ( $zone['id'] ?? $zone['zone_id'] ?? 0 );
+					$zone_name = (string) ( $zone['zone_name'] ?? '' );
+					$postcodes_in_zone = [];
+					foreach ( (array) ( $zone['zone_locations'] ?? [] ) as $location ) {
+						if ( is_object( $location ) && 'postcode' === ( $location->type ?? '' ) ) {
+							$postcodes_in_zone[] = (string) $location->code;
+						}
+					}
+					$methods = [];
+					foreach ( (array) ( $zone['shipping_methods'] ?? [] ) as $m ) {
+						if ( is_object( $m ) && method_exists( $m, 'get_title' ) ) {
+							$methods[] = $m->get_title();
+						}
+					}
+					printf(
+						'<label style="display:block;padding:6px;border-bottom:1px solid #eee">
+							<input type="checkbox" name="zone_ids[]" value="%1$d" %2$s />
+							<strong>%3$s</strong>
+							%4$s
+							%5$s
+						</label>',
+						$zone_id,
+						checked( in_array( $zone_id, $selected_zones, true ), true, false ),
+						esc_html( $zone_name ),
+						! empty( $postcodes_in_zone ) ? '<br><small style="color:#555">' . esc_html__( 'Postcodes:', 'fastnutrition-mealprep' ) . ' <code>' . esc_html( implode( ', ', array_slice( $postcodes_in_zone, 0, 12 ) ) ) . ( count( $postcodes_in_zone ) > 12 ? ' …' : '' ) . '</code></small>' : '<br><small style="color:#888">' . esc_html__( 'No postcode restrictions on this zone.', 'fastnutrition-mealprep' ) . '</small>',
+						! empty( $methods ) ? '<br><small style="color:#555">' . esc_html__( 'Methods:', 'fastnutrition-mealprep' ) . ' ' . esc_html( implode( ', ', $methods ) ) . '</small>' : ''
+					);
+				}
+				echo '</div>';
+			}
+		} else {
+			echo '<p class="description">' . esc_html__( 'WooCommerce not available — can\'t load zones.', 'fastnutrition-mealprep' ) . '</p>';
+		}
+		echo '</td></tr>';
+
+		printf( '<tr><th><label for="fn_postcodes">%s</label></th><td><textarea id="fn_postcodes" name="postcodes" rows="4" cols="40" placeholder="%s">%s</textarea><p class="description">%s</p></td></tr>',
+			esc_html__( 'Additional postcodes (optional)', 'fastnutrition-mealprep' ),
 			esc_attr__( 'One per line. Use * for wildcard (e.g. ST10*) or a prefix (e.g. ST10).', 'fastnutrition-mealprep' ),
 			esc_textarea( implode( "\n", (array) ( $p['postcodes'] ?? [] ) ) ),
-			esc_html__( 'Collection profiles ignore postcode matching.', 'fastnutrition-mealprep' )
+			esc_html__( 'Manual list, combined with any postcodes inherited from the zones above. Leave empty if zones cover everything. Collection profiles ignore postcode matching entirely.', 'fastnutrition-mealprep' )
 		);
 
 		printf( '<tr><th><label for="fn_priority">%s</label></th><td><input id="fn_priority" type="number" name="priority" value="%d" /><p class="description">%s</p></td></tr>',

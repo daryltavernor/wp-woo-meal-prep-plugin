@@ -56,16 +56,17 @@ final class Profile {
 			'days'      => (int) ( $data['days'] ?? 0 ),
 			'slots'     => wp_json_encode( is_array( $data['slots'] ?? null ) ? $data['slots'] : [] ),
 			'postcodes' => wp_json_encode( is_array( $data['postcodes'] ?? null ) ? array_values( array_filter( $data['postcodes'] ) ) : [] ),
+			'zone_ids'  => wp_json_encode( is_array( $data['zone_ids'] ?? null ) ? array_values( array_filter( array_map( 'intval', $data['zone_ids'] ) ) ) : [] ),
 			'priority'  => (int) ( $data['priority'] ?? 10 ),
 			'active'    => ! empty( $data['active'] ) ? 1 : 0,
 		];
 
 		if ( ! empty( $data['id'] ) ) {
-			$wpdb->update( $table, $row, [ 'id' => (int) $data['id'] ], [ '%s', '%s', '%d', '%s', '%s', '%d', '%d' ], [ '%d' ] );
+			$wpdb->update( $table, $row, [ 'id' => (int) $data['id'] ], [ '%s', '%s', '%d', '%s', '%s', '%s', '%d', '%d' ], [ '%d' ] );
 			return (int) $data['id'];
 		}
 		$row['created_at'] = current_time( 'mysql' );
-		$wpdb->insert( $table, $row, [ '%s', '%s', '%d', '%s', '%s', '%d', '%d', '%s' ] );
+		$wpdb->insert( $table, $row, [ '%s', '%s', '%d', '%s', '%s', '%s', '%d', '%d', '%s' ] );
 		return (int) $wpdb->insert_id;
 	}
 
@@ -82,10 +83,47 @@ final class Profile {
 			'days'       => (int) $row['days'],
 			'slots'      => self::decode_json( $row['slots'] ?? '' ),
 			'postcodes'  => self::decode_json( $row['postcodes'] ?? '' ),
+			'zone_ids'   => array_map( 'intval', self::decode_json( $row['zone_ids'] ?? '' ) ),
 			'priority'   => (int) $row['priority'],
 			'active'     => (bool) $row['active'],
 			'created_at' => (string) ( $row['created_at'] ?? '' ),
 		];
+	}
+
+	/**
+	 * Extracts the postcode patterns stored against a WooCommerce shipping zone.
+	 *
+	 * @return array<int,string>
+	 */
+	public static function zone_postcodes( int $zone_id ): array {
+		if ( ! class_exists( \WC_Shipping_Zones::class ) ) {
+			return [];
+		}
+		$zone = \WC_Shipping_Zones::get_zone( $zone_id );
+		if ( ! $zone ) {
+			return [];
+		}
+		$out = [];
+		foreach ( (array) $zone->get_zone_locations() as $location ) {
+			if ( is_object( $location ) && 'postcode' === ( $location->type ?? '' ) ) {
+				$out[] = (string) $location->code;
+			}
+		}
+		return $out;
+	}
+
+	/**
+	 * Returns all postcode patterns the profile covers, combining manual entries
+	 * with those pulled from the linked shipping zones.
+	 *
+	 * @return array<int,string>
+	 */
+	public static function effective_postcodes( array $profile ): array {
+		$all = is_array( $profile['postcodes'] ?? null ) ? $profile['postcodes'] : [];
+		foreach ( (array) ( $profile['zone_ids'] ?? [] ) as $zid ) {
+			$all = array_merge( $all, self::zone_postcodes( (int) $zid ) );
+		}
+		return array_values( array_unique( array_filter( array_map( 'strval', $all ) ) ) );
 	}
 
 	private static function decode_json( string $json ): array {

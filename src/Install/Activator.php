@@ -8,12 +8,24 @@ use FastNutrition\MealPrep\Taxonomies\IngredientType;
 
 final class Activator {
 
+	public const DB_VERSION = '1.1.0';
+
 	public static function activate(): void {
 		self::create_tables();
 		( new IngredientType() )->register_taxonomy();
 		( new Allergen() )->register_taxonomy();
 		self::seed_ingredient_types();
+		update_option( 'fn_mealprep_db_version', self::DB_VERSION, false );
 		flush_rewrite_rules();
+	}
+
+	public static function maybe_migrate(): void {
+		$installed = (string) get_option( 'fn_mealprep_db_version', '0' );
+		if ( version_compare( $installed, self::DB_VERSION, '>=' ) ) {
+			return;
+		}
+		self::create_tables();
+		update_option( 'fn_mealprep_db_version', self::DB_VERSION, false );
 	}
 
 	public static function deactivate(): void {
@@ -38,6 +50,7 @@ final class Activator {
 				days tinyint(3) unsigned NOT NULL DEFAULT 0,
 				slots longtext NULL,
 				postcodes longtext NULL,
+				zone_ids longtext NULL,
 				priority int(11) NOT NULL DEFAULT 10,
 				active tinyint(1) NOT NULL DEFAULT 1,
 				created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,

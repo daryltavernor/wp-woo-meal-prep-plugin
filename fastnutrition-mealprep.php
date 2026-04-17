@@ -67,6 +67,7 @@ add_action(
 			);
 			return;
 		}
+		\FastNutrition\MealPrep\Install\Activator::maybe_migrate();
 		\FastNutrition\MealPrep\Plugin::instance()->boot();
 	}
 );

@@ -19,7 +19,7 @@ final class ProfileResolver {
 			if ( $method && $profile['method'] !== $method && $profile['method'] !== 'collection' ) {
 				continue;
 			}
-			if ( self::postcode_matches( $postcode, $profile['postcodes'] ) ) {
+			if ( self::postcode_matches( $postcode, Profile::effective_postcodes( $profile ) ) ) {
 				$results[] = $profile;
 			}
 		}
@@ -71,7 +71,7 @@ final class ProfileResolver {
 			if ( Profile::METHOD_DELIVERY !== $p['method'] ) {
 				continue;
 			}
-			foreach ( $p['postcodes'] as $pc ) {
+			foreach ( Profile::effective_postcodes( $p ) as $pc ) {
 				$key = self::normalize( (string) $pc );
 				if ( '' === $key ) {
 					continue;
@@ -99,7 +99,7 @@ final class ProfileResolver {
 				}
 				foreach ( $postcodes_in_zone as $pc ) {
 					foreach ( $profiles as $p ) {
-						if ( self::postcode_matches( $pc, $p['postcodes'] ) ) {
+						if ( self::postcode_matches( $pc, Profile::effective_postcodes( $p ) ) ) {
 							$has_match = true;
 							break 2;
 						}
