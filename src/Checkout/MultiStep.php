@@ -3,6 +3,8 @@ declare( strict_types=1 );
 
 namespace FastNutrition\MealPrep\Checkout;
 
+use FastNutrition\MealPrep\Admin\SettingsPage;
+
 final class MultiStep {
 
 	public function register(): void {
@@ -21,24 +23,44 @@ final class MultiStep {
 	}
 
 	public function enqueue_frontend(): void {
-		if ( ! is_checkout() ) {
+		if ( ! function_exists( 'is_checkout' ) || ! is_checkout() ) {
 			return;
 		}
-		wp_enqueue_style(
+		if ( ! SettingsPage::multistep_enabled() ) {
+			return;
+		}
+
+		$build = FN_MEALPREP_DIR . 'assets/build/blocks/multi-step-checkout/';
+		$url   = FN_MEALPREP_URL . 'assets/build/blocks/multi-step-checkout/';
+
+		$view_js = $build . 'view.js';
+		if ( ! is_readable( $view_js ) ) {
+			return;
+		}
+		$asset = is_readable( $build . 'view.asset.php' ) ? include $build . 'view.asset.php' : [ 'dependencies' => [], 'version' => FN_MEALPREP_VERSION ];
+
+		wp_enqueue_script(
 			'fn-multi-step-checkout',
-			FN_MEALPREP_URL . 'assets/build/multi-step.css',
-			[],
-			FN_MEALPREP_VERSION
+			$url . 'view.js',
+			$asset['dependencies'] ?? [],
+			$asset['version'] ?? FN_MEALPREP_VERSION,
+			true
 		);
-		$script = FN_MEALPREP_DIR . 'assets/build/multi-step.js';
-		if ( is_readable( $script ) ) {
-			wp_enqueue_script(
+		if ( is_readable( $build . 'style-view.css' ) ) {
+			wp_enqueue_style(
 				'fn-multi-step-checkout',
-				FN_MEALPREP_URL . 'assets/build/multi-step.js',
-				[ 'wp-element', 'wp-data', 'wc-blocks-checkout' ],
-				FN_MEALPREP_VERSION,
-				true
+				$url . 'style-view.css',
+				[],
+				FN_MEALPREP_VERSION
 			);
 		}
+		wp_localize_script(
+			'fn-multi-step-checkout',
+			'fnMultiStep',
+			[
+				'restUrl' => esc_url_raw( rest_url( 'fastnutrition/v1/' ) ),
+				'nonce'   => wp_create_nonce( 'wp_rest' ),
+			]
+		);
 	}
 }

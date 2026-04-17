@@ -24,15 +24,16 @@ final class Ingredient {
 			[
 				'label'        => __( 'Ingredients', 'fastnutrition-mealprep' ),
 				'labels'       => [
-					'name'          => __( 'Ingredients', 'fastnutrition-mealprep' ),
+					'name'          => __( 'Ingredients & Set Meals', 'fastnutrition-mealprep' ),
 					'singular_name' => __( 'Ingredient', 'fastnutrition-mealprep' ),
 					'add_new'       => __( 'Add Ingredient', 'fastnutrition-mealprep' ),
 					'add_new_item'  => __( 'Add New Ingredient', 'fastnutrition-mealprep' ),
 					'edit_item'     => __( 'Edit Ingredient', 'fastnutrition-mealprep' ),
+					'menu_name'     => __( 'Ingredients', 'fastnutrition-mealprep' ),
 				],
 				'public'       => false,
 				'show_ui'      => true,
-				'show_in_menu' => 'edit.php?post_type=product',
+				'show_in_menu' => 'fn-mealprep',
 				'show_in_rest' => true,
 				'supports'     => [ 'title', 'thumbnail', 'excerpt' ],
 				'taxonomies'   => [ IngredientType::TAXONOMY, Allergen::TAXONOMY ],
@@ -127,6 +128,12 @@ final class Ingredient {
 		$price_delta = get_post_meta( $post->ID, '_fn_price_delta', true ) ?: 0;
 		$active      = get_post_meta( $post->ID, '_fn_active', true );
 		$active      = '' === $active ? true : (bool) $active;
+
+		echo '<div style="background:#f0f6fc;border-left:4px solid #2271b1;padding:8px 12px;margin-bottom:12px;">';
+		echo '<p style="margin:0"><strong>' . esc_html__( 'What is this for?', 'fastnutrition-mealprep' ) . '</strong> ';
+		echo esc_html__( 'Ingredients are the building blocks for the meal builder. Use the "Ingredient Type" taxonomy (right sidebar) to mark each one as a Protein, Carb, Greens, or Set Meal. Set Meals are complete pre-made meals that customers can pick instead of building from components.', 'fastnutrition-mealprep' );
+		echo '</p></div>';
+
 		$fields      = [
 			'kcal'      => __( 'Calories (kcal)', 'fastnutrition-mealprep' ),
 			'protein_g' => __( 'Protein (g)', 'fastnutrition-mealprep' ),

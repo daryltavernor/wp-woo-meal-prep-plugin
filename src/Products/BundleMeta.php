@@ -26,7 +26,10 @@ final class BundleMeta {
 	public function render( WP_Post $post ): void {
 		wp_nonce_field( 'fn_save_bundles', 'fn_bundles_nonce' );
 		$bundles = self::get_bundles( $post->ID );
-		echo '<p class="description">' . esc_html__( 'Quantity-based deals that apply only to this product (e.g. 10 for £35, 15 for £50). The largest matching tier is chosen; remaining qty stays at base price.', 'fastnutrition-mealprep' ) . '</p>';
+		echo '<div style="background:#f7f7f7;padding:8px 12px;margin:0 0 10px;border-left:3px solid #2271b1">';
+		echo '<strong>' . esc_html__( 'How bundle pricing works', 'fastnutrition-mealprep' ) . '</strong><br>';
+		echo esc_html__( 'Bundles only apply when the customer has the specified quantity of THIS exact product in their cart. Desserts and other non-bundle items are never counted. The largest matching tier wins — e.g. if 10/£35 and 15/£50 both exist, adding 15 applies the £50 tier. Remaining qty (above a tier but below the next) stays at base price. The cart shows both the bundle total and an effective per-meal price (e.g. "10 for £35 (~£3.50 each)").', 'fastnutrition-mealprep' );
+		echo '</div>';
 		echo '<table class="widefat" id="fn-bundles-table"><thead><tr>';
 		echo '<th>' . esc_html__( 'Quantity', 'fastnutrition-mealprep' ) . '</th>';
 		echo '<th>' . esc_html__( 'Bundle price (£)', 'fastnutrition-mealprep' ) . '</th>';

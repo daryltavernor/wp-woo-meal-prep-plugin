@@ -44,7 +44,10 @@ final class BlockedDatesAdmin {
 			wp_die( esc_html__( 'You do not have permission to access this page.', 'fastnutrition-mealprep' ) );
 		}
 		echo '<div class="wrap"><h1>' . esc_html__( 'Blocked Dates', 'fastnutrition-mealprep' ) . '</h1>';
-		echo '<p>' . esc_html__( 'Blocked dates prevent all delivery and collection slots from being offered.', 'fastnutrition-mealprep' ) . '</p>';
+		echo '<div style="background:#f0f6fc;border-left:4px solid #2271b1;padding:10px 14px;margin:14px 0;max-width:900px">';
+		echo '<p style="margin:0"><strong>' . esc_html__( 'What this page does', 'fastnutrition-mealprep' ) . '</strong><br>';
+		echo esc_html__( 'Use this for one-off closures (e.g. 15 October is blocked — Christmas day, staff training, a bank holiday you don\'t usually run). A blocked date hides every slot on every profile for that date, so customers can\'t select it. The reason field is internal-only.', 'fastnutrition-mealprep' );
+		echo '</p></div>';
 
 		echo '<form method="post" style="margin:1em 0;">';
 		wp_nonce_field( 'fn_blocked_action', 'fn_blocked_nonce' );

@@ -78,7 +78,13 @@ final class ProfileAdmin {
 		$editing = $edit_id ? Profile::get( $edit_id ) : null;
 
 		echo '<div class="wrap"><h1>' . esc_html__( 'Delivery & Collection Profiles', 'fastnutrition-mealprep' ) . '</h1>';
-		echo '<p>' . esc_html__( 'A profile groups postcodes with the days and time slots available. Collection profiles apply regardless of postcode.', 'fastnutrition-mealprep' ) . '</p>';
+		echo '<div style="background:#f0f6fc;border-left:4px solid #2271b1;padding:10px 14px;margin:14px 0;max-width:900px">';
+		echo '<p style="margin:0 0 6px"><strong>' . esc_html__( 'What a profile is', 'fastnutrition-mealprep' ) . '</strong><br>';
+		echo esc_html__( 'A profile groups one or more postcodes with the days of the week you deliver there and the time windows for each day. For example: one profile covering ST10/ST9/ST5/ST7 on Tue/Thu/Sun, another covering ST3/ST6/ST8 on Wed/Fri. Collection profiles apply to everyone regardless of postcode.', 'fastnutrition-mealprep' );
+		echo '</p>';
+		echo '<p style="margin:6px 0 0"><strong>' . esc_html__( 'Conflicts', 'fastnutrition-mealprep' ) . '</strong> — ';
+		echo esc_html__( 'If the same postcode is listed in more than one delivery profile, the Priority field decides which wins (lower = first). The dashboard widget also flags any WooCommerce shipping zone postcodes that no profile covers, so you can spot gaps before customers do.', 'fastnutrition-mealprep' );
+		echo '</p></div>';
 
 		if ( $editing || isset( $_GET['new'] ) ) {
 			$this->render_form( $editing ?? [] );
@@ -135,17 +141,19 @@ final class ProfileAdmin {
 		}
 
 		echo '<table class="form-table"><tbody>';
-		printf( '<tr><th><label for="fn_name">%s</label></th><td><input id="fn_name" type="text" name="name" value="%s" class="regular-text" required /></td></tr>',
+		printf( '<tr><th><label for="fn_name">%s</label></th><td><input id="fn_name" type="text" name="name" value="%s" class="regular-text" required /><p class="description">%s</p></td></tr>',
 			esc_html__( 'Name', 'fastnutrition-mealprep' ),
-			esc_attr( (string) ( $p['name'] ?? '' ) )
+			esc_attr( (string) ( $p['name'] ?? '' ) ),
+			esc_html__( 'Internal label, e.g. "North Staffs Tue/Thu/Sun". Only shown in admin.', 'fastnutrition-mealprep' )
 		);
 		printf(
-			'<tr><th><label for="fn_method">%s</label></th><td><select id="fn_method" name="method"><option value="delivery" %s>%s</option><option value="collection" %s>%s</option></select></td></tr>',
+			'<tr><th><label for="fn_method">%s</label></th><td><select id="fn_method" name="method"><option value="delivery" %s>%s</option><option value="collection" %s>%s</option></select><p class="description">%s</p></td></tr>',
 			esc_html__( 'Method', 'fastnutrition-mealprep' ),
 			selected( (string) ( $p['method'] ?? 'delivery' ), 'delivery', false ),
 			esc_html__( 'Delivery', 'fastnutrition-mealprep' ),
 			selected( (string) ( $p['method'] ?? '' ), 'collection', false ),
-			esc_html__( 'Collection', 'fastnutrition-mealprep' )
+			esc_html__( 'Collection', 'fastnutrition-mealprep' ),
+			esc_html__( 'Delivery profiles are matched against the customer\'s postcode. Collection profiles are offered to everyone regardless of postcode.', 'fastnutrition-mealprep' )
 		);
 
 		echo '<tr><th>' . esc_html__( 'Days', 'fastnutrition-mealprep' ) . '</th><td>';
@@ -166,9 +174,10 @@ final class ProfileAdmin {
 				esc_html( $label )
 			);
 		}
+		echo '<p class="description">' . esc_html__( 'Tick every day of the week this profile operates. The slot picker at checkout will automatically offer matching dates within the next 14 days.', 'fastnutrition-mealprep' ) . '</p>';
 		echo '</td></tr>';
 
-		echo '<tr><th>' . esc_html__( 'Time slots', 'fastnutrition-mealprep' ) . '</th><td><table id="fn-slots"><tbody>';
+		echo '<tr><th>' . esc_html__( 'Time slots', 'fastnutrition-mealprep' ) . '</th><td><p class="description" style="margin-top:0">' . esc_html__( 'One row per time window you offer (e.g. 09:00–12:00, 17:00–20:00). Capacity limits the number of bookings per window — leave blank for unlimited.', 'fastnutrition-mealprep' ) . '</p><table id="fn-slots"><tbody>';
 		foreach ( $slots as $i => $s ) {
 			echo '<tr>';
 			printf( '<td><input type="time" name="slots[%1$d][start]" value="%2$s" required /> – <input type="time" name="slots[%1$d][end]" value="%3$s" required /></td>',

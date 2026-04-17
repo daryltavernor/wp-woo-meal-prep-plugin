@@ -26,7 +26,10 @@ final class AddOnMeta {
 	public function render( WP_Post $post ): void {
 		wp_nonce_field( 'fn_save_addons', 'fn_addons_nonce' );
 		$addons = self::get_addons( $post->ID );
-		echo '<p class="description">' . esc_html__( 'Optional extras attached per line item (e.g. "+£1 boiled eggs").', 'fastnutrition-mealprep' ) . '</p>';
+		echo '<div style="background:#f7f7f7;padding:8px 12px;margin:0 0 10px;border-left:3px solid #2271b1">';
+		echo '<strong>' . esc_html__( 'What add-ons are', 'fastnutrition-mealprep' ) . '</strong><br>';
+		echo esc_html__( 'Optional extras the customer can tick when adding this product to cart (e.g. "+£1 boiled eggs"). Each tick adds the price to that line. Add-ons attach per line item, so the same product can appear in the cart twice with different add-ons. Leave empty to disable add-ons for this product.', 'fastnutrition-mealprep' );
+		echo '</div>';
 		echo '<table class="widefat" id="fn-addons-table"><thead><tr>';
 		echo '<th>' . esc_html__( 'Label', 'fastnutrition-mealprep' ) . '</th>';
 		echo '<th>' . esc_html__( 'Price (£)', 'fastnutrition-mealprep' ) . '</th>';

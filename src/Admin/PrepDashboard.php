@@ -27,6 +27,10 @@ final class PrepDashboard {
 		$view = isset( $_GET['view'] ) && 'order' === $_GET['view'] ? 'order' : 'day';
 
 		echo '<div class="wrap"><h1>' . esc_html__( 'Kitchen Prep Dashboard', 'fastnutrition-mealprep' ) . '</h1>';
+		echo '<div style="background:#f0f6fc;border-left:4px solid #2271b1;padding:10px 14px;margin:14px 0;max-width:900px">';
+		echo '<p style="margin:0"><strong>' . esc_html__( 'What this page shows', 'fastnutrition-mealprep' ) . '</strong><br>';
+		echo esc_html__( 'Pick a fulfilment date (the date the customer chose for delivery or collection). "By day" aggregates every active order into one list of ingredient portions to prep, which helps the kitchen cut waste. "By order" shows each order individually for packing. Use the "Open printable prep sheet" button for a printer/PDF-friendly version.', 'fastnutrition-mealprep' );
+		echo '</p></div>';
 		echo '<form method="get" style="margin:1em 0;">';
 		printf( '<input type="hidden" name="page" value="%s" />', esc_attr( MenuRegistry::SLUG ) );
 		printf( '<label>%s <input type="date" name="date" value="%s" /></label> ', esc_html__( 'Fulfilment date', 'fastnutrition-mealprep' ), esc_attr( $date ) );

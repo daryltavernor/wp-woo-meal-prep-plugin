@@ -50,18 +50,36 @@ composer lint        # run PHPCS against WordPress + WooCommerce standards
 
 ## Post-install checklist
 
-1. **WooCommerce → Meal Prep** appears in the admin menu. Check the sub-pages: *Prep Dashboard*, *Prep Sheet*, *Delivery Profiles*, *Blocked Dates*.
-2. Open **Products → Ingredients** (injected under the Products menu) and create Proteins, Carbs, Greens, and Set Meals. Assign macros and an optional price modifier to each.
-3. Edit (or create) a **simple Woo product** — new tabs/meta boxes appear:
+Everything lives under the **Meal Prep** top-level menu in WP admin (the only per-product settings are the three meta boxes/tab on the Edit Product screen, which is the right place for them).
+
+1. **Meal Prep → Ingredients** — create Proteins, Carbs, Greens, and **Set Meals**. Set meals are complete pre-made meals; they use the same Ingredient screen with **Ingredient Type = Set Meal** (see the sidebar taxonomy on the edit screen). A "Set Meals" shortcut submenu filters this list to just set meals. Each ingredient carries macros and an optional price modifier.
+2. **Meal Prep → Ingredient Types / Allergens** — manage the taxonomy terms if you want to add e.g. a "Nut Free" diet tag.
+3. **Meal Prep → Delivery Profiles** — create profiles (a group of postcodes + days of the week + time windows). Delivery profiles match by postcode; collection profiles apply to everyone. The dashboard widget flags postcode overlaps and WC shipping zones that aren't covered by any profile.
+4. **Meal Prep → Blocked Dates** — one-off closures (Christmas, training days). Disables every slot on every profile for that date.
+5. **Meal Prep → Settings** — toggle the multi-step checkout, convert a legacy shortcode checkout page to Blocks in one click, or auto-create a Macro Calculator page.
+6. **Meal Prep → Prep Dashboard / Prep Sheet** — daily kitchen views.
+7. **Edit Product** (any simple Woo product) — the extras live on the product itself because they're product-specific:
    * **Meal Builder** tab — enable the builder, choose tier (standard/bulk), allow double greens, allow set meal mode, restrict allowed ingredients.
-   * **Meal Add-ons** meta box — per-meal line-item add-ons (e.g. *+£1 boiled eggs*).
-   * **Quantity Bundles** meta box — e.g. `10 / £35`, `15 / £50`. Bundles only apply to this specific product ID.
-4. Create **Delivery Profiles** under Meal Prep → Delivery Profiles:
-   * Name, Delivery or Collection, postcode list (one per line, wildcards like `ST10*` or prefix match `ST10`), day-of-week checkboxes, timed slots with optional capacity.
-5. Block any one-off dates under **Meal Prep → Blocked Dates**.
-6. Open the **Checkout** page and replace the default *Checkout* block with **Fast Nutrition Multi-step Checkout**. Inside the Checkout inner block, insert the **Delivery / Collection Slot Picker** block where you want the slot chooser to appear (typically between Shipping Address and Payment).
-7. Add the **Macro Calculator** block or the `[fn_macro_calculator]` shortcode to any page you like.
-8. Customers with an account get a **Favourites** tab under *My Account* to save and reorder meal combos.
+   * **Meal Add-ons** meta box — per-line-item extras (e.g. *+£1 boiled eggs*).
+   * **Quantity Bundles** meta box — e.g. `10 / £35`, `15 / £50`. Applies only to this product ID.
+
+### Where do I add Set Meals?
+Meal Prep → **Ingredients → Add Ingredient**. In the right-hand sidebar, under **Ingredient Type**, tick **Set Meal**. Set the macros for the complete meal and (optionally) a price modifier. Then on each meal product that should offer set meals, tick **Allow set meal mode** in the Meal Builder tab and select which set meals are allowed.
+
+## Checkout — how it works now
+
+You **do not** need to edit the checkout page or drop blocks into it. As long as the checkout page uses the standard WooCommerce Checkout block (the default for fresh stores since WC 8.x), the multi-step flow applies automatically.
+
+* If your checkout page still uses the old `[woocommerce_checkout]` **shortcode**, go to **Meal Prep → Settings** and click **Convert checkout page to Blocks**. That replaces the shortcode with the block and keeps a WP revision of the old content.
+* If you'd rather keep the single-page Woo checkout, turn off **Enable multi-step checkout** under Settings.
+* The slot picker is **auto-injected** between the shipping address and payment blocks — no manual block placement required.
+
+### Third-party checkout plugins
+The multi-step flow is a **UI layer on top** of the native WC Checkout block — we don't remove or replace anything. Any plugin that registers its UI against the Checkout block (upsells, cross-sells, extra fields, order bumps) will continue to render. Unknown blocks fall into **Step 1 (Your details)** by default. If a third-party plugin's UI needs to appear during Payment, add its CSS selector to the `STEPS[2].matchers` array in `assets/src/blocks/multi-step-checkout/view.js` and rebuild.
+
+## Do I need to create any pages?
+
+No. The plugin uses the existing WooCommerce **Cart** and **Checkout** pages. If you want a dedicated Macro Calculator page, the Settings screen has a one-click button to create one; otherwise the `[fn_macro_calculator]` shortcode (or the Macro Calculator block) works on any page/post. Logged-in customers automatically get a **Favourites** tab added to their My Account page.
 
 ---
 

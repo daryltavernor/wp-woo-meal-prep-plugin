@@ -57,6 +57,10 @@ final class PrepSheet {
 		);
 
 		echo '<div class="wrap fn-prep-sheet-wrap"><h1 class="screen-reader-text">' . esc_html__( 'Prep Sheet', 'fastnutrition-mealprep' ) . '</h1>';
+		echo '<div class="fn-no-print" style="background:#f0f6fc;border-left:4px solid #2271b1;padding:10px 14px;margin:14px 0;max-width:900px">';
+		echo '<p style="margin:0"><strong>' . esc_html__( 'What this page is for', 'fastnutrition-mealprep' ) . '</strong><br>';
+		echo esc_html__( 'A print-ready version of the kitchen prep list. Three sections: ingredient totals for mise-en-place, a per-order pick list with tick-off boxes for packing, and a delivery run sheet grouped by profile/postcode for drivers. Use "Print" for your browser print dialog or "Download PDF" for an A4 PDF.', 'fastnutrition-mealprep' );
+		echo '</p></div>';
 		echo '<form method="get" class="fn-no-print" style="margin:1em 0;">';
 		echo '<input type="hidden" name="page" value="fn-prep-sheet" />';
 		printf( '<label>%s <input type="date" name="date" value="%s" /></label> ', esc_html__( 'Date', 'fastnutrition-mealprep' ), esc_attr( $date ) );

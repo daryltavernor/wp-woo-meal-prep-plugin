@@ -69,6 +69,12 @@ final class MealProduct {
 		$allowed_set_meals     = (array) get_post_meta( $post->ID, '_fn_allowed_set_meal_ids', true );
 
 		echo '<div id="fn_meal_builder_panel" class="panel woocommerce_options_panel">';
+		echo '<div class="options_group" style="padding:10px 14px">';
+		echo '<div style="background:#f0f6fc;border-left:4px solid #2271b1;padding:8px 12px;margin:4px 0 10px">';
+		echo '<strong>' . esc_html__( 'Meal Builder — what this does', 'fastnutrition-mealprep' ) . '</strong><br>';
+		echo esc_html__( 'Enabling this turns the product page\'s Add-to-Cart into an interactive builder: Protein + Carb + Greens (or 2 Greens instead of a Carb), or a pre-made Set Meal. The macros are summed live from the ingredients you\'ve set up under Meal Prep → Ingredients. If no ingredients are listed under "Allowed X", the builder shows every active one of that type.', 'fastnutrition-mealprep' );
+		echo '</div>';
+		echo '</div>';
 		echo '<div class="options_group">';
 
 		woocommerce_wp_checkbox(

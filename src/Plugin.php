@@ -11,6 +11,7 @@ use FastNutrition\MealPrep\Admin\MenuRegistry;
 use FastNutrition\MealPrep\Admin\PrepDashboard;
 use FastNutrition\MealPrep\Admin\PrepSheet;
 use FastNutrition\MealPrep\Admin\ProfileAdmin;
+use FastNutrition\MealPrep\Admin\SettingsPage;
 use FastNutrition\MealPrep\Cart\AddOnPricer;
 use FastNutrition\MealPrep\Cart\BundlePricer;
 use FastNutrition\MealPrep\Cart\OrderItemMeta;
@@ -73,6 +74,7 @@ final class Plugin {
 		( new StoreApiExtensions() )->register();
 
 		( new MenuRegistry() )->register();
+		( new SettingsPage() )->register();
 		( new PrepDashboard() )->register();
 		( new PrepSheet() )->register();
 		( new ProfileAdmin() )->register();
