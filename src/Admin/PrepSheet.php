@@ -1,0 +1,243 @@
+<?php
+declare( strict_types=1 );
+
+namespace FastNutrition\MealPrep\Admin;
+
+final class PrepSheet {
+
+	public function register(): void {
+		add_action( 'admin_init', [ $this, 'maybe_handle_pdf' ] );
+	}
+
+	public static function render_static(): void {
+		( new self() )->render();
+	}
+
+	public function maybe_handle_pdf(): void {
+		if ( ! isset( $_GET['page'], $_GET['action'] ) || 'fn-prep-sheet' !== $_GET['page'] || 'pdf' !== $_GET['action'] ) {
+			return;
+		}
+		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			return;
+		}
+		check_admin_referer( 'fn_prep_sheet_pdf' );
+
+		$date   = isset( $_GET['date'] ) ? sanitize_text_field( wp_unslash( (string) $_GET['date'] ) ) : gmdate( 'Y-m-d' );
+		$method = isset( $_GET['method'] ) ? sanitize_key( wp_unslash( (string) $_GET['method'] ) ) : '';
+
+		if ( ! class_exists( \Dompdf\Dompdf::class ) ) {
+			wp_die( esc_html__( 'Dompdf is not installed. Run composer install.', 'fastnutrition-mealprep' ) );
+		}
+
+		ob_start();
+		$this->render_sheet( $date, $method, true );
+		$html = (string) ob_get_clean();
+
+		$dompdf = new \Dompdf\Dompdf( [ 'isRemoteEnabled' => false ] );
+		$dompdf->loadHtml( $html );
+		$dompdf->setPaper( 'A4', 'portrait' );
+		$dompdf->render();
+		$dompdf->stream( 'prep-sheet-' . $date . '.pdf', [ 'Attachment' => true ] );
+		exit;
+	}
+
+	public function render(): void {
+		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			wp_die( esc_html__( 'You do not have permission to access this page.', 'fastnutrition-mealprep' ) );
+		}
+
+		$date   = isset( $_GET['date'] ) ? sanitize_text_field( wp_unslash( (string) $_GET['date'] ) ) : gmdate( 'Y-m-d', strtotime( '+1 day' ) );
+		$method = isset( $_GET['method'] ) ? sanitize_key( wp_unslash( (string) $_GET['method'] ) ) : '';
+		$pdf_url = wp_nonce_url(
+			add_query_arg(
+				[ 'page' => 'fn-prep-sheet', 'action' => 'pdf', 'date' => $date, 'method' => $method ],
+				admin_url( 'admin.php' )
+			),
+			'fn_prep_sheet_pdf'
+		);
+
+		echo '<div class="wrap fn-prep-sheet-wrap"><h1 class="screen-reader-text">' . esc_html__( 'Prep Sheet', 'fastnutrition-mealprep' ) . '</h1>';
+		echo '<form method="get" class="fn-no-print" style="margin:1em 0;">';
+		echo '<input type="hidden" name="page" value="fn-prep-sheet" />';
+		printf( '<label>%s <input type="date" name="date" value="%s" /></label> ', esc_html__( 'Date', 'fastnutrition-mealprep' ), esc_attr( $date ) );
+		printf( '<label>%s <select name="method">', esc_html__( 'Method', 'fastnutrition-mealprep' ) );
+		foreach ( [
+			''           => __( 'All', 'fastnutrition-mealprep' ),
+			'delivery'   => __( 'Delivery only', 'fastnutrition-mealprep' ),
+			'collection' => __( 'Collection only', 'fastnutrition-mealprep' ),
+		] as $val => $label ) {
+			printf( '<option value="%s" %s>%s</option>', esc_attr( $val ), selected( $method, $val, false ), esc_html( $label ) );
+		}
+		echo '</select></label> ';
+		submit_button( __( 'Update', 'fastnutrition-mealprep' ), 'primary', '', false );
+		echo ' <button type="button" class="button" onclick="window.print()">' . esc_html__( 'Print', 'fastnutrition-mealprep' ) . '</button>';
+		echo ' <a class="button" href="' . esc_url( $pdf_url ) . '">' . esc_html__( 'Download PDF', 'fastnutrition-mealprep' ) . '</a>';
+		echo '</form>';
+
+		self::print_styles();
+		$this->render_sheet( $date, $method, false );
+		echo '</div>';
+	}
+
+	private function render_sheet( string $date, string $method, bool $for_pdf ): void {
+		$title = sprintf( __( 'Prep Sheet — %s', 'fastnutrition-mealprep' ), $date );
+		if ( $for_pdf ) {
+			echo '<html><head><meta charset="utf-8"><title>' . esc_html( $title ) . '</title>';
+			self::print_styles();
+			echo '</head><body>';
+		}
+		echo '<h1 class="fn-sheet-title">' . esc_html( $title ) . '</h1>';
+
+		// Section 1 — Ingredient totals.
+		echo '<section class="fn-sheet-section"><h2>' . esc_html__( 'Ingredient totals', 'fastnutrition-mealprep' ) . '</h2>';
+		$totals = PrepDashboard::get_day_totals( $date );
+		$grouped = [];
+		foreach ( $totals as $row ) {
+			$grouped[ $row['type_slug'] ][] = $row;
+		}
+		$labels = [
+			'protein'  => __( 'Proteins', 'fastnutrition-mealprep' ),
+			'carb'     => __( 'Carbs', 'fastnutrition-mealprep' ),
+			'greens'   => __( 'Greens', 'fastnutrition-mealprep' ),
+			'set_meal' => __( 'Set Meals', 'fastnutrition-mealprep' ),
+		];
+		foreach ( $labels as $slug => $label ) {
+			if ( empty( $grouped[ $slug ] ) ) {
+				continue;
+			}
+			echo '<h3>' . esc_html( $label ) . '</h3>';
+			echo '<table class="fn-sheet-table"><thead><tr><th>' . esc_html__( 'Ingredient', 'fastnutrition-mealprep' ) . '</th><th>' . esc_html__( 'Portions', 'fastnutrition-mealprep' ) . '</th></tr></thead><tbody>';
+			foreach ( $grouped[ $slug ] as $row ) {
+				echo '<tr><td>' . esc_html( $row['name'] ) . '</td><td>' . (int) $row['portions'] . '</td></tr>';
+			}
+			echo '</tbody></table>';
+		}
+		echo '</section>';
+
+		// Section 2 — Per-order pick list.
+		echo '<section class="fn-sheet-section"><h2>' . esc_html__( 'Per-order pick list', 'fastnutrition-mealprep' ) . '</h2>';
+		$orders = wc_get_orders(
+			[
+				'status'   => [ 'processing', 'completed', 'on-hold' ],
+				'limit'    => -1,
+				'meta_key' => '_fn_fulfilment',
+			]
+		);
+		$matched = [];
+		foreach ( $orders as $order ) {
+			$ff = $order->get_meta( '_fn_fulfilment' );
+			if ( ! is_array( $ff ) || ( $ff['date'] ?? '' ) !== $date ) {
+				continue;
+			}
+			if ( '' !== $method && ( $ff['type'] ?? '' ) !== $method ) {
+				continue;
+			}
+			$matched[] = [ 'order' => $order, 'fulfilment' => $ff ];
+		}
+		if ( empty( $matched ) ) {
+			echo '<p><em>' . esc_html__( 'No orders for this filter.', 'fastnutrition-mealprep' ) . '</em></p>';
+		} else {
+			foreach ( $matched as $m ) {
+				$order = $m['order'];
+				$ff    = $m['fulfilment'];
+				echo '<article class="fn-sheet-card">';
+				printf(
+					'<h3>#%d — %s <span class="fn-sheet-meta">(%s)</span></h3>',
+					(int) $order->get_id(),
+					esc_html( $order->get_formatted_billing_full_name() ),
+					esc_html( (string) ( $ff['type'] ?? '' ) )
+				);
+				$slot = $ff['slot'] ?? [];
+				echo '<p class="fn-sheet-meta">';
+				echo esc_html( (string) ( $slot['start'] ?? '' ) . '–' . (string) ( $slot['end'] ?? '' ) );
+				if ( 'delivery' === ( $ff['type'] ?? '' ) ) {
+					echo ' · ' . esc_html( $order->get_formatted_shipping_address() ?: $order->get_formatted_billing_address() );
+				}
+				echo '</p>';
+				echo '<ul class="fn-sheet-items">';
+				foreach ( $order->get_items() as $item ) {
+					$sel = $item->get_meta( '_fn_selection', true );
+					$describe = is_array( $sel ) ? PrepDashboard::describe_selection( $sel ) : '';
+					$addons = is_array( $sel ) && ! empty( $sel['addons'] ) ? array_filter( array_map( static fn( $a ) => (string) ( $a['label'] ?? '' ), $sel['addons'] ) ) : [];
+					echo '<li>';
+					echo '<label><input type="checkbox" disabled /> ';
+					printf(
+						'%d × <strong>%s</strong>%s%s',
+						(int) $item->get_quantity(),
+						esc_html( $item->get_name() ),
+						'' !== $describe ? ' — ' . esc_html( $describe ) : '',
+						! empty( $addons ) ? ' <em>(+ ' . esc_html( implode( ', ', $addons ) ) . ')</em>' : ''
+					);
+					echo '</label></li>';
+				}
+				echo '</ul></article>';
+			}
+		}
+		echo '</section>';
+
+		// Section 3 — Delivery run sheet.
+		if ( '' === $method || 'delivery' === $method ) {
+			echo '<section class="fn-sheet-section"><h2>' . esc_html__( 'Delivery run sheet', 'fastnutrition-mealprep' ) . '</h2>';
+			$runs = [];
+			foreach ( $matched as $m ) {
+				$ff = $m['fulfilment'];
+				if ( 'delivery' !== ( $ff['type'] ?? '' ) ) {
+					continue;
+				}
+				$pid = (int) ( $ff['profile_id'] ?? 0 );
+				$runs[ $pid ][] = $m;
+			}
+			if ( empty( $runs ) ) {
+				echo '<p><em>' . esc_html__( 'No delivery orders.', 'fastnutrition-mealprep' ) . '</em></p>';
+			} else {
+				foreach ( $runs as $pid => $list ) {
+					$profile = \FastNutrition\MealPrep\Delivery\Profile::get( $pid );
+					echo '<h3>' . esc_html( $profile['name'] ?? ( __( 'Profile #', 'fastnutrition-mealprep' ) . $pid ) ) . '</h3>';
+					echo '<table class="fn-sheet-table"><thead><tr>';
+					echo '<th>' . esc_html__( 'Postcode', 'fastnutrition-mealprep' ) . '</th>';
+					echo '<th>' . esc_html__( 'Customer', 'fastnutrition-mealprep' ) . '</th>';
+					echo '<th>' . esc_html__( 'Slot', 'fastnutrition-mealprep' ) . '</th>';
+					echo '<th>' . esc_html__( 'Meals', 'fastnutrition-mealprep' ) . '</th>';
+					echo '</tr></thead><tbody>';
+					foreach ( $list as $m ) {
+						$order = $m['order'];
+						$ff    = $m['fulfilment'];
+						$slot  = $ff['slot'] ?? [];
+						$total = 0;
+						foreach ( $order->get_items() as $item ) {
+							$total += (int) $item->get_quantity();
+						}
+						echo '<tr>';
+						echo '<td>' . esc_html( $order->get_shipping_postcode() ?: $order->get_billing_postcode() ) . '</td>';
+						echo '<td>' . esc_html( $order->get_formatted_billing_full_name() ) . '</td>';
+						echo '<td>' . esc_html( (string) ( $slot['start'] ?? '' ) . '–' . (string) ( $slot['end'] ?? '' ) ) . '</td>';
+						echo '<td>' . (int) $total . '</td>';
+						echo '</tr>';
+					}
+					echo '</tbody></table>';
+				}
+			}
+			echo '</section>';
+		}
+
+		if ( $for_pdf ) {
+			echo '</body></html>';
+		}
+	}
+
+	private static function print_styles(): void {
+		?>
+		<style>
+		@media print { .fn-no-print { display: none !important; } }
+		.fn-sheet-section { margin: 20px 0; page-break-inside: avoid; }
+		.fn-sheet-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+		.fn-sheet-table th, .fn-sheet-table td { border: 1px solid #333; padding: 6px 10px; text-align: left; }
+		.fn-sheet-card { border: 1px solid #000; padding: 10px; margin-bottom: 10px; page-break-inside: avoid; }
+		.fn-sheet-meta { color: #444; font-size: 12px; }
+		.fn-sheet-items { list-style: none; padding-left: 0; }
+		.fn-sheet-items li { padding: 4px 0; border-bottom: 1px dashed #ccc; }
+		.fn-sheet-title { font-size: 20px; margin: 10px 0; }
+		</style>
+		<?php
+	}
+}

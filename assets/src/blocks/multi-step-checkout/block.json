@@ -1,0 +1,14 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "fastnutrition/multi-step-checkout",
+  "title": "Fast Nutrition Multi-step Checkout",
+  "category": "woocommerce",
+  "icon": "feedback",
+  "description": "Wraps the WooCommerce Checkout block to add 3 steps: Address, Slot, Payment.",
+  "supports": { "html": false, "inserter": false },
+  "textdomain": "fastnutrition-mealprep",
+  "editorScript": "file:./index.js",
+  "viewScript": "file:./view.js",
+  "style": "file:./style.css"
+}

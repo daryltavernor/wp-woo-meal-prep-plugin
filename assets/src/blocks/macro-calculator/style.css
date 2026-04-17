@@ -1,0 +1,65 @@
+.fn-macro-calc {
+	font-family: 'Kanit', system-ui, sans-serif;
+	max-width: 720px;
+	margin: 0 auto;
+	padding: 1rem;
+	border: 2px solid #000;
+	border-radius: 12px;
+	background: #fff;
+}
+.fn-macro-calc h3 {
+	margin-top: 0;
+	color: #000;
+	text-transform: uppercase;
+	font-weight: 800;
+}
+.fn-macro-calc table {
+	width: 100%;
+	border-collapse: collapse;
+}
+.fn-macro-calc th, .fn-macro-calc td {
+	padding: 0.4rem;
+	border-bottom: 1px solid #ddd;
+	text-align: left;
+}
+.fn-macro-calc select, .fn-macro-calc input[type="number"], .fn-macro-calc input[type="text"] {
+	padding: 0.4rem;
+	border: 1px solid #000;
+	border-radius: 6px;
+	width: 100%;
+}
+.fn-macro-calc .fn-macro-actions {
+	margin: 0.5rem 0;
+	display: flex;
+	gap: 0.5rem;
+}
+.fn-macro-calc button {
+	padding: 0.4rem 0.8rem;
+	border: 2px solid #000;
+	background: #c5e643;
+	border-radius: 999px;
+	cursor: pointer;
+	font-weight: 700;
+}
+.fn-macro-calc .fn-macro-totals {
+	margin-top: 1rem;
+	background: #000;
+	color: #c5e643;
+	padding: 0.75rem;
+	border-radius: 8px;
+}
+.fn-macro-calc .fn-macro-custom, .fn-macro-calc .fn-macro-targets {
+	margin-top: 1rem;
+	padding: 0.75rem;
+	background: #f7f7f7;
+	border-radius: 8px;
+}
+.fn-macro-calc .fn-macro-custom label, .fn-macro-calc .fn-macro-targets label {
+	display: flex;
+	gap: 0.5rem;
+	align-items: center;
+	margin: 0.25rem 0;
+}
+.fn-macro-calc progress {
+	width: 100%;
+}

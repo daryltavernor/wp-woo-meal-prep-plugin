@@ -1,0 +1,49 @@
+.fn-slot-picker {
+	margin: 1rem 0;
+	font-family: 'Kanit', system-ui, sans-serif;
+}
+.fn-slot-tabs {
+	display: flex;
+	gap: 0.5rem;
+	margin-bottom: 1rem;
+}
+.fn-slot-tabs button {
+	flex: 1;
+	padding: 0.6rem 1rem;
+	border: 2px solid #000;
+	border-radius: 999px;
+	background: #fff;
+	cursor: pointer;
+	font-weight: 800;
+}
+.fn-slot-tabs button.is-active {
+	background: #000;
+	color: #c5e643;
+}
+.fn-slot-day h4 {
+	margin: 0 0 0.5rem;
+	font-weight: 800;
+	text-transform: uppercase;
+}
+.fn-slot-rows {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+	gap: 0.5rem;
+	margin-bottom: 1rem;
+}
+.fn-slot-rows button {
+	padding: 0.5rem 0.75rem;
+	border: 2px solid #000;
+	border-radius: 8px;
+	background: #fff;
+	cursor: pointer;
+}
+.fn-slot-rows button.is-active {
+	background: #c5e643;
+}
+.fn-slot-empty {
+	padding: 1rem;
+	background: #ffe4e4;
+	border-radius: 8px;
+	color: #800000;
+}

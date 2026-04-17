@@ -1,0 +1,14 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "fastnutrition/macro-calculator",
+  "title": "Macro Calculator",
+  "category": "woocommerce",
+  "icon": "chart-pie",
+  "description": "Customer-facing macro calculator.",
+  "supports": { "html": false },
+  "textdomain": "fastnutrition-mealprep",
+  "editorScript": "file:./index.js",
+  "viewScript": "file:./view.js",
+  "style": "file:./style.css"
+}

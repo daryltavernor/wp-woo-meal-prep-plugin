@@ -1,0 +1,41 @@
+.fn-steps-nav {
+	display: flex;
+	gap: 0.5rem;
+	padding: 0;
+	margin: 0 0 1rem;
+	list-style: none;
+	counter-reset: none;
+}
+.fn-steps-nav li {
+	flex: 1;
+	padding: 0.6rem 1rem;
+	border: 2px solid #000;
+	border-radius: 999px;
+	background: #fff;
+	cursor: pointer;
+	font-weight: 700;
+	text-align: center;
+	font-family: 'Kanit', system-ui, sans-serif;
+}
+.fn-steps-nav li.is-active {
+	background: #c5e643;
+	color: #000;
+}
+.fn-step-actions {
+	margin-top: 1rem;
+	display: flex;
+	justify-content: space-between;
+}
+.fn-step-actions button {
+	padding: 0.6rem 1.2rem;
+	border: 2px solid #000;
+	border-radius: 999px;
+	font-weight: 800;
+	cursor: pointer;
+}
+.fn-step-actions .fn-step-next {
+	background: #c5e643;
+}
+.fn-step-actions .fn-step-back {
+	background: #fff;
+}
