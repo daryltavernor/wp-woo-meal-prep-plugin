@@ -18,22 +18,24 @@ A full meal-prep ordering system for the Fast Nutrition website, built on the la
 
 ## Installation
 
+The repository ships with `vendor/` (composer dependencies) and `assets/build/` (compiled blocks) already built, so no build step is required for production use.
+
 1. **Place the plugin** in your WP install:
    ```
    wp-content/plugins/fastnutrition-mealprep/
    ```
-2. **Install PHP dependencies** (Dompdf for the printable prep sheet, autoloader):
-   ```bash
-   composer install --no-dev --optimize-autoloader
-   ```
-   Use `composer install` (without `--no-dev`) if you want the PHPUnit + PHPCS tooling for development.
-3. **Install and build JS/CSS**:
-   ```bash
-   npm install
-   npm run build
-   ```
-   This compiles the four Gutenberg blocks (Meal Builder, Macro Calculator, Multi-step Checkout, Slot Picker) into `assets/build/`.
-4. **Activate the plugin** in WP Admin → Plugins. Activation creates three DB tables (`fn_delivery_profiles`, `fn_blocked_dates`, `fn_prep_cache`) and seeds the Ingredient Type and Allergen taxonomies.
+2. **Activate the plugin** in WP Admin → Plugins. Activation creates three DB tables (`fn_delivery_profiles`, `fn_blocked_dates`, `fn_prep_cache`) and seeds the Ingredient Type and Allergen taxonomies.
+
+That's it. If you're developing on the plugin and need to rebuild assets, see the **Development** section below.
+
+### Development (only if you're changing the code)
+
+```bash
+composer install                  # dev deps incl. PHPUnit + PHPCS
+npm install                       # JS deps
+npm run build                     # one-off build
+npm run start                     # watch mode
+```
 
 ### Development scripts
 
