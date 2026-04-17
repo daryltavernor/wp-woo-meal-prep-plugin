@@ -1,0 +1,16 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "fastnutrition/meal-builder",
+  "title": "Meal Builder",
+  "category": "woocommerce",
+  "icon": "food",
+  "description": "Interactive meal builder for meal-prep products.",
+  "supports": {
+    "html": false
+  },
+  "textdomain": "fastnutrition-mealprep",
+  "editorScript": "file:./index.js",
+  "viewScript": "file:./view.js",
+  "style": "file:./style.css"
+}
