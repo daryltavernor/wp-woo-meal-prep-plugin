@@ -1,0 +1,9 @@
+/node_modules/
+/fastnutrition-mealprep/vendor/
+/fastnutrition-mealprep/node_modules/
+/fastnutrition-mealprep/assets/build/
+/fastnutrition-mealprep/.phpunit.cache/
+composer.lock
+package-lock.json
+.DS_Store
+*.log

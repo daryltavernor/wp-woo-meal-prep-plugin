@@ -1,0 +1,15 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "fastnutrition/slot-picker",
+  "title": "Fast Nutrition Slot Picker",
+  "category": "woocommerce",
+  "icon": "calendar-alt",
+  "description": "Delivery / collection date & slot picker.",
+  "parent": [ "fastnutrition/multi-step-checkout", "woocommerce/checkout" ],
+  "supports": { "html": false, "inserter": true },
+  "textdomain": "fastnutrition-mealprep",
+  "editorScript": "file:./edit.js",
+  "viewScript": "fn-slot-picker",
+  "render": "file:./render.php"
+}

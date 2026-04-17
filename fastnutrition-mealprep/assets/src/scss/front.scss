@@ -1,0 +1,85 @@
+/* Fast Nutrition — front-end styles. Colour palette matches the live flatsome theme. */
+
+:root {
+	--fn-black: #000;
+	--fn-lime: #c5e643;
+	--fn-white: #fff;
+	--fn-grey-100: #f3f3f3;
+	--fn-grey-300: #d9d9d9;
+	--fn-grey-500: #888;
+}
+
+.fn-meal-builder,
+.fn-macro-calculator,
+.fn-slot-picker {
+	font-family: 'Kanit', Arial, sans-serif;
+	color: var(--fn-black);
+}
+
+.fn-builder-root {
+	display: grid;
+	gap: 16px;
+
+	.fn-mode-toggle {
+		display: flex;
+		gap: 8px;
+		button {
+			background: var(--fn-white);
+			border: 2px solid var(--fn-black);
+			padding: 8px 16px;
+			font-weight: 700;
+			cursor: pointer;
+			&.is-active {
+				background: var(--fn-lime);
+			}
+		}
+	}
+
+	.fn-type-picker {
+		border: 1px solid var(--fn-grey-300);
+		padding: 12px;
+		legend { text-transform: uppercase; font-weight: 800; }
+		ul { list-style: none; display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; }
+		.fn-option {
+			background: var(--fn-white);
+			border: 2px solid var(--fn-black);
+			padding: 6px 12px;
+			cursor: pointer;
+			&.is-active { background: var(--fn-lime); }
+			&:disabled { opacity: .4; cursor: not-allowed; }
+		}
+	}
+
+	.fn-chip-tags { color: var(--fn-grey-500); font-style: normal; font-weight: 400; font-size: 11px; margin-left: 4px; }
+
+	.fn-macros-live { padding: 10px; background: var(--fn-grey-100); font-weight: 700; }
+
+	.fn-add-row { display: flex; gap: 8px; align-items: center; }
+	.fn-add-row input[type="number"] { width: 72px; padding: 8px; }
+	.fn-add-to-cart { background: var(--fn-black); color: var(--fn-lime); border: 0; padding: 12px 18px; font-weight: 800; cursor: pointer; }
+
+	.fn-error { color: #b00; }
+}
+
+.fn-macro-calc-root {
+	table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+	th, td { border: 1px solid var(--fn-grey-300); padding: 6px; text-align: left; }
+	.fn-macro-totals { background: var(--fn-grey-100); padding: 12px; }
+	.fn-bar { margin: 6px 0; }
+	.fn-bar-track { height: 6px; background: var(--fn-grey-300); position: relative; }
+	.fn-bar-fill { height: 100%; background: var(--fn-lime); }
+}
+
+.fn-slot-picker-root {
+	.fn-method-tabs { display: flex; gap: 8px; margin-bottom: 12px; }
+	.fn-method-tabs button { border: 2px solid var(--fn-black); background: var(--fn-white); padding: 8px 16px; cursor: pointer; }
+	.fn-method-tabs button.is-active { background: var(--fn-black); color: var(--fn-lime); }
+	fieldset { border: 1px solid var(--fn-grey-300); padding: 8px; margin-bottom: 8px; }
+	label { display: inline-block; margin-right: 8px; padding: 4px 8px; border: 1px solid transparent; cursor: pointer; }
+	label:has(input:checked) { border-color: var(--fn-black); background: var(--fn-lime); }
+}
+
+.fn-multistep-checkout {
+	.fn-step-nav { display: flex; justify-content: space-between; align-items: center; padding: 12px; background: var(--fn-grey-100); margin-bottom: 12px; }
+	.fn-step-nav .button-primary { background: var(--fn-black); color: var(--fn-lime); }
+}
