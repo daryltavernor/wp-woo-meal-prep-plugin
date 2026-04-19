@@ -3,6 +3,8 @@ declare( strict_types=1 );
 
 namespace FastNutrition\MealPrep\Support;
 
+use FastNutrition\MealPrep\Admin\SettingsPage;
+
 final class AssetManager {
 
 	public function register(): void {
@@ -48,8 +50,9 @@ final class AssetManager {
 				'fn-meal-builder',
 				'fnMealBuilder',
 				[
-					'restUrl' => esc_url_raw( rest_url( 'fastnutrition/v1/' ) ),
-					'nonce'   => wp_create_nonce( 'wp_rest' ),
+					'restUrl'        => esc_url_raw( rest_url( 'fastnutrition/v1/' ) ),
+					'nonce'          => wp_create_nonce( 'wp_rest' ),
+					'minimalStyling' => SettingsPage::minimal_styling(),
 				]
 			);
 		}
@@ -75,7 +78,7 @@ final class AssetManager {
 			$asset = $this->load_asset_file( $assetPath );
 			wp_register_script( $handle, $jsUrl, $asset['dependencies'], $asset['version'], true );
 		}
-		if ( is_readable( $cssPath ) ) {
+		if ( is_readable( $cssPath ) && ! SettingsPage::minimal_styling() ) {
 			wp_register_style( $handle, $cssUrl, [], FN_MEALPREP_VERSION );
 		}
 	}

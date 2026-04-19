@@ -7,6 +7,7 @@ final class SettingsPage {
 
 	public const OPTION_MULTISTEP_ENABLED = 'fn_multistep_enabled';
 	public const OPTION_CREATE_CALC_PAGE  = 'fn_macro_calc_page_id';
+	public const OPTION_MINIMAL_STYLING   = 'fn_minimal_styling';
 
 	public function register(): void {
 		add_action( 'admin_init', [ $this, 'handle_actions' ] );
@@ -29,6 +30,7 @@ final class SettingsPage {
 		$action = isset( $_POST['fn_action'] ) ? sanitize_key( wp_unslash( (string) $_POST['fn_action'] ) ) : '';
 		if ( 'save' === $action ) {
 			update_option( self::OPTION_MULTISTEP_ENABLED, ! empty( $_POST['fn_multistep_enabled'] ) ? 1 : 0 );
+			update_option( self::OPTION_MINIMAL_STYLING, ! empty( $_POST['fn_minimal_styling'] ) ? 1 : 0 );
 		} elseif ( 'convert_checkout' === $action ) {
 			$result = self::convert_checkout_page_to_blocks();
 			set_transient( 'fn_settings_notice', $result, 30 );
@@ -52,6 +54,7 @@ final class SettingsPage {
 		}
 
 		$enabled      = '' === get_option( self::OPTION_MULTISTEP_ENABLED, '1' ) ? true : (bool) get_option( self::OPTION_MULTISTEP_ENABLED, '1' );
+		$minimal      = (bool) get_option( self::OPTION_MINIMAL_STYLING, '0' );
 		$checkout_id  = (int) wc_get_page_id( 'checkout' );
 		$checkout     = $checkout_id > 0 ? get_post( $checkout_id ) : null;
 		$using_blocks = $checkout && has_block( 'woocommerce/checkout', $checkout );
@@ -99,6 +102,13 @@ final class SettingsPage {
 			checked( $enabled, true, false ),
 			esc_html__( 'Group the checkout into Address → Delivery/Collection → Payment', 'fastnutrition-mealprep' ),
 			esc_html__( 'When enabled, the plugin transparently groups the native WooCommerce Checkout block into three steps. No manual block placement needed. Disable this to fall back to the standard single-page Woo checkout.', 'fastnutrition-mealprep' )
+		);
+		printf(
+			'<tr><th>%s</th><td><label><input type="checkbox" name="fn_minimal_styling" value="1" %s /> %s</label><p class="description">%s</p></td></tr>',
+			esc_html__( 'Inherit theme styling (minimal mode)', 'fastnutrition-mealprep' ),
+			checked( $minimal, true, false ),
+			esc_html__( 'Turn off plugin CSS and render the meal builder as native dropdowns', 'fastnutrition-mealprep' ),
+			esc_html__( 'Off (default): the meal builder, macro calculator, slot picker, and multi-step nav use the plugin\'s built-in black + lime pill styling. On: plugin stylesheets are not enqueued and the meal builder renders using <select> dropdowns — exactly like your existing Fast Nutrition site — so your Flatsome theme CSS controls every colour, font, and button.', 'fastnutrition-mealprep' )
 		);
 		echo '</tbody></table>';
 		submit_button();
@@ -171,5 +181,9 @@ final class SettingsPage {
 
 	public static function multistep_enabled(): bool {
 		return '1' === (string) get_option( self::OPTION_MULTISTEP_ENABLED, '1' );
+	}
+
+	public static function minimal_styling(): bool {
+		return '1' === (string) get_option( self::OPTION_MINIMAL_STYLING, '0' );
 	}
 }

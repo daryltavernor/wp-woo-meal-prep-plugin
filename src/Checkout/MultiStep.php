@@ -46,7 +46,7 @@ final class MultiStep {
 			$asset['version'] ?? FN_MEALPREP_VERSION,
 			true
 		);
-		if ( is_readable( $build . 'style-view.css' ) ) {
+		if ( is_readable( $build . 'style-view.css' ) && ! SettingsPage::minimal_styling() ) {
 			wp_enqueue_style(
 				'fn-multi-step-checkout',
 				$url . 'style-view.css',
