@@ -145,6 +145,9 @@ final class PrepDashboard {
 		if ( 'set' === ( $sel['mode'] ?? '' ) && ! empty( $sel['set_meal_id'] ) ) {
 			return get_the_title( (int) $sel['set_meal_id'] );
 		}
+		if ( 'sweet' === ( $sel['mode'] ?? '' ) && ! empty( $sel['sweet_id'] ) ) {
+			return get_the_title( (int) $sel['sweet_id'] );
+		}
 		$parts = [];
 		if ( ! empty( $sel['protein_id'] ) ) {
 			$parts[] = get_the_title( (int) $sel['protein_id'] );

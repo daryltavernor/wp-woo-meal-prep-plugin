@@ -63,6 +63,11 @@ final class Selections {
 				wc_add_notice( __( 'Please choose a valid set meal.', 'fastnutrition-mealprep' ), 'error' );
 				return false;
 			}
+		} elseif ( 'sweet' === $mode ) {
+			if ( ! $config['allow_sweet_mode'] || empty( $selection['sweet_id'] ) ) {
+				wc_add_notice( __( 'Please choose a sweet.', 'fastnutrition-mealprep' ), 'error' );
+				return false;
+			}
 		} elseif ( 'build' === $mode ) {
 			if ( empty( $selection['protein_id'] ) ) {
 				wc_add_notice( __( 'Please choose a protein.', 'fastnutrition-mealprep' ), 'error' );
@@ -98,6 +103,11 @@ final class Selections {
 			$item_data[] = [
 				'key'   => __( 'Set Meal', 'fastnutrition-mealprep' ),
 				'value' => get_the_title( (int) $selection['set_meal_id'] ),
+			];
+		} elseif ( 'sweet' === ( $selection['mode'] ?? '' ) && ! empty( $selection['sweet_id'] ) ) {
+			$item_data[] = [
+				'key'   => __( 'Sweet', 'fastnutrition-mealprep' ),
+				'value' => get_the_title( (int) $selection['sweet_id'] ),
 			];
 		} else {
 			if ( ! empty( $selection['protein_id'] ) ) {
@@ -139,7 +149,7 @@ final class Selections {
 			return [];
 		}
 
-		$mode = isset( $raw['mode'] ) && in_array( $raw['mode'], [ 'build', 'set' ], true ) ? (string) $raw['mode'] : 'build';
+		$mode = isset( $raw['mode'] ) && in_array( $raw['mode'], [ 'build', 'set', 'sweet' ], true ) ? (string) $raw['mode'] : 'build';
 
 		if ( 'set' === $mode && $config['allow_set_meal_mode'] ) {
 			$set_meal_id = isset( $raw['set_meal_id'] ) ? (int) $raw['set_meal_id'] : 0;
@@ -155,6 +165,23 @@ final class Selections {
 				'set_meal_id' => $set_meal_id,
 				'addons'      => $addons,
 				'tier'        => $config['tier'],
+			];
+		}
+
+		if ( 'sweet' === $mode && $config['allow_sweet_mode'] ) {
+			$sweet_id = isset( $raw['sweet_id'] ) ? (int) $raw['sweet_id'] : 0;
+			if ( ! $sweet_id || ( ! empty( $config['allowed_sweets'] ) && ! in_array( $sweet_id, $config['allowed_sweets'], true ) ) ) {
+				return [];
+			}
+			if ( 'sweet' !== Ingredient::get_type_slug( $sweet_id ) ) {
+				return [];
+			}
+			$addons = self::sanitize_addons( $product_id, $raw['addons'] ?? [] );
+			return [
+				'mode'     => 'sweet',
+				'sweet_id' => $sweet_id,
+				'addons'   => $addons,
+				'tier'     => $config['tier'],
 			];
 		}
 
@@ -230,6 +257,8 @@ final class Selections {
 		$delta = 0.0;
 		if ( ( $selection['mode'] ?? '' ) === 'set' && ! empty( $selection['set_meal_id'] ) ) {
 			$delta += (float) get_post_meta( (int) $selection['set_meal_id'], '_fn_price_delta', true );
+		} elseif ( ( $selection['mode'] ?? '' ) === 'sweet' && ! empty( $selection['sweet_id'] ) ) {
+			$delta += (float) get_post_meta( (int) $selection['sweet_id'], '_fn_price_delta', true );
 		} else {
 			foreach ( [ 'protein_id', 'carb_id' ] as $k ) {
 				if ( ! empty( $selection[ $k ] ) ) {

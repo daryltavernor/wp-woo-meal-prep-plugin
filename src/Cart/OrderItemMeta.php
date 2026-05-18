@@ -26,6 +26,8 @@ final class OrderItemMeta {
 
 		if ( 'set' === ( $selection['mode'] ?? '' ) && ! empty( $selection['set_meal_id'] ) ) {
 			$item->add_meta_data( __( 'Set Meal', 'fastnutrition-mealprep' ), get_the_title( (int) $selection['set_meal_id'] ) );
+		} elseif ( 'sweet' === ( $selection['mode'] ?? '' ) && ! empty( $selection['sweet_id'] ) ) {
+			$item->add_meta_data( __( 'Sweet', 'fastnutrition-mealprep' ), get_the_title( (int) $selection['sweet_id'] ) );
 		} else {
 			if ( ! empty( $selection['protein_id'] ) ) {
 				$item->add_meta_data( __( 'Protein', 'fastnutrition-mealprep' ), get_the_title( (int) $selection['protein_id'] ) );
@@ -114,6 +116,8 @@ final class OrderItemMeta {
 				$ids = [];
 				if ( 'set' === ( $sel['mode'] ?? '' ) && ! empty( $sel['set_meal_id'] ) ) {
 					$ids[] = (int) $sel['set_meal_id'];
+				} elseif ( 'sweet' === ( $sel['mode'] ?? '' ) && ! empty( $sel['sweet_id'] ) ) {
+					$ids[] = (int) $sel['sweet_id'];
 				} else {
 					if ( ! empty( $sel['protein_id'] ) ) {
 						$ids[] = (int) $sel['protein_id'];

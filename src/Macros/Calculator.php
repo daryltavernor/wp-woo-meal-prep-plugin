@@ -23,6 +23,9 @@ final class Calculator {
 		if ( 'set' === ( $selection['mode'] ?? '' ) && ! empty( $selection['set_meal_id'] ) ) {
 			return self::add( $total, Ingredient::get_macros( (int) $selection['set_meal_id'] ) );
 		}
+		if ( 'sweet' === ( $selection['mode'] ?? '' ) && ! empty( $selection['sweet_id'] ) ) {
+			return self::add( $total, Ingredient::get_macros( (int) $selection['sweet_id'] ) );
+		}
 		if ( ! empty( $selection['protein_id'] ) ) {
 			$total = self::add( $total, Ingredient::get_macros( (int) $selection['protein_id'] ) );
 		}

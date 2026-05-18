@@ -63,10 +63,12 @@ final class MealProduct {
 		$tier                  = get_post_meta( $post->ID, '_fn_meal_tier', true ) ?: 'standard';
 		$allow_double_greens   = (bool) get_post_meta( $post->ID, '_fn_allow_double_greens', true );
 		$allow_set_meal_mode   = (bool) get_post_meta( $post->ID, '_fn_allow_set_meal_mode', true );
+		$allow_sweet_mode      = (bool) get_post_meta( $post->ID, '_fn_allow_sweet_mode', true );
 		$allowed_proteins      = (array) get_post_meta( $post->ID, '_fn_allowed_protein_ids', true );
 		$allowed_carbs         = (array) get_post_meta( $post->ID, '_fn_allowed_carb_ids', true );
 		$allowed_greens        = (array) get_post_meta( $post->ID, '_fn_allowed_greens_ids', true );
 		$allowed_set_meals     = (array) get_post_meta( $post->ID, '_fn_allowed_set_meal_ids', true );
+		$allowed_sweets        = (array) get_post_meta( $post->ID, '_fn_allowed_sweet_ids', true );
 
 		echo '<div id="fn_meal_builder_panel" class="panel woocommerce_options_panel">';
 		echo '<div class="options_group" style="padding:10px 14px">';
@@ -116,26 +118,72 @@ final class MealProduct {
 			]
 		);
 
+		woocommerce_wp_checkbox(
+			[
+				'id'          => '_fn_allow_sweet_mode',
+				'label'       => __( 'Sweets product (Sweet mode)', 'fastnutrition-mealprep' ),
+				'description' => __( 'Customers pick which sweet (e.g. protein flapjack flavour) instead of building a meal. Use this on dessert / sweet product pages.', 'fastnutrition-mealprep' ),
+				'value'       => $allow_sweet_mode ? 'yes' : 'no',
+			]
+		);
+
 		echo '</div><div class="options_group">';
 		echo '<p class="form-field"><strong>' . esc_html__( 'Allowed ingredients (leave blank for all active of that type)', 'fastnutrition-mealprep' ) . '</strong></p>';
+		echo '<p class="form-field"><em>' . esc_html__( 'The lists below are filtered by the Meal tier above — switching between Standard and Bulk hides ingredients that don\'t match the tier.', 'fastnutrition-mealprep' ) . '</em></p>';
 
 		$this->render_ingredient_multiselect( 'proteins', '_fn_allowed_protein_ids', __( 'Allowed proteins', 'fastnutrition-mealprep' ), $allowed_proteins, 'protein' );
 		$this->render_ingredient_multiselect( 'carbs', '_fn_allowed_carb_ids', __( 'Allowed carbs', 'fastnutrition-mealprep' ), $allowed_carbs, 'carb' );
 		$this->render_ingredient_multiselect( 'greens', '_fn_allowed_greens_ids', __( 'Allowed greens', 'fastnutrition-mealprep' ), $allowed_greens, 'greens' );
 		$this->render_ingredient_multiselect( 'set_meals', '_fn_allowed_set_meal_ids', __( 'Allowed set meals', 'fastnutrition-mealprep' ), $allowed_set_meals, 'set_meal' );
+		$this->render_ingredient_multiselect( 'sweets', '_fn_allowed_sweet_ids', __( 'Allowed sweets', 'fastnutrition-mealprep' ), $allowed_sweets, 'sweet' );
 
 		echo '</div></div>';
+		$this->render_tier_filter_script();
+	}
+
+	private function render_tier_filter_script(): void {
+		?>
+		<script>
+		(function(){
+			const tierField = document.getElementById('_fn_meal_tier');
+			if (!tierField) return;
+
+			const apply = () => {
+				const tier = tierField.value || 'standard';
+				document.querySelectorAll('select[data-fn-ingredient-list]').forEach((sel) => {
+					Array.from(sel.options).forEach((opt) => {
+						const optTier = opt.getAttribute('data-tier') || '';
+						if (!optTier) {
+							opt.hidden = false;
+							return;
+						}
+						const matches = optTier === tier;
+						opt.hidden = !matches;
+						if (!matches) {
+							opt.selected = false;
+						}
+					});
+				});
+			};
+			tierField.addEventListener('change', apply);
+			apply();
+		})();
+		</script>
+		<?php
 	}
 
 	private function render_ingredient_multiselect( string $handle, string $key, string $label, array $selected, string $type_slug ): void {
 		$ingredients = $this->get_ingredients_by_type( $type_slug );
 		printf( '<p class="form-field"><label for="fn_select_%1$s">%2$s</label>', esc_attr( $handle ), esc_html( $label ) );
-		printf( '<select multiple id="fn_select_%1$s" name="%2$s[]" style="width:50%%;min-height:100px;">', esc_attr( $handle ), esc_attr( $key ) );
+		printf( '<select multiple data-fn-ingredient-list="1" id="fn_select_%1$s" name="%2$s[]" style="width:50%%;min-height:100px;">', esc_attr( $handle ), esc_attr( $key ) );
 		foreach ( $ingredients as $ingredient ) {
-			$is_selected = in_array( $ingredient->ID, array_map( 'intval', $selected ), true );
+			$is_selected   = in_array( $ingredient->ID, array_map( 'intval', $selected ), true );
+			$ingr_tier     = (string) get_post_meta( (int) $ingredient->ID, '_fn_tier', true );
+			$ingr_tier     = $ingr_tier === 'bulk' ? 'bulk' : 'standard';
 			printf(
-				'<option value="%1$d" %2$s>%3$s</option>',
+				'<option value="%1$d" data-tier="%2$s" %3$s>%4$s</option>',
 				(int) $ingredient->ID,
+				esc_attr( $ingr_tier ),
 				selected( $is_selected, true, false ),
 				esc_html( $ingredient->post_title )
 			);
@@ -173,11 +221,12 @@ final class MealProduct {
 		update_post_meta( $product_id, '_fn_is_meal', ! empty( $_POST['_fn_is_meal'] ) );
 		update_post_meta( $product_id, '_fn_allow_double_greens', ! empty( $_POST['_fn_allow_double_greens'] ) );
 		update_post_meta( $product_id, '_fn_allow_set_meal_mode', ! empty( $_POST['_fn_allow_set_meal_mode'] ) );
+		update_post_meta( $product_id, '_fn_allow_sweet_mode', ! empty( $_POST['_fn_allow_sweet_mode'] ) );
 
 		$tier = isset( $_POST['_fn_meal_tier'] ) ? sanitize_key( wp_unslash( $_POST['_fn_meal_tier'] ) ) : 'standard';
 		update_post_meta( $product_id, '_fn_meal_tier', in_array( $tier, [ 'standard', 'bulk' ], true ) ? $tier : 'standard' );
 
-		foreach ( [ '_fn_allowed_protein_ids', '_fn_allowed_carb_ids', '_fn_allowed_greens_ids', '_fn_allowed_set_meal_ids' ] as $key ) {
+		foreach ( [ '_fn_allowed_protein_ids', '_fn_allowed_carb_ids', '_fn_allowed_greens_ids', '_fn_allowed_set_meal_ids', '_fn_allowed_sweet_ids' ] as $key ) {
 			$values = isset( $_POST[ $key ] ) && is_array( $_POST[ $key ] )
 				? array_filter( array_map( 'absint', wp_unslash( $_POST[ $key ] ) ) )
 				: [];
@@ -195,10 +244,12 @@ final class MealProduct {
 			'tier'                 => get_post_meta( $product_id, '_fn_meal_tier', true ) ?: 'standard',
 			'allow_double_greens'  => (bool) get_post_meta( $product_id, '_fn_allow_double_greens', true ),
 			'allow_set_meal_mode'  => (bool) get_post_meta( $product_id, '_fn_allow_set_meal_mode', true ),
+			'allow_sweet_mode'     => (bool) get_post_meta( $product_id, '_fn_allow_sweet_mode', true ),
 			'allowed_proteins'     => array_map( 'intval', (array) get_post_meta( $product_id, '_fn_allowed_protein_ids', true ) ),
 			'allowed_carbs'        => array_map( 'intval', (array) get_post_meta( $product_id, '_fn_allowed_carb_ids', true ) ),
 			'allowed_greens'       => array_map( 'intval', (array) get_post_meta( $product_id, '_fn_allowed_greens_ids', true ) ),
 			'allowed_set_meals'    => array_map( 'intval', (array) get_post_meta( $product_id, '_fn_allowed_set_meal_ids', true ) ),
+			'allowed_sweets'       => array_map( 'intval', (array) get_post_meta( $product_id, '_fn_allowed_sweet_ids', true ) ),
 		];
 	}
 }

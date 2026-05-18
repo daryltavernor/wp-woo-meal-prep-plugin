@@ -17,31 +17,42 @@ function MealBuilder( { productId, minimal } ) {
 		carb_id: 0,
 		greens_ids: [],
 		set_meal_id: 0,
+		sweet_id: 0,
 		addons: [],
 	} );
 	const [ doubleGreens, setDoubleGreens ] = useState( false );
 
 	useEffect( () => {
-		apiFetch( { path: `fastnutrition/v1/meal-config/${ productId }` } ).then( setConfig );
+		apiFetch( { path: `fastnutrition/v1/meal-config/${ productId }` } ).then( ( cfg ) => {
+			setConfig( cfg );
+			if ( cfg && cfg.config && cfg.config.allow_sweet_mode && ! cfg.config.allow_set_meal_mode ) {
+				setMode( 'sweet' );
+			}
+		} );
 		Promise.all( [
 			apiFetch( { path: 'fastnutrition/v1/ingredients?type=protein' } ),
 			apiFetch( { path: 'fastnutrition/v1/ingredients?type=carb' } ),
 			apiFetch( { path: 'fastnutrition/v1/ingredients?type=greens' } ),
 			apiFetch( { path: 'fastnutrition/v1/ingredients?type=set_meal' } ),
-		] ).then( ( [ p, c, g, s ] ) => setIngredients( { protein: p, carb: c, greens: g, set_meal: s } ) );
+			apiFetch( { path: 'fastnutrition/v1/ingredients?type=sweet' } ),
+		] ).then( ( [ p, c, g, s, sw ] ) => setIngredients( { protein: p, carb: c, greens: g, set_meal: s, sweet: sw } ) );
 	}, [ productId ] );
 
 	const allowed = useMemo( () => {
 		if ( ! config ) {
 			return ingredients;
 		}
-		const filter = ( list, allowList ) =>
+		const tier = config.config.tier || 'standard';
+		const byAllow = ( list, allowList ) =>
 			! allowList || ! allowList.length ? list : list.filter( ( i ) => allowList.includes( i.id ) );
+		const byTier = ( list ) => list.filter( ( i ) => ! i.tier || i.tier === tier );
+		const apply = ( list, allowList ) => byTier( byAllow( list || [], allowList ) );
 		return {
-			protein: filter( ingredients.protein, config.config.allowed_proteins ),
-			carb: filter( ingredients.carb, config.config.allowed_carbs ),
-			greens: filter( ingredients.greens, config.config.allowed_greens ),
-			set_meal: filter( ingredients.set_meal, config.config.allowed_set_meals ),
+			protein: apply( ingredients.protein, config.config.allowed_proteins ),
+			carb: apply( ingredients.carb, config.config.allowed_carbs ),
+			greens: apply( ingredients.greens, config.config.allowed_greens ),
+			set_meal: apply( ingredients.set_meal, config.config.allowed_set_meals ),
+			sweet: apply( ingredients.sweet || [], config.config.allowed_sweets ),
 		};
 	}, [ config, ingredients ] );
 
@@ -57,6 +68,8 @@ function MealBuilder( { productId, minimal } ) {
 		let t = { ...zero };
 		if ( mode === 'set' && selection.set_meal_id ) {
 			t = add( t, lookup( selection.set_meal_id, ingredients.set_meal )?.macros );
+		} else if ( mode === 'sweet' && selection.sweet_id ) {
+			t = add( t, lookup( selection.sweet_id, ingredients.sweet || [] )?.macros );
 		} else {
 			t = add( t, lookup( selection.protein_id, ingredients.protein )?.macros );
 			t = add( t, lookup( selection.carb_id, ingredients.carb )?.macros );
@@ -120,14 +133,23 @@ function MealBuilder( { productId, minimal } ) {
 			<input type="hidden" name="fn_selection" value="" />
 			<input type="hidden" name="quantity" value="1" />
 
-			{ config.config.allow_set_meal_mode && (
+			{ ( config.config.allow_set_meal_mode || config.config.allow_sweet_mode ) && (
 				<div className="fn-mode-toggle">
-					<button type="button" className={ mode === 'build' ? 'is-active' : '' } onClick={ () => setMode( 'build' ) }>
-						{ __( 'Build your meal', 'fastnutrition-mealprep' ) }
-					</button>
-					<button type="button" className={ mode === 'set' ? 'is-active' : '' } onClick={ () => setMode( 'set' ) }>
-						{ __( 'Choose a set meal', 'fastnutrition-mealprep' ) }
-					</button>
+					{ ! config.config.allow_sweet_mode && (
+						<button type="button" className={ mode === 'build' ? 'is-active' : '' } onClick={ () => setMode( 'build' ) }>
+							{ __( 'Build your meal', 'fastnutrition-mealprep' ) }
+						</button>
+					) }
+					{ config.config.allow_set_meal_mode && (
+						<button type="button" className={ mode === 'set' ? 'is-active' : '' } onClick={ () => setMode( 'set' ) }>
+							{ __( 'Choose a set meal', 'fastnutrition-mealprep' ) }
+						</button>
+					) }
+					{ config.config.allow_sweet_mode && (
+						<button type="button" className={ mode === 'sweet' ? 'is-active' : '' } onClick={ () => setMode( 'sweet' ) }>
+							{ __( 'Choose a sweet', 'fastnutrition-mealprep' ) }
+						</button>
+					) }
 				</div>
 			) }
 
@@ -141,6 +163,21 @@ function MealBuilder( { productId, minimal } ) {
 								value={ i.id }
 								checked={ selection.set_meal_id === i.id }
 								onChange={ () => setSelection( { ...selection, set_meal_id: i.id } ) }
+							/>
+							{ i.name }
+						</label>
+					) ) }
+				</Section>
+			) : mode === 'sweet' ? (
+				<Section title={ __( 'Sweet', 'fastnutrition-mealprep' ) }>
+					{ ( allowed.sweet || [] ).map( ( i ) => (
+						<label key={ i.id } className={ selection.sweet_id === i.id ? 'is-selected' : '' }>
+							<input
+								type="radio"
+								name="sweet"
+								value={ i.id }
+								checked={ selection.sweet_id === i.id }
+								onChange={ () => setSelection( { ...selection, sweet_id: i.id } ) }
 							/>
 							{ i.name }
 						</label>
@@ -260,14 +297,23 @@ function MinimalView( { config, allowed, mode, setMode, selection, setSelection,
 			<input type="hidden" name="fn_selection" value="" />
 			<input type="hidden" name="quantity" value="1" />
 
-			{ config.config.allow_set_meal_mode && (
+			{ ( config.config.allow_set_meal_mode || config.config.allow_sweet_mode ) && (
 				<p>
-					<label>
-						<input type="radio" name="fn_mode" checked={ mode === 'build' } onChange={ () => setMode( 'build' ) } /> { __( 'Build your meal', 'fastnutrition-mealprep' ) }
-					</label>{ ' ' }
-					<label>
-						<input type="radio" name="fn_mode" checked={ mode === 'set' } onChange={ () => setMode( 'set' ) } /> { __( 'Choose a set meal', 'fastnutrition-mealprep' ) }
-					</label>
+					{ ! config.config.allow_sweet_mode && (
+						<><label>
+							<input type="radio" name="fn_mode" checked={ mode === 'build' } onChange={ () => setMode( 'build' ) } /> { __( 'Build your meal', 'fastnutrition-mealprep' ) }
+						</label>{ ' ' }</>
+					) }
+					{ config.config.allow_set_meal_mode && (
+						<><label>
+							<input type="radio" name="fn_mode" checked={ mode === 'set' } onChange={ () => setMode( 'set' ) } /> { __( 'Choose a set meal', 'fastnutrition-mealprep' ) }
+						</label>{ ' ' }</>
+					) }
+					{ config.config.allow_sweet_mode && (
+						<label>
+							<input type="radio" name="fn_mode" checked={ mode === 'sweet' } onChange={ () => setMode( 'sweet' ) } /> { __( 'Choose a sweet', 'fastnutrition-mealprep' ) }
+						</label>
+					) }
 				</p>
 			) }
 
@@ -278,6 +324,17 @@ function MinimalView( { config, allowed, mode, setMode, selection, setSelection,
 							<option value="">— { __( 'Pick a set meal', 'fastnutrition-mealprep' ) } —</option>
 							{ allowed.set_meal.map( ( i ) => (
 								<option key={ i.id } value={ i.id }>{ i.name }</option>
+							) ) }
+						</select>
+					</label>
+				</p>
+			) : mode === 'sweet' ? (
+				<p>
+					<label><span style={ { color: 'red' } }>*</span> { __( 'Sweet', 'fastnutrition-mealprep' ) }{ ' ' }
+						<select name="sweet" required value={ selection.sweet_id || '' } onChange={ ( e ) => setSelection( { ...selection, sweet_id: parseInt( e.target.value, 10 ) || 0 } ) }>
+							<option value="">— { __( 'Pick a sweet', 'fastnutrition-mealprep' ) } —</option>
+							{ ( allowed.sweet || [] ).map( ( i ) => (
+								<option key={ i.id } value={ i.id }>{ i.name }{ i.price_delta ? ` (+£${ Number( i.price_delta ).toFixed( 2 ) })` : '' }</option>
 							) ) }
 						</select>
 					</label>
