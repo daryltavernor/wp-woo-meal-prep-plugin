@@ -3,6 +3,7 @@ declare( strict_types=1 );
 
 namespace FastNutrition\MealPrep\Rest;
 
+use FastNutrition\MealPrep\Cart\Selections;
 use FastNutrition\MealPrep\Delivery\Profile;
 use FastNutrition\MealPrep\Delivery\SlotAvailability;
 use FastNutrition\MealPrep\PostTypes\Ingredient;
@@ -11,6 +12,7 @@ use FastNutrition\MealPrep\Products\BundleMeta;
 use FastNutrition\MealPrep\Products\MealProduct;
 use FastNutrition\MealPrep\Taxonomies\Allergen;
 use FastNutrition\MealPrep\Taxonomies\IngredientType;
+use WP_Error;
 use WP_REST_Request;
 
 final class RestController {
@@ -56,6 +58,72 @@ final class RestController {
 				],
 			]
 		);
+
+		register_rest_route(
+			'fastnutrition/v1',
+			'/cart/add',
+			[
+				'methods'             => 'POST',
+				'callback'            => [ $this, 'ajax_add_to_cart' ],
+				'permission_callback' => '__return_true',
+				'args'                => [
+					'product_id' => [ 'type' => 'integer', 'required' => true ],
+					'quantity'   => [ 'type' => 'integer', 'required' => true ],
+					'selection'  => [ 'required' => true ],
+				],
+			]
+		);
+	}
+
+	public function ajax_add_to_cart( WP_REST_Request $req ): array|WP_Error {
+		if ( ! function_exists( 'WC' ) || ! WC()->cart ) {
+			return new WP_Error( 'fn_cart_unavailable', __( 'Cart unavailable.', 'fastnutrition-mealprep' ), [ 'status' => 503 ] );
+		}
+
+		$product_id = (int) $req->get_param( 'product_id' );
+		$quantity   = max( 1, (int) $req->get_param( 'quantity' ) );
+		$raw        = $req->get_param( 'selection' );
+		if ( is_string( $raw ) ) {
+			$raw = json_decode( $raw, true );
+		}
+		$raw = is_array( $raw ) ? $raw : [];
+
+		// The existing Selections filter reads $_REQUEST['fn_selection'], so route the data through it.
+		$_REQUEST['fn_selection'] = $raw;
+
+		try {
+			$added_key = WC()->cart->add_to_cart( $product_id, $quantity );
+		} catch ( \Throwable $e ) {
+			$added_key = false;
+		}
+
+		if ( ! $added_key ) {
+			$notices = wc_get_notices( 'error' );
+			$message = '';
+			if ( is_array( $notices ) && ! empty( $notices ) ) {
+				$first   = reset( $notices );
+				$message = is_array( $first ) ? (string) ( $first['notice'] ?? '' ) : (string) $first;
+			}
+			wc_clear_notices();
+			return new WP_Error(
+				'fn_cart_add_failed',
+				$message !== '' ? $message : __( 'Could not add to cart.', 'fastnutrition-mealprep' ),
+				[ 'status' => 400 ]
+			);
+		}
+
+		WC()->cart->calculate_totals();
+
+		// Build the standard Woo fragments so themes/plugins can update mini-cart, count badges, totals etc.
+		$fragments = apply_filters( 'woocommerce_add_to_cart_fragments', [] );
+
+		return [
+			'success'    => true,
+			'cart_count' => (int) WC()->cart->get_cart_contents_count(),
+			'cart_total' => wp_strip_all_tags( WC()->cart->get_cart_total() ),
+			'cart_url'   => wc_get_cart_url(),
+			'fragments'  => $fragments,
+		];
 	}
 
 	public function get_ingredients( WP_REST_Request $req ): array {

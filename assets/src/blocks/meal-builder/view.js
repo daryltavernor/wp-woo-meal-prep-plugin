@@ -138,30 +138,62 @@ function MealBuilder( { productId, minimal } ) {
 		}
 	};
 
-	const submit = () => {
-		if ( ! isValid ) return;
+	const [ submitting, setSubmitting ] = useState( false );
+	const [ toast, setToast ] = useState( null );
+
+	const applyFragments = ( fragments ) => {
+		if ( ! fragments || typeof fragments !== 'object' ) return;
+		Object.keys( fragments ).forEach( ( sel ) => {
+			document.querySelectorAll( sel ).forEach( ( node ) => {
+				const wrapper = document.createElement( 'div' );
+				wrapper.innerHTML = fragments[ sel ];
+				const replacement = wrapper.firstElementChild;
+				if ( replacement ) {
+					node.replaceWith( replacement );
+				}
+			} );
+		} );
+		document.body.dispatchEvent( new CustomEvent( 'wc_fragments_refreshed' ) );
+	};
+
+	const resetSelection = () => {
+		setSelection( { protein_id: 0, carb_id: 0, greens_ids: [], set_meal_id: 0, sweet_id: 0, addons: [] } );
+		setLowCarb( false );
+		setQty( 1 );
+	};
+
+	const submit = async () => {
+		if ( ! isValid || submitting ) return;
+		setSubmitting( true );
 		const payload = {
 			mode,
 			...selection,
 			greens_ids: selection.greens_ids.filter( Boolean ),
 		};
-		const form = document.createElement( 'form' );
-		form.method = 'post';
-		form.action = '';
-		form.className = 'fn-builder-form';
-		form.style.display = 'none';
-		const add = ( name, value ) => {
-			const i = document.createElement( 'input' );
-			i.type = 'hidden';
-			i.name = name;
-			i.value = value;
-			form.appendChild( i );
-		};
-		add( 'add-to-cart', productId );
-		add( 'quantity', Math.max( 1, parseInt( qty, 10 ) || 1 ) );
-		add( 'fn_selection', JSON.stringify( payload ) );
-		document.body.appendChild( form );
-		form.submit();
+		try {
+			const result = await apiFetch( {
+				path: 'fastnutrition/v1/cart/add',
+				method: 'POST',
+				data: {
+					product_id: productId,
+					quantity: Math.max( 1, parseInt( qty, 10 ) || 1 ),
+					selection: payload,
+				},
+			} );
+			applyFragments( result?.fragments );
+			setToast( {
+				type: 'ok',
+				text: __( 'Added to your meal prep!', 'fastnutrition-mealprep' ),
+				count: result?.cart_count || 0,
+				cartUrl: result?.cart_url || '',
+			} );
+			resetSelection();
+		} catch ( err ) {
+			setToast( { type: 'err', text: err?.message || __( 'Could not add to cart.', 'fastnutrition-mealprep' ) } );
+		} finally {
+			setSubmitting( false );
+			window.setTimeout( () => setToast( null ), 4500 );
+		}
 	};
 
 	if ( ! config ) {
@@ -330,6 +362,15 @@ function MealBuilder( { productId, minimal } ) {
 			</div>
 
 			<div className="fn-meal-builder-footer">
+				{ toast && (
+					<div className={ `fn-toast ${ toast.type === 'ok' ? 'is-ok' : 'is-err' }` } role="status" aria-live="polite">
+						<span className="fn-toast-icon">{ toast.type === 'ok' ? '✓' : '!' }</span>
+						<span className="fn-toast-text">{ toast.text }</span>
+						{ toast.type === 'ok' && toast.cartUrl && (
+							<a className="fn-toast-link" href={ toast.cartUrl }>{ __( 'View cart', 'fastnutrition-mealprep' ) } ({ toast.count })</a>
+						) }
+					</div>
+				) }
 				<div className="fn-meal-builder-footer-inner">
 					<div className="fn-foot-macros">
 						<strong>{ __( 'Macros', 'fastnutrition-mealprep' ) }</strong>
@@ -340,8 +381,8 @@ function MealBuilder( { productId, minimal } ) {
 						<input type="number" min="1" value={ qty } onChange={ ( e ) => setQty( Math.max( 1, parseInt( e.target.value, 10 ) || 1 ) ) } />
 						<button type="button" onClick={ () => setQty( qty + 1 ) } aria-label="+">+</button>
 					</div>
-					<button type="button" className="fn-cta" disabled={ ! isValid } onClick={ submit }>
-						{ __( 'Add to meal prep', 'fastnutrition-mealprep' ) }
+					<button type="button" className="fn-cta" disabled={ ! isValid || submitting } onClick={ submit }>
+						{ submitting ? __( 'Adding…', 'fastnutrition-mealprep' ) : __( 'Add to meal prep', 'fastnutrition-mealprep' ) }
 					</button>
 				</div>
 			</div>
@@ -350,8 +391,25 @@ function MealBuilder( { productId, minimal } ) {
 }
 
 function MinimalView( { config, allowed, mode, setMode, selection, setSelection, doubleGreens, setDoubleGreens, productId, qty, setQty } ) {
+	const [ submitting, setSubmitting ] = useState( false );
+	const [ msg, setMsg ] = useState( null );
 	const DOUBLE_GREENS_VALUE = 'double';
 	const carbValue = doubleGreens ? DOUBLE_GREENS_VALUE : String( selection.carb_id || '' );
+
+	const applyFragments = ( fragments ) => {
+		if ( ! fragments || typeof fragments !== 'object' ) return;
+		Object.keys( fragments ).forEach( ( sel ) => {
+			document.querySelectorAll( sel ).forEach( ( node ) => {
+				const wrapper = document.createElement( 'div' );
+				wrapper.innerHTML = fragments[ sel ];
+				const replacement = wrapper.firstElementChild;
+				if ( replacement ) {
+					node.replaceWith( replacement );
+				}
+			} );
+		} );
+		document.body.dispatchEvent( new CustomEvent( 'wc_fragments_refreshed' ) );
+	};
 
 	const onCarbChange = ( e ) => {
 		if ( e.target.value === DOUBLE_GREENS_VALUE ) {
@@ -382,17 +440,36 @@ function MinimalView( { config, allowed, mode, setMode, selection, setSelection,
 
 	const priceStr = ( n ) => `£${ Number( n || 0 ).toFixed( 2 ) }`;
 
-	const onSubmit = ( e ) => {
+	const onSubmit = async ( e ) => {
 		e.preventDefault();
+		if ( submitting ) return;
+		setSubmitting( true );
 		const payload = {
 			mode,
 			...selection,
 			greens_ids: selection.greens_ids.filter( Boolean ),
 		};
-		const form = e.target;
-		const input = form.querySelector( 'input[name="fn_selection"]' );
-		input.value = JSON.stringify( payload );
-		form.submit();
+		try {
+			const result = await apiFetch( {
+				path: 'fastnutrition/v1/cart/add',
+				method: 'POST',
+				data: {
+					product_id: productId,
+					quantity: Math.max( 1, parseInt( qty, 10 ) || 1 ),
+					selection: payload,
+				},
+			} );
+			applyFragments( result?.fragments );
+			setMsg( { type: 'ok', text: __( 'Added — view cart', 'fastnutrition-mealprep' ) + ` (${ result?.cart_count || 0 })`, url: result?.cart_url || '' } );
+			setSelection( { protein_id: 0, carb_id: 0, greens_ids: [], set_meal_id: 0, sweet_id: 0, addons: [] } );
+			setDoubleGreens( false );
+			setQty( 1 );
+		} catch ( err ) {
+			setMsg( { type: 'err', text: err?.message || __( 'Could not add to cart.', 'fastnutrition-mealprep' ) } );
+		} finally {
+			setSubmitting( false );
+			window.setTimeout( () => setMsg( null ), 4500 );
+		}
 	};
 
 	return (
@@ -516,8 +593,17 @@ function MinimalView( { config, allowed, mode, setMode, selection, setSelection,
 				</label>
 			</p>
 
+			{ msg && (
+				<p className="fn-min-msg" style={ { color: msg.type === 'ok' ? '#006400' : '#a00', fontWeight: 600 } } role="status" aria-live="polite">
+					{ msg.text }{ ' ' }
+					{ msg.type === 'ok' && msg.url && <a href={ msg.url }>{ __( '→', 'fastnutrition-mealprep' ) }</a> }
+				</p>
+			) }
+
 			<p>
-				<button type="submit" className="single_add_to_cart_button button alt">{ __( 'Add to basket', 'fastnutrition-mealprep' ) }</button>
+				<button type="submit" className="single_add_to_cart_button button alt" disabled={ submitting }>
+					{ submitting ? __( 'Adding…', 'fastnutrition-mealprep' ) : __( 'Add to basket', 'fastnutrition-mealprep' ) }
+				</button>
 			</p>
 		</form>
 	);

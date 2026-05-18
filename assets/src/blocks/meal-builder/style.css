@@ -321,6 +321,46 @@
 	}
 }
 
+/* Toast over the sticky footer */
+.fn-toast {
+	position: absolute;
+	left: 1rem;
+	right: 1rem;
+	bottom: 100%;
+	max-width: 920px;
+	margin: 0 auto 0.55rem;
+	padding: 0.55rem 0.85rem;
+	border-radius: 10px;
+	display: flex;
+	align-items: center;
+	gap: 0.6rem;
+	font-size: 0.9rem;
+	font-weight: 600;
+	box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+	animation: fn-toast-in 0.18s ease-out;
+}
+.fn-toast.is-ok { background: #c5e643; color: #1a3d00; }
+.fn-toast.is-err { background: #ffe1e1; color: #7a0000; }
+.fn-toast-icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 24px;
+	height: 24px;
+	border-radius: 50%;
+	background: rgba(0, 0, 0, 0.15);
+	font-weight: 800;
+}
+.fn-toast-link {
+	margin-left: auto;
+	color: inherit;
+	text-decoration: underline;
+}
+@keyframes fn-toast-in {
+	from { transform: translateY(8px); opacity: 0; }
+	to   { transform: translateY(0); opacity: 1; }
+}
+
 /* Hide the theme's default add-to-cart when our builder is mounted on the page. */
 body.fn-meal-builder-active form.cart:not(.fn-builder-form),
 body.fn-meal-builder-active .single_add_to_cart_button:not(.fn-cta) {
