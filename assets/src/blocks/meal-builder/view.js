@@ -154,7 +154,7 @@ function MealBuilder( { productId, minimal } ) {
 			) }
 
 			{ mode === 'set' ? (
-				<Section title={ __( 'Set meal', 'fastnutrition-mealprep' ) }>
+				<Section title={ __( 'Set meal', 'fastnutrition-mealprep' ) } wide>
 					{ allowed.set_meal.map( ( i ) => (
 						<label key={ i.id } className={ selection.set_meal_id === i.id ? 'is-selected' : '' }>
 							<input
@@ -164,12 +164,12 @@ function MealBuilder( { productId, minimal } ) {
 								checked={ selection.set_meal_id === i.id }
 								onChange={ () => setSelection( { ...selection, set_meal_id: i.id } ) }
 							/>
-							{ i.name }
+							<span className="fn-pill-text">{ i.name }</span>
 						</label>
 					) ) }
 				</Section>
 			) : mode === 'sweet' ? (
-				<Section title={ __( 'Sweet', 'fastnutrition-mealprep' ) }>
+				<Section title={ __( 'Sweet', 'fastnutrition-mealprep' ) } wide>
 					{ ( allowed.sweet || [] ).map( ( i ) => (
 						<label key={ i.id } className={ selection.sweet_id === i.id ? 'is-selected' : '' }>
 							<input
@@ -179,7 +179,7 @@ function MealBuilder( { productId, minimal } ) {
 								checked={ selection.sweet_id === i.id }
 								onChange={ () => setSelection( { ...selection, sweet_id: i.id } ) }
 							/>
-							{ i.name }
+							<span className="fn-pill-text">{ i.name }</span>
 						</label>
 					) ) }
 				</Section>
@@ -194,57 +194,80 @@ function MealBuilder( { productId, minimal } ) {
 									checked={ selection.protein_id === i.id }
 									onChange={ () => setSelection( { ...selection, protein_id: i.id } ) }
 								/>
-								{ i.name }
+								<span className="fn-pill-text">{ i.name }</span>
 							</label>
 						) ) }
 					</Section>
-					<Section title={ __( 'Carb', 'fastnutrition-mealprep' ) }>
-						{ allowed.carb.map( ( i ) => (
-							<label key={ i.id } className={ selection.carb_id === i.id ? 'is-selected' : '' }>
-								<input
-									type="radio"
-									name="carb"
-									disabled={ selection.greens_ids.length === 2 }
-									checked={ selection.carb_id === i.id }
-									onChange={ () => setSelection( { ...selection, carb_id: i.id } ) }
-								/>
-								{ i.name }
-							</label>
-						) ) }
-						{ config.config.allow_double_greens && (
-							<p className="fn-hint">
-								{ __( 'Prefer low carb? Pick a 2nd greens below to swap out the carb.', 'fastnutrition-mealprep' ) }
-							</p>
-						) }
-					</Section>
-					<Section title={ config.config.allow_double_greens ? __( 'Greens (pick 1 or 2)', 'fastnutrition-mealprep' ) : __( 'Greens', 'fastnutrition-mealprep' ) }>
-						{ allowed.greens.map( ( i ) => (
-							<label key={ i.id } className={ selection.greens_ids.includes( i.id ) ? 'is-selected' : '' }>
-								<input
-									type="checkbox"
-									checked={ selection.greens_ids.includes( i.id ) }
-									onChange={ () => toggleGreens( i.id ) }
-								/>
-								{ i.name }
-							</label>
-						) ) }
-					</Section>
+
+					<div className="fn-two-col">
+						<div className="fn-section">
+							<h3>{ __( 'Carb', 'fastnutrition-mealprep' ) }</h3>
+							<div className="fn-pills">
+								{ allowed.carb.map( ( i ) => {
+									const disabled = selection.greens_ids.length === 2;
+									const classes  = [];
+									if ( selection.carb_id === i.id ) classes.push( 'is-selected' );
+									if ( disabled ) classes.push( 'is-disabled' );
+									return (
+										<label key={ i.id } className={ classes.join( ' ' ) }>
+											<input
+												type="radio"
+												name="carb"
+												disabled={ disabled }
+												checked={ selection.carb_id === i.id }
+												onChange={ () => setSelection( { ...selection, carb_id: i.id } ) }
+											/>
+											<span className="fn-pill-text">{ i.name }</span>
+										</label>
+									);
+								} ) }
+							</div>
+							{ config.config.allow_double_greens && (
+								<p className="fn-callout">
+									<strong>{ __( 'Prefer low carb?', 'fastnutrition-mealprep' ) }</strong>{ ' ' }
+									{ __( 'Pick a 2nd Greens (right) to swap out the carb.', 'fastnutrition-mealprep' ) }
+								</p>
+							) }
+						</div>
+
+						<div className="fn-section">
+							<h3>{ config.config.allow_double_greens ? __( 'Greens (pick 1 or 2)', 'fastnutrition-mealprep' ) : __( 'Greens', 'fastnutrition-mealprep' ) }</h3>
+							<div className="fn-pills">
+								{ allowed.greens.map( ( i ) => (
+									<label key={ i.id } className={ selection.greens_ids.includes( i.id ) ? 'is-selected' : '' }>
+										<input
+											type="checkbox"
+											checked={ selection.greens_ids.includes( i.id ) }
+											onChange={ () => toggleGreens( i.id ) }
+										/>
+										<span className="fn-pill-text">{ i.name }</span>
+									</label>
+								) ) }
+							</div>
+						</div>
+					</div>
 				</>
 			) }
 
 			{ config.addons && config.addons.length > 0 && (
-				<Section title={ __( 'Add-ons', 'fastnutrition-mealprep' ) }>
-					{ config.addons.map( ( addon ) => (
-						<label key={ addon.id }>
-							<input
-								type="checkbox"
-								checked={ selection.addons.some( ( a ) => a.id === addon.id ) }
-								onChange={ () => toggleAddon( addon ) }
-							/>
-							{ addon.label } (+ £{ Number( addon.price ).toFixed( 2 ) })
-						</label>
-					) ) }
-				</Section>
+				<div className="fn-section">
+					<h3>{ __( 'Optional add-ons', 'fastnutrition-mealprep' ) }</h3>
+					<div className="fn-addons">
+						{ config.addons.map( ( addon ) => {
+							const selected = selection.addons.some( ( a ) => a.id === addon.id );
+							return (
+								<label key={ addon.id } className={ selected ? 'is-selected' : '' }>
+									<input
+										type="checkbox"
+										checked={ selected }
+										onChange={ () => toggleAddon( addon ) }
+									/>
+									{ addon.label } (+£{ Number( addon.price ).toFixed( 2 ) })
+								</label>
+							);
+						} ) }
+					</div>
+				</div>
 			) }
 
 			<div className="fn-totals">
@@ -413,11 +436,12 @@ function MinimalView( { config, allowed, mode, setMode, selection, setSelection,
 	);
 }
 
-function Section( { title, children } ) {
+function Section( { title, children, wide } ) {
+	const cls = wide ? 'fn-pills fn-pills-wide' : 'fn-pills';
 	return (
 		<div className="fn-section">
 			<h3>{ title }</h3>
-			<div className="fn-grid">{ children }</div>
+			<div className={ cls }>{ children }</div>
 		</div>
 	);
 }
