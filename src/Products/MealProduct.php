@@ -3,6 +3,7 @@ declare( strict_types=1 );
 
 namespace FastNutrition\MealPrep\Products;
 
+use FastNutrition\MealPrep\Admin\SettingsPage;
 use FastNutrition\MealPrep\PostTypes\Ingredient;
 use FastNutrition\MealPrep\Taxonomies\IngredientType;
 use WP_Post;
@@ -16,29 +17,65 @@ final class MealProduct {
 		add_action( 'woocommerce_product_data_panels', [ $this, 'render_product_panel' ] );
 		add_action( 'woocommerce_process_product_meta_simple', [ $this, 'save' ] );
 		add_action( 'woocommerce_process_product_meta', [ $this, 'save' ] );
-		add_action( 'wp', [ $this, 'maybe_replace_add_to_cart' ] );
+		add_action( 'wp', [ $this, 'apply_placement' ] );
+		add_shortcode( 'fn_meal_builder', [ $this, 'shortcode' ] );
 	}
 
-	public function maybe_replace_add_to_cart(): void {
-		if ( ! is_product() ) {
+	public function apply_placement(): void {
+		if ( ! function_exists( 'is_product' ) || ! is_product() ) {
 			return;
 		}
-		$product_id = get_queried_object_id();
-		if ( ! self::is_meal( (int) $product_id ) ) {
+		$product_id = (int) get_queried_object_id();
+		if ( ! self::is_meal( $product_id ) ) {
 			return;
 		}
-		remove_action( 'woocommerce_single_product_summary', 'woocommerce_template_single_add_to_cart', 30 );
-		add_action(
-			'woocommerce_single_product_summary',
-			static function () use ( $product_id ): void {
-				wp_enqueue_script( 'fn-meal-builder' );
-				wp_enqueue_style( 'fn-meal-builder' );
-				printf(
-					'<div class="fn-meal-builder-mount" data-fn-meal-builder="1" data-product-id="%d"></div>',
-					(int) $product_id
-				);
-			},
-			30
+
+		$placements = SettingsPage::placements();
+		$key        = SettingsPage::get_placement();
+		$cb         = function () use ( $product_id ): void {
+			echo self::render_mount( $product_id ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+		};
+
+		switch ( $key ) {
+			case 'replace_add_to_cart':
+				remove_action( 'woocommerce_single_product_summary', 'woocommerce_template_single_add_to_cart', 30 );
+				add_action( 'woocommerce_single_product_summary', $cb, 30 );
+				break;
+			case 'shortcode':
+				// Nothing to do — the user places it manually.
+				break;
+			default:
+				$row = $placements[ $key ] ?? null;
+				if ( $row && $row['hook'] ) {
+					add_action( $row['hook'], $cb, (int) $row['priority'] );
+				}
+		}
+	}
+
+	public function shortcode( array|string $atts = [] ): string {
+		$atts = shortcode_atts(
+			[
+				'product_id' => 0,
+			],
+			is_array( $atts ) ? $atts : [],
+			'fn_meal_builder'
+		);
+		$product_id = (int) $atts['product_id'];
+		if ( ! $product_id && function_exists( 'is_product' ) && is_product() ) {
+			$product_id = (int) get_queried_object_id();
+		}
+		if ( ! $product_id || ! self::is_meal( $product_id ) ) {
+			return '';
+		}
+		return self::render_mount( $product_id );
+	}
+
+	public static function render_mount( int $product_id ): string {
+		wp_enqueue_script( 'fn-meal-builder' );
+		wp_enqueue_style( 'fn-meal-builder' );
+		return sprintf(
+			'<div class="fn-meal-builder-mount" data-fn-meal-builder="1" data-product-id="%d"></div>',
+			(int) $product_id
 		);
 	}
 

@@ -10,6 +10,26 @@ final class SettingsPage {
 	public const OPTION_MULTISTEP_ENABLED = 'fn_multistep_enabled';
 	public const OPTION_CREATE_CALC_PAGE  = 'fn_macro_calc_page_id';
 	public const OPTION_MINIMAL_STYLING   = 'fn_minimal_styling';
+	public const OPTION_BUILDER_PLACEMENT = 'fn_builder_placement';
+
+	/**
+	 * @return array<string,array{label:string,hook:string,priority:int}>
+	 */
+	public static function placements(): array {
+		return [
+			'replace_add_to_cart' => [ 'label' => 'Replace the Add-to-Cart button', 'hook' => '', 'priority' => 0 ],
+			'before_add_to_cart'  => [ 'label' => 'Before the Add-to-Cart button', 'hook' => 'woocommerce_before_add_to_cart_form', 'priority' => 10 ],
+			'after_add_to_cart'   => [ 'label' => 'After the Add-to-Cart button', 'hook' => 'woocommerce_after_add_to_cart_form', 'priority' => 10 ],
+			'after_short_desc'    => [ 'label' => 'After the short description', 'hook' => 'woocommerce_single_product_summary', 'priority' => 21 ],
+			'after_title'         => [ 'label' => 'After the product title', 'hook' => 'woocommerce_single_product_summary', 'priority' => 6 ],
+			'shortcode'           => [ 'label' => 'Manual — only via [fn_meal_builder] shortcode', 'hook' => '', 'priority' => 0 ],
+		];
+	}
+
+	public static function get_placement(): string {
+		$val = (string) get_option( self::OPTION_BUILDER_PLACEMENT, 'replace_add_to_cart' );
+		return isset( self::placements()[ $val ] ) ? $val : 'replace_add_to_cart';
+	}
 
 	public function register(): void {
 		add_action( 'admin_init', [ $this, 'handle_actions' ] );
@@ -33,6 +53,8 @@ final class SettingsPage {
 		if ( 'save' === $action ) {
 			update_option( self::OPTION_MULTISTEP_ENABLED, ! empty( $_POST['fn_multistep_enabled'] ) ? 1 : 0 );
 			update_option( self::OPTION_MINIMAL_STYLING, ! empty( $_POST['fn_minimal_styling'] ) ? 1 : 0 );
+			$placement = isset( $_POST['fn_builder_placement'] ) ? sanitize_key( wp_unslash( (string) $_POST['fn_builder_placement'] ) ) : 'replace_add_to_cart';
+			update_option( self::OPTION_BUILDER_PLACEMENT, isset( self::placements()[ $placement ] ) ? $placement : 'replace_add_to_cart' );
 		} elseif ( 'convert_checkout' === $action ) {
 			$result = self::convert_checkout_page_to_blocks();
 			set_transient( 'fn_settings_notice', $result, 30 );
@@ -119,7 +141,16 @@ final class SettingsPage {
 			esc_html__( 'Turn off plugin CSS and render the meal builder as native dropdowns', 'fastnutrition-mealprep' ),
 			esc_html__( 'Off (default): the meal builder, macro calculator, slot picker, and multi-step nav use the plugin\'s built-in black + lime pill styling. On: plugin stylesheets are not enqueued and the meal builder renders using <select> dropdowns — exactly like your existing Fast Nutrition site — so your Flatsome theme CSS controls every colour, font, and button.', 'fastnutrition-mealprep' )
 		);
+
+		$current_placement = self::get_placement();
+		echo '<tr><th>' . esc_html__( 'Meal builder placement', 'fastnutrition-mealprep' ) . '</th><td><select name="fn_builder_placement">';
+		foreach ( self::placements() as $key => $row ) {
+			printf( '<option value="%s" %s>%s</option>', esc_attr( $key ), selected( $current_placement, $key, false ), esc_html( $row['label'] ) );
+		}
+		echo '</select><p class="description">' . esc_html__( 'Where the builder appears on meal products. If your theme or another plugin (Flatsome, Extra Product Options, Yith add-ons, etc.) is overriding the Add-to-Cart area, try "Before/After the Add-to-Cart button". Use "Manual" + the [fn_meal_builder] shortcode to drop it anywhere in the product description or a custom block.', 'fastnutrition-mealprep' ) . '</p></td></tr>';
+
 		echo '</tbody></table>';
+		echo '<p class="description"><strong>' . esc_html__( 'Shortcode:', 'fastnutrition-mealprep' ) . '</strong> <code>[fn_meal_builder]</code> ' . esc_html__( 'inside a meal product description, or', 'fastnutrition-mealprep' ) . ' <code>[fn_meal_builder product_id="123"]</code> ' . esc_html__( 'anywhere on the site to render it for that specific product.', 'fastnutrition-mealprep' ) . '</p>';
 		submit_button();
 		echo '</form>';
 
