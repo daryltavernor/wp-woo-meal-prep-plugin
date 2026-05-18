@@ -1,78 +1,46 @@
 .fn-meal-builder {
 	font-family: 'Kanit', system-ui, -apple-system, 'Helvetica Neue', sans-serif;
-	color: #000;
+	color: #1a1a1a;
 	max-width: 920px;
 	margin: 0 auto;
+	/* Leave room for the sticky footer so the last section is never hidden behind it. */
+	padding-bottom: 7.5rem;
 }
 .fn-meal-builder .fn-section {
 	margin-bottom: 1.5rem;
-}
-.fn-meal-builder .fn-section + .fn-section {
-	margin-top: 0;
 }
 .fn-meal-builder h3 {
 	margin: 0 0 0.6rem;
 	font-weight: 800;
 	text-transform: uppercase;
-	font-size: 1rem;
+	font-size: 0.95rem;
 	letter-spacing: 0.03em;
 }
-.fn-meal-builder .fn-pills {
+.fn-meal-builder .fn-section-head {
 	display: flex;
-	flex-wrap: wrap;
-	gap: 0.5rem 0.45rem;
-	align-items: flex-start;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem;
+	margin-bottom: 0.55rem;
 }
-.fn-meal-builder .fn-pills label {
+.fn-meal-builder .fn-section-head h3 {
+	margin: 0;
+}
+.fn-meal-builder .fn-section-toggle {
 	display: inline-flex;
 	align-items: center;
-	justify-content: center;
-	flex: 0 0 auto;
-	max-width: 100%;
-	padding: 0.5rem 0.95rem;
-	border: 2px solid #000;
-	border-radius: 999px;
-	cursor: pointer;
-	text-align: center;
-	background: #fff;
-	transition: background 0.15s, color 0.15s, transform 0.05s;
+	gap: 0.4rem;
+	font-size: 0.82rem;
 	font-weight: 600;
-	font-size: 0.92rem;
-	line-height: 1.15;
-	white-space: nowrap;
+	color: #444;
+	cursor: pointer;
+	user-select: none;
 }
-.fn-meal-builder .fn-pills label.is-disabled {
-	opacity: 0.35;
-	cursor: not-allowed;
-}
-.fn-meal-builder .fn-pills label input {
-	position: absolute;
-	opacity: 0;
-	pointer-events: none;
-}
-.fn-meal-builder .fn-pills label.is-selected {
-	background: #c5e643;
-	color: #000;
-	border-color: #000;
-}
-.fn-meal-builder .fn-pills label:hover:not(.is-selected):not(.is-disabled) {
-	background: #f4f9d6;
+.fn-meal-builder .fn-section-toggle input {
+	transform: scale(1.05);
 }
 
-/* Long names wrap inside the pill rather than blowing up vertically. */
-.fn-meal-builder .fn-pills label .fn-pill-text {
-	display: inline-block;
-	white-space: normal;
-	overflow-wrap: anywhere;
-	hyphens: auto;
-	max-width: 22ch;
-}
-.fn-meal-builder .fn-pills.fn-pills-wide label {
-	white-space: normal;
-	max-width: 100%;
-}
-
-/* Mode toggle (Build/Set/Sweet). */
+/* Mode toggle (Build / Set / Sweet) */
 .fn-meal-builder .fn-mode-toggle {
 	display: flex;
 	flex-wrap: wrap;
@@ -83,10 +51,11 @@
 	flex: 1 1 auto;
 	min-width: 140px;
 	padding: 0.65rem 1rem;
-	border: 2px solid #000;
+	border: 1px solid #e0e0e0;
 	border-radius: 999px;
-	background: #fff;
-	font-weight: 800;
+	background: #f4f4f4;
+	color: #1a1a1a;
+	font-weight: 700;
 	cursor: pointer;
 	font-family: inherit;
 	font-size: 0.95rem;
@@ -94,64 +63,139 @@
 .fn-meal-builder .fn-mode-toggle button.is-active {
 	background: #000;
 	color: #c5e643;
+	border-color: #000;
 }
 
-/* Two-column layout for Carb + Greens on desktop. */
-.fn-meal-builder .fn-two-col {
-	display: grid;
-	grid-template-columns: 1fr;
-	gap: 1.25rem;
+/* Dietary filter */
+.fn-meal-builder .fn-diet-filter {
+	display: inline-flex;
+	gap: 0.25rem;
+	padding: 0.2rem;
+	background: #f4f4f4;
+	border-radius: 999px;
 }
-@media (min-width: 720px) {
-	.fn-meal-builder .fn-two-col {
-		grid-template-columns: 1fr 1fr;
+.fn-meal-builder .fn-diet-filter button {
+	padding: 0.35rem 0.8rem;
+	border: none;
+	border-radius: 999px;
+	background: transparent;
+	cursor: pointer;
+	font-size: 0.82rem;
+	font-weight: 600;
+	color: #555;
+	font-family: inherit;
+}
+.fn-meal-builder .fn-diet-filter button.is-active {
+	background: #fff;
+	color: #000;
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+/* CSS Grid for pill ingredients — uniform cells. */
+.fn-meal-builder .fn-grid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 0.5rem;
+}
+@media (min-width: 480px) {
+	.fn-meal-builder .fn-grid {
+		grid-template-columns: repeat(3, minmax(0, 1fr));
 	}
 }
+@media (min-width: 820px) {
+	.fn-meal-builder .fn-grid {
+		grid-template-columns: repeat(4, minmax(0, 1fr));
+	}
+}
+.fn-meal-builder .fn-grid label {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 44px;
+	padding: 0.55rem 0.85rem;
+	background: #f4f4f4;
+	border: 1px solid #e7e7e7;
+	border-radius: 10px;
+	cursor: pointer;
+	font-weight: 500;
+	font-size: 0.9rem;
+	text-align: center;
+	color: #1a1a1a;
+	transition: background 0.12s, color 0.12s, border-color 0.12s;
+	line-height: 1.2;
+	word-break: break-word;
+	hyphens: auto;
+}
+.fn-meal-builder .fn-grid label input {
+	position: absolute;
+	opacity: 0;
+	pointer-events: none;
+}
+.fn-meal-builder .fn-grid label:hover:not(.is-selected):not(.is-disabled) {
+	background: #ecf3d9;
+	border-color: #d1d1d1;
+}
+.fn-meal-builder .fn-grid label.is-selected {
+	background: #c5e643;
+	color: #000;
+	border-color: #a8c92e;
+	font-weight: 700;
+}
+.fn-meal-builder .fn-grid label.is-disabled {
+	opacity: 0.4;
+	cursor: not-allowed;
+	background: #f4f4f4;
+	color: #888;
+}
 
-/* Low-carb hint as a clear standalone callout. */
-.fn-meal-builder .fn-callout {
-	margin: 0.5rem 0 0;
-	padding: 0.55rem 0.8rem;
-	background: #f4f9d6;
-	border-left: 4px solid #c5e643;
-	border-radius: 6px;
-	font-size: 0.88rem;
+/* Cards for set meals & sweets — typographic hierarchy. */
+.fn-meal-builder .fn-cards {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+	gap: 0.6rem;
+}
+.fn-meal-builder .fn-cards label {
+	display: block;
+	padding: 0.85rem 1rem;
+	background: #f4f4f4;
+	border: 1px solid #e7e7e7;
+	border-radius: 12px;
+	cursor: pointer;
+	text-align: left;
+	transition: background 0.12s, border-color 0.12s;
+}
+.fn-meal-builder .fn-cards label:hover:not(.is-selected) {
+	background: #ecf3d9;
+}
+.fn-meal-builder .fn-cards label.is-selected {
+	background: #c5e643;
+	border-color: #a8c92e;
+}
+.fn-meal-builder .fn-cards label input {
+	position: absolute;
+	opacity: 0;
+	pointer-events: none;
+}
+.fn-meal-builder .fn-card-title {
+	display: block;
+	font-weight: 800;
+	font-size: 0.98rem;
+	line-height: 1.2;
 	color: #1a1a1a;
 }
-
-.fn-meal-builder .fn-totals {
-	padding: 0.85rem 1rem;
-	background: #000;
-	color: #c5e643;
-	border-radius: 10px;
-	margin: 1.25rem 0;
-	font-size: 0.95rem;
-	letter-spacing: 0.02em;
-}
-.fn-meal-builder .fn-add-to-cart {
+.fn-meal-builder .fn-card-sub {
 	display: block;
-	width: 100%;
-	background: #c5e643 !important;
-	color: #000 !important;
-	font-weight: 800;
-	padding: 0.95rem;
-	border-radius: 999px;
-	border: 2px solid #000;
-	cursor: pointer;
-	font-family: inherit;
-	font-size: 1rem;
-	text-transform: uppercase;
-	letter-spacing: 0.05em;
+	margin-top: 0.2rem;
+	font-size: 0.83rem;
+	color: #555;
+	font-weight: 400;
+	line-height: 1.25;
 }
-.fn-meal-builder .fn-add-to-cart:hover {
-	background: #d6f266 !important;
-}
-.fn-meal-builder .fn-add-to-cart:disabled {
-	opacity: 0.5;
-	cursor: not-allowed;
+.fn-meal-builder .fn-cards label.is-selected .fn-card-sub {
+	color: #2a2a2a;
 }
 
-/* Addons */
+/* Add-ons */
 .fn-meal-builder .fn-addons {
 	display: flex;
 	flex-wrap: wrap;
@@ -159,19 +203,126 @@
 }
 .fn-meal-builder .fn-addons label {
 	display: inline-flex;
-	gap: 0.4rem;
+	gap: 0.45rem;
 	align-items: center;
 	padding: 0.55rem 0.95rem;
-	border: 2px solid #000;
+	background: #f4f4f4;
+	border: 1px solid #e7e7e7;
 	border-radius: 999px;
-	background: #fff;
 	cursor: pointer;
 	font-weight: 600;
-}
-.fn-meal-builder .fn-addons label input {
-	margin: 0;
-	transform: translateY(-1px);
+	font-size: 0.9rem;
+	color: #1a1a1a;
 }
 .fn-meal-builder .fn-addons label.is-selected {
 	background: #c5e643;
+	border-color: #a8c92e;
+}
+.fn-meal-builder .fn-addons input {
+	margin: 0;
+}
+
+/* Sticky single-CTA footer */
+.fn-meal-builder-footer {
+	position: fixed;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	z-index: 9999;
+	background: #000;
+	color: #fff;
+	padding: 0.85rem 1rem;
+	box-shadow: 0 -6px 18px rgba(0, 0, 0, 0.18);
+	font-family: 'Kanit', system-ui, sans-serif;
+}
+.fn-meal-builder-footer-inner {
+	max-width: 920px;
+	margin: 0 auto;
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	flex-wrap: wrap;
+}
+.fn-meal-builder-footer .fn-foot-macros {
+	flex: 1 1 200px;
+	color: #c5e643;
+	font-size: 0.88rem;
+	letter-spacing: 0.02em;
+	line-height: 1.3;
+}
+.fn-meal-builder-footer .fn-foot-macros strong {
+	color: #fff;
+	display: block;
+	font-size: 0.7rem;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	margin-bottom: 0.15rem;
+}
+.fn-meal-builder-footer .fn-qty {
+	display: inline-flex;
+	align-items: stretch;
+	border: 1px solid #c5e643;
+	border-radius: 999px;
+	overflow: hidden;
+	background: #000;
+}
+.fn-meal-builder-footer .fn-qty button {
+	background: transparent;
+	color: #c5e643;
+	border: none;
+	width: 36px;
+	font-size: 1.1rem;
+	cursor: pointer;
+	font-weight: 700;
+}
+.fn-meal-builder-footer .fn-qty input {
+	width: 44px;
+	border: none;
+	background: transparent;
+	color: #fff;
+	text-align: center;
+	font-size: 1rem;
+	font-weight: 700;
+	-moz-appearance: textfield;
+	appearance: textfield;
+}
+.fn-meal-builder-footer .fn-qty input::-webkit-outer-spin-button,
+.fn-meal-builder-footer .fn-qty input::-webkit-inner-spin-button {
+	-webkit-appearance: none;
+	margin: 0;
+}
+.fn-meal-builder-footer .fn-cta {
+	background: #c5e643;
+	color: #000;
+	font-weight: 800;
+	padding: 0.7rem 1.4rem;
+	border: none;
+	border-radius: 999px;
+	font-family: inherit;
+	font-size: 0.95rem;
+	cursor: pointer;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	flex: 1 1 180px;
+}
+.fn-meal-builder-footer .fn-cta:hover {
+	background: #d6f266;
+}
+.fn-meal-builder-footer .fn-cta:disabled {
+	background: #555;
+	color: #aaa;
+	cursor: not-allowed;
+}
+@media (max-width: 540px) {
+	.fn-meal-builder-footer .fn-foot-macros {
+		flex-basis: 100%;
+		text-align: center;
+	}
+}
+
+/* Hide the theme's default add-to-cart when our builder is mounted on the page. */
+body.fn-meal-builder-active form.cart:not(.fn-builder-form),
+body.fn-meal-builder-active .single_add_to_cart_button:not(.fn-cta) {
+	display: none !important;
 }

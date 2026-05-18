@@ -36,13 +36,15 @@ final class MealProduct {
 			echo self::render_mount( $product_id ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 		};
 
+		// Always hide the theme/Woo default add-to-cart on meal products — the builder owns the action.
+		remove_action( 'woocommerce_single_product_summary', 'woocommerce_template_single_add_to_cart', 30 );
+
 		switch ( $key ) {
 			case 'replace_add_to_cart':
-				remove_action( 'woocommerce_single_product_summary', 'woocommerce_template_single_add_to_cart', 30 );
 				add_action( 'woocommerce_single_product_summary', $cb, 30 );
 				break;
 			case 'shortcode':
-				// Nothing to do — the user places it manually.
+				// Render only where [fn_meal_builder] is placed.
 				break;
 			default:
 				$row = $placements[ $key ] ?? null;
