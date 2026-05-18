@@ -104,6 +104,7 @@ final class PrepSheet {
 			'carb'     => __( 'Carbs', 'fastnutrition-mealprep' ),
 			'greens'   => __( 'Greens', 'fastnutrition-mealprep' ),
 			'set_meal' => __( 'Set Meals', 'fastnutrition-mealprep' ),
+			'sweet'    => __( 'Sweets', 'fastnutrition-mealprep' ),
 		];
 		foreach ( $labels as $slug => $label ) {
 			if ( empty( $grouped[ $slug ] ) ) {

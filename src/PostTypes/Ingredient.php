@@ -40,6 +40,7 @@ final class Ingredient {
 				'carb'     => __( 'Carb', 'fastnutrition-mealprep' ),
 				'greens'   => __( 'Greens', 'fastnutrition-mealprep' ),
 				'set_meal' => __( 'Set Meal', 'fastnutrition-mealprep' ),
+				'sweet'    => __( 'Sweet', 'fastnutrition-mealprep' ),
 			];
 			$label = $map[ $slug ] ?? '—';
 			$color = [
@@ -47,6 +48,7 @@ final class Ingredient {
 				'carb'     => '#2271b1',
 				'greens'   => '#006400',
 				'set_meal' => '#7c3aed',
+				'sweet'    => '#d97706',
 			][ $slug ] ?? '#666';
 			printf( '<span style="display:inline-block;padding:2px 8px;border-radius:999px;background:%s;color:#fff;font-size:11px;font-weight:600">%s</span>', esc_attr( $color ), esc_html( $label ) );
 		} elseif ( 'fn_macros' === $column ) {
@@ -107,7 +109,6 @@ final class Ingredient {
 							'protein_g' => [ 'type' => 'number' ],
 							'carbs_g'   => [ 'type' => 'number' ],
 							'fat_g'     => [ 'type' => 'number' ],
-							'fibre_g'   => [ 'type' => 'number' ],
 						],
 					],
 				],
@@ -184,6 +185,7 @@ final class Ingredient {
 			'carb'     => [ __( 'Carb', 'fastnutrition-mealprep' ), __( 'A single carb (rice, sweet potato…). Optional — customers can swap it for a 2nd Greens if the meal allows.', 'fastnutrition-mealprep' ) ],
 			'greens'   => [ __( 'Greens', 'fastnutrition-mealprep' ), __( 'A vegetable side. Customers can pick 1, or 2 different Greens instead of a carb.', 'fastnutrition-mealprep' ) ],
 			'set_meal' => [ __( 'Set Meal', 'fastnutrition-mealprep' ), __( 'A complete pre-made meal. Chosen instead of building from components.', 'fastnutrition-mealprep' ) ],
+			'sweet'    => [ __( 'Sweet', 'fastnutrition-mealprep' ), __( 'A dessert or sweet snack (protein flapjacks, energy balls, overnight oats…). Sold as a separate product or add-on rather than part of the meal builder.', 'fastnutrition-mealprep' ) ],
 		];
 		echo '<h3 style="margin:4px 0">' . esc_html__( 'Type (required)', 'fastnutrition-mealprep' ) . '</h3>';
 		echo '<p class="description" style="margin-top:0">' . esc_html__( 'Pick one. This controls which dropdown the ingredient appears in on the product page.', 'fastnutrition-mealprep' ) . '</p>';
@@ -211,7 +213,6 @@ final class Ingredient {
 			'protein_g' => __( 'Protein (g)', 'fastnutrition-mealprep' ),
 			'carbs_g'   => __( 'Carbs (g)', 'fastnutrition-mealprep' ),
 			'fat_g'     => __( 'Fat (g)', 'fastnutrition-mealprep' ),
-			'fibre_g'   => __( 'Fibre (g)', 'fastnutrition-mealprep' ),
 		];
 		echo '<table class="form-table"><tbody>';
 		foreach ( $fields as $key => $label ) {
@@ -285,7 +286,6 @@ final class Ingredient {
 			'protein_g' => isset( $raw['protein_g'] ) ? (float) $raw['protein_g'] : 0,
 			'carbs_g'   => isset( $raw['carbs_g'] ) ? (float) $raw['carbs_g'] : 0,
 			'fat_g'     => isset( $raw['fat_g'] ) ? (float) $raw['fat_g'] : 0,
-			'fibre_g'   => isset( $raw['fibre_g'] ) ? (float) $raw['fibre_g'] : 0,
 		];
 		update_post_meta( $post_id, '_fn_macros', $macros );
 
@@ -299,7 +299,7 @@ final class Ingredient {
 
 		if ( isset( $_POST['fn_ingredient_type'] ) ) {
 			$type_slug = sanitize_key( wp_unslash( (string) $_POST['fn_ingredient_type'] ) );
-			if ( in_array( $type_slug, [ 'protein', 'carb', 'greens', 'set_meal' ], true ) ) {
+			if ( in_array( $type_slug, [ 'protein', 'carb', 'greens', 'set_meal', 'sweet' ], true ) ) {
 				$term = get_term_by( 'slug', $type_slug, IngredientType::TAXONOMY );
 				if ( ! $term ) {
 					$labels  = [
@@ -307,6 +307,7 @@ final class Ingredient {
 						'carb'     => __( 'Carb', 'fastnutrition-mealprep' ),
 						'greens'   => __( 'Greens', 'fastnutrition-mealprep' ),
 						'set_meal' => __( 'Set Meal', 'fastnutrition-mealprep' ),
+						'sweet'    => __( 'Sweet', 'fastnutrition-mealprep' ),
 					];
 					$created = wp_insert_term( $labels[ $type_slug ], IngredientType::TAXONOMY, [ 'slug' => $type_slug ] );
 					if ( ! is_wp_error( $created ) ) {
@@ -353,7 +354,6 @@ final class Ingredient {
 			'protein_g' => (float) ( $macros['protein_g'] ?? 0 ),
 			'carbs_g'   => (float) ( $macros['carbs_g'] ?? 0 ),
 			'fat_g'     => (float) ( $macros['fat_g'] ?? 0 ),
-			'fibre_g'   => (float) ( $macros['fibre_g'] ?? 0 ),
 		];
 	}
 

@@ -46,14 +46,13 @@ function MealBuilder( { productId, minimal } ) {
 	}, [ config, ingredients ] );
 
 	const totals = useMemo( () => {
-		const zero = { kcal: 0, protein_g: 0, carbs_g: 0, fat_g: 0, fibre_g: 0 };
+		const zero = { kcal: 0, protein_g: 0, carbs_g: 0, fat_g: 0 };
 		const lookup = ( id, list ) => list.find( ( i ) => i.id === id );
 		const add = ( a, b ) => ( {
 			kcal: a.kcal + ( b?.kcal || 0 ),
 			protein_g: a.protein_g + ( b?.protein_g || 0 ),
 			carbs_g: a.carbs_g + ( b?.carbs_g || 0 ),
 			fat_g: a.fat_g + ( b?.fat_g || 0 ),
-			fibre_g: a.fibre_g + ( b?.fibre_g || 0 ),
 		} );
 		let t = { ...zero };
 		if ( mode === 'set' && selection.set_meal_id ) {

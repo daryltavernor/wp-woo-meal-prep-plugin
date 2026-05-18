@@ -21,6 +21,7 @@ final class IngredientType {
 			'carb'     => __( 'Carb', 'fastnutrition-mealprep' ),
 			'greens'   => __( 'Greens', 'fastnutrition-mealprep' ),
 			'set_meal' => __( 'Set Meal', 'fastnutrition-mealprep' ),
+			'sweet'    => __( 'Sweet', 'fastnutrition-mealprep' ),
 		];
 		$seeded = 0;
 		foreach ( $terms as $slug => $name ) {

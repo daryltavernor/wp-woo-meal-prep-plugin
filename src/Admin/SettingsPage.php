@@ -3,6 +3,8 @@ declare( strict_types=1 );
 
 namespace FastNutrition\MealPrep\Admin;
 
+use FastNutrition\MealPrep\Install\IngredientSeeder;
+
 final class SettingsPage {
 
 	public const OPTION_MULTISTEP_ENABLED = 'fn_multistep_enabled';
@@ -37,6 +39,13 @@ final class SettingsPage {
 		} elseif ( 'create_calc_page' === $action ) {
 			$page_id = self::ensure_macro_calculator_page();
 			set_transient( 'fn_settings_notice', 'Macro Calculator page created (ID ' . $page_id . ').', 30 );
+		} elseif ( 'seed_ingredients' === $action ) {
+			$count = IngredientSeeder::seed( true );
+			set_transient(
+				'fn_settings_notice',
+				sprintf( 'Seeded %d ingredients (existing entries skipped).', $count ),
+				30
+			);
 		}
 		wp_safe_redirect( admin_url( 'admin.php?page=fn-settings' ) );
 		exit;
@@ -125,6 +134,14 @@ final class SettingsPage {
 			submit_button( __( 'Create Macro Calculator page', 'fastnutrition-mealprep' ), 'secondary', '', false );
 			echo '</form>';
 		}
+
+		echo '<h2>' . esc_html__( 'Ingredient catalogue', 'fastnutrition-mealprep' ) . '</h2>';
+		echo '<form method="post">';
+		wp_nonce_field( 'fn_save_settings', 'fn_settings_nonce' );
+		echo '<input type="hidden" name="fn_action" value="seed_ingredients" />';
+		echo '<p>' . esc_html__( 'Re-imports the Fast Nutrition starter ingredient catalogue (proteins, carbs, greens, set meals, sweets — both Standard and Bulk tiers — with macros). Existing ingredients with the same name are skipped, so this is safe to run multiple times.', 'fastnutrition-mealprep' ) . '</p>';
+		submit_button( __( 'Import starter ingredients', 'fastnutrition-mealprep' ), 'secondary', '', false );
+		echo '</form>';
 
 		echo '<h2>' . esc_html__( 'Third-party checkout compatibility', 'fastnutrition-mealprep' ) . '</h2>';
 		echo '<p>' . esc_html__( 'The multi-step flow is a layer on top of the native WooCommerce Checkout block — it does not replace the block. Any add-on that registers against the Checkout block (upsells, cross-sell widgets, extra field blocks, etc.) will continue to render. Unknown blocks default to Step 1 (Your details); if you have a plugin whose UI needs to appear during Payment, contact support to add its selector to the step map.', 'fastnutrition-mealprep' ) . '</p>';

@@ -12,7 +12,6 @@ final class Calculator {
 		'protein_g' => 0.0,
 		'carbs_g'   => 0.0,
 		'fat_g'     => 0.0,
-		'fibre_g'   => 0.0,
 	];
 
 	public function register(): void {
@@ -42,7 +41,6 @@ final class Calculator {
 			'protein_g' => (float) ( $a['protein_g'] ?? 0 ) + (float) ( $b['protein_g'] ?? 0 ),
 			'carbs_g'   => (float) ( $a['carbs_g'] ?? 0 ) + (float) ( $b['carbs_g'] ?? 0 ),
 			'fat_g'     => (float) ( $a['fat_g'] ?? 0 ) + (float) ( $b['fat_g'] ?? 0 ),
-			'fibre_g'   => (float) ( $a['fibre_g'] ?? 0 ) + (float) ( $b['fibre_g'] ?? 0 ),
 		];
 	}
 
@@ -52,7 +50,6 @@ final class Calculator {
 			'protein_g' => (float) ( $macros['protein_g'] ?? 0 ) * $factor,
 			'carbs_g'   => (float) ( $macros['carbs_g'] ?? 0 ) * $factor,
 			'fat_g'     => (float) ( $macros['fat_g'] ?? 0 ) * $factor,
-			'fibre_g'   => (float) ( $macros['fibre_g'] ?? 0 ) * $factor,
 		];
 	}
 
@@ -72,24 +69,22 @@ final class Calculator {
 		}
 		if ( $plain_text ) {
 			echo "\n" . esc_html__( 'Order macros', 'fastnutrition-mealprep' ) . ":\n";
-			printf( "%s kcal, P %sg, C %sg, F %sg, Fibre %sg\n",
+			printf( "%s kcal, P %sg, C %sg, F %sg\n",
 				number_format( $total['kcal'], 0 ),
 				number_format( $total['protein_g'], 1 ),
 				number_format( $total['carbs_g'], 1 ),
-				number_format( $total['fat_g'], 1 ),
-				number_format( $total['fibre_g'], 1 )
+				number_format( $total['fat_g'], 1 )
 			);
 			return;
 		}
 		echo '<h3>' . esc_html__( 'Order macros', 'fastnutrition-mealprep' ) . '</h3>';
 		echo '<p style="font-size:14px">' . sprintf(
-			/* translators: kcal, protein, carbs, fat, fibre */
-			esc_html__( '%1$s kcal · Protein %2$sg · Carbs %3$sg · Fat %4$sg · Fibre %5$sg', 'fastnutrition-mealprep' ),
+			/* translators: kcal, protein, carbs, fat */
+			esc_html__( '%1$s kcal · Protein %2$sg · Carbs %3$sg · Fat %4$sg', 'fastnutrition-mealprep' ),
 			esc_html( number_format( $total['kcal'], 0 ) ),
 			esc_html( number_format( $total['protein_g'], 1 ) ),
 			esc_html( number_format( $total['carbs_g'], 1 ) ),
-			esc_html( number_format( $total['fat_g'], 1 ) ),
-			esc_html( number_format( $total['fibre_g'], 1 ) )
+			esc_html( number_format( $total['fat_g'], 1 ) )
 		) . '</p>';
 	}
 }

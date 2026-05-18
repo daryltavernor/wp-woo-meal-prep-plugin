@@ -15,6 +15,7 @@ final class Activator {
 		( new IngredientType() )->register_taxonomy();
 		( new Allergen() )->register_taxonomy();
 		self::seed_ingredient_types();
+		IngredientSeeder::seed();
 		update_option( 'fn_mealprep_db_version', self::DB_VERSION, false );
 		flush_rewrite_rules();
 	}
@@ -92,6 +93,7 @@ final class Activator {
 			'carb'     => __( 'Carb', 'fastnutrition-mealprep' ),
 			'greens'   => __( 'Greens', 'fastnutrition-mealprep' ),
 			'set_meal' => __( 'Set Meal', 'fastnutrition-mealprep' ),
+			'sweet'    => __( 'Sweet', 'fastnutrition-mealprep' ),
 		];
 
 		foreach ( $terms as $slug => $name ) {

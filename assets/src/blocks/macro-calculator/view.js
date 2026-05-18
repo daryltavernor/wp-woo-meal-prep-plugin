@@ -4,7 +4,7 @@ import { __ } from '@wordpress/i18n';
 import './style.css';
 
 const STORAGE_KEY = 'fn-custom-ingredients';
-const emptyMacros = { kcal: 0, protein_g: 0, carbs_g: 0, fat_g: 0, fibre_g: 0 };
+const emptyMacros = { kcal: 0, protein_g: 0, carbs_g: 0, fat_g: 0 };
 
 function MacroCalculator() {
 	const [ catalog, setCatalog ] = useState( [] );
@@ -75,7 +75,6 @@ function MacroCalculator() {
 				protein_g: acc.protein_g + ( opt.macros.protein_g || 0 ) * factor,
 				carbs_g: acc.carbs_g + ( opt.macros.carbs_g || 0 ) * factor,
 				fat_g: acc.fat_g + ( opt.macros.fat_g || 0 ) * factor,
-				fibre_g: acc.fibre_g + ( opt.macros.fibre_g || 0 ) * factor,
 			};
 		}, { ...emptyMacros } );
 	}, [ rows, options ] );
@@ -94,6 +93,8 @@ function MacroCalculator() {
 		setCustom( [ ...custom, { id, ...draftCustom } ] );
 		setDraftCustom( null );
 	};
+
+	const MACRO_FIELDS = [ 'kcal', 'protein_g', 'carbs_g', 'fat_g' ];
 
 	return (
 		<div className="fn-macro-calc">
@@ -129,7 +130,7 @@ function MacroCalculator() {
 			</table>
 			<div className="fn-macro-actions">
 				<button type="button" onClick={ addRow }>{ __( 'Add row', 'fastnutrition-mealprep' ) }</button>
-				<button type="button" onClick={ () => setDraftCustom( { name: '', kcal: 0, protein_g: 0, carbs_g: 0, fat_g: 0, fibre_g: 0 } ) }>
+				<button type="button" onClick={ () => setDraftCustom( { name: '', kcal: 0, protein_g: 0, carbs_g: 0, fat_g: 0 } ) }>
 					{ __( 'Add custom ingredient', 'fastnutrition-mealprep' ) }
 				</button>
 			</div>
@@ -137,8 +138,8 @@ function MacroCalculator() {
 			{ draftCustom && (
 				<div className="fn-macro-custom">
 					<h4>{ __( 'New custom ingredient', 'fastnutrition-mealprep' ) }</h4>
-					<label>{ __( 'Name', 'fastnutrition-mealprep' ) }<input type="text" value={ draftCustom.name } onChange={ ( e ) => setDraftCustom( { ...draftCustom, name: e.target.value } ) } /></label>
-					{ [ 'kcal', 'protein_g', 'carbs_g', 'fat_g', 'fibre_g' ].map( ( k ) => (
+					<label>{ __( 'Name', 'fastnutrition-mealprep' ) }<input type="text" value={ draftCustom.name || '' } onChange={ ( e ) => setDraftCustom( { ...draftCustom, name: e.target.value } ) } /></label>
+					{ MACRO_FIELDS.map( ( k ) => (
 						<label key={ k }>{ k }<input type="number" value={ draftCustom[ k ] } onChange={ ( e ) => setDraftCustom( { ...draftCustom, [ k ]: Number( e.target.value ) } ) } /></label>
 					) ) }
 					<button type="button" onClick={ saveCustom }>{ __( 'Save', 'fastnutrition-mealprep' ) }</button>
@@ -147,7 +148,7 @@ function MacroCalculator() {
 			) }
 
 			<div className="fn-macro-totals">
-				<strong>{ __( 'Totals', 'fastnutrition-mealprep' ) }:</strong> { totals.kcal.toFixed( 0 ) } kcal · P { totals.protein_g.toFixed( 1 ) }g · C { totals.carbs_g.toFixed( 1 ) }g · F { totals.fat_g.toFixed( 1 ) }g · Fibre { totals.fibre_g.toFixed( 1 ) }g
+				<strong>{ __( 'Totals', 'fastnutrition-mealprep' ) }:</strong> { totals.kcal.toFixed( 0 ) } kcal · P { totals.protein_g.toFixed( 1 ) }g · C { totals.carbs_g.toFixed( 1 ) }g · F { totals.fat_g.toFixed( 1 ) }g
 			</div>
 
 			<div className="fn-macro-targets">

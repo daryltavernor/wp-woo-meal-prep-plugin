@@ -58,7 +58,6 @@ final class CustomIngredientStore {
 				'protein_g' => (float) ( $item['protein_g'] ?? 0 ),
 				'carbs_g'   => (float) ( $item['carbs_g'] ?? 0 ),
 				'fat_g'     => (float) ( $item['fat_g'] ?? 0 ),
-				'fibre_g'   => (float) ( $item['fibre_g'] ?? 0 ),
 			];
 		}
 		update_user_meta( get_current_user_id(), self::META_KEY, $clean );
