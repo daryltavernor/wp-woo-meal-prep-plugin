@@ -89,6 +89,7 @@ class ComposerStaticInita137623878dc30cbd11bee5e0cb9930d
         '356736db98a6834f0a886b8d509b0ecd' => __DIR__ . '/..' . '/thecodingmachine/safe/generated/zlib.php',
         '0174385c3be07e86008907d06ee66531' => __DIR__ . '/..' . '/sabberworm/php-css-parser/src/Rule/Rule.php',
         '98aea6e41b9cb79b379b10f37ba1f0b7' => __DIR__ . '/..' . '/sabberworm/php-css-parser/src/RuleSet/RuleContainer.php',
+        'f6d4f6bcee7247df6b777884c3e22f98' => __DIR__ . '/..' . '/yahnis-elsts/plugin-update-checker/load-v5p6.php',
     );
 
     public static $prefixLengthsPsr4 = array (
@@ -229,6 +230,7 @@ class ComposerStaticInita137623878dc30cbd11bee5e0cb9930d
         'FastNutrition\\MealPrep\\Admin\\PrepDashboard' => __DIR__ . '/../..' . '/src/Admin/PrepDashboard.php',
         'FastNutrition\\MealPrep\\Admin\\PrepSheet' => __DIR__ . '/../..' . '/src/Admin/PrepSheet.php',
         'FastNutrition\\MealPrep\\Admin\\ProfileAdmin' => __DIR__ . '/../..' . '/src/Admin/ProfileAdmin.php',
+        'FastNutrition\\MealPrep\\Admin\\SettingsPage' => __DIR__ . '/../..' . '/src/Admin/SettingsPage.php',
         'FastNutrition\\MealPrep\\Cart\\AddOnPricer' => __DIR__ . '/../..' . '/src/Cart/AddOnPricer.php',
         'FastNutrition\\MealPrep\\Cart\\BundlePricer' => __DIR__ . '/../..' . '/src/Cart/BundlePricer.php',
         'FastNutrition\\MealPrep\\Cart\\OrderItemMeta' => __DIR__ . '/../..' . '/src/Cart/OrderItemMeta.php',
@@ -240,6 +242,7 @@ class ComposerStaticInita137623878dc30cbd11bee5e0cb9930d
         'FastNutrition\\MealPrep\\Delivery\\ProfileResolver' => __DIR__ . '/../..' . '/src/Delivery/ProfileResolver.php',
         'FastNutrition\\MealPrep\\Delivery\\SlotAvailability' => __DIR__ . '/../..' . '/src/Delivery/SlotAvailability.php',
         'FastNutrition\\MealPrep\\Install\\Activator' => __DIR__ . '/../..' . '/src/Install/Activator.php',
+        'FastNutrition\\MealPrep\\Install\\IngredientSeeder' => __DIR__ . '/../..' . '/src/Install/IngredientSeeder.php',
         'FastNutrition\\MealPrep\\Macros\\Calculator' => __DIR__ . '/../..' . '/src/Macros/Calculator.php',
         'FastNutrition\\MealPrep\\Macros\\CustomIngredientStore' => __DIR__ . '/../..' . '/src/Macros/CustomIngredientStore.php',
         'FastNutrition\\MealPrep\\Macros\\ShortcodeCalculator' => __DIR__ . '/../..' . '/src/Macros/ShortcodeCalculator.php',

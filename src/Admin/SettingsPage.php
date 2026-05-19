@@ -11,6 +11,8 @@ final class SettingsPage {
 	public const OPTION_CREATE_CALC_PAGE  = 'fn_macro_calc_page_id';
 	public const OPTION_MINIMAL_STYLING   = 'fn_minimal_styling';
 	public const OPTION_BUILDER_PLACEMENT = 'fn_builder_placement';
+	public const OPTION_UPDATE_BRANCH     = 'fn_update_branch';
+	public const OPTION_UPDATE_TOKEN      = 'fn_update_token';
 
 	/**
 	 * @return array<string,array{label:string,hook:string,priority:int}>
@@ -55,6 +57,12 @@ final class SettingsPage {
 			update_option( self::OPTION_MINIMAL_STYLING, ! empty( $_POST['fn_minimal_styling'] ) ? 1 : 0 );
 			$placement = isset( $_POST['fn_builder_placement'] ) ? sanitize_key( wp_unslash( (string) $_POST['fn_builder_placement'] ) ) : 'replace_add_to_cart';
 			update_option( self::OPTION_BUILDER_PLACEMENT, isset( self::placements()[ $placement ] ) ? $placement : 'replace_add_to_cart' );
+
+			$branch = isset( $_POST['fn_update_branch'] ) ? sanitize_text_field( wp_unslash( (string) $_POST['fn_update_branch'] ) ) : '';
+			update_option( self::OPTION_UPDATE_BRANCH, $branch !== '' ? $branch : 'main' );
+			if ( isset( $_POST['fn_update_token'] ) ) {
+				update_option( self::OPTION_UPDATE_TOKEN, sanitize_text_field( wp_unslash( (string) $_POST['fn_update_token'] ) ) );
+			}
 		} elseif ( 'convert_checkout' === $action ) {
 			$result = self::convert_checkout_page_to_blocks();
 			set_transient( 'fn_settings_notice', $result, 30 );
@@ -151,6 +159,36 @@ final class SettingsPage {
 
 		echo '</tbody></table>';
 		echo '<p class="description"><strong>' . esc_html__( 'Shortcode:', 'fastnutrition-mealprep' ) . '</strong> <code>[fn_meal_builder]</code> ' . esc_html__( 'inside a meal product description, or', 'fastnutrition-mealprep' ) . ' <code>[fn_meal_builder product_id="123"]</code> ' . esc_html__( 'anywhere on the site to render it for that specific product.', 'fastnutrition-mealprep' ) . '</p>';
+
+		// Self-updates from GitHub.
+		$branch = (string) get_option( self::OPTION_UPDATE_BRANCH, 'main' );
+		$token  = (string) get_option( self::OPTION_UPDATE_TOKEN, '' );
+		echo '<h2>' . esc_html__( 'Plugin updates', 'fastnutrition-mealprep' ) . '</h2>';
+		echo '<p>' . esc_html__( 'WordPress checks the GitHub repository for new versions in the background. When the Version header in fastnutrition-mealprep.php is bumped on the branch below and pushed, the standard WP "Update available" notice appears in Plugins and Dashboard → Updates.', 'fastnutrition-mealprep' ) . '</p>';
+		echo '<form method="post">';
+		wp_nonce_field( 'fn_save_settings', 'fn_settings_nonce' );
+		echo '<input type="hidden" name="fn_action" value="save" />';
+		// Re-submit the other current values so this form doesn\'t reset them.
+		echo '<input type="hidden" name="fn_multistep_enabled" value="' . ( self::multistep_enabled() ? '1' : '0' ) . '" />';
+		echo '<input type="hidden" name="fn_minimal_styling" value="' . ( self::minimal_styling() ? '1' : '0' ) . '" />';
+		echo '<input type="hidden" name="fn_builder_placement" value="' . esc_attr( self::get_placement() ) . '" />';
+
+		echo '<table class="form-table"><tbody>';
+		printf(
+			'<tr><th><label for="fn_update_branch">%s</label></th><td><input type="text" id="fn_update_branch" name="fn_update_branch" value="%s" class="regular-text" /><p class="description">%s</p></td></tr>',
+			esc_html__( 'Update branch', 'fastnutrition-mealprep' ),
+			esc_attr( $branch ),
+			esc_html__( 'GitHub branch to watch for new versions. Defaults to "main". After pushing a commit that bumps the Version header, WordPress will see the update within ~12 hours, or use "Check again" on Plugins → Updates to fetch immediately.', 'fastnutrition-mealprep' )
+		);
+		printf(
+			'<tr><th><label for="fn_update_token">%s</label></th><td><input type="password" id="fn_update_token" name="fn_update_token" value="%s" class="regular-text" autocomplete="new-password" /><p class="description">%s</p></td></tr>',
+			esc_html__( 'GitHub access token (private repos only)', 'fastnutrition-mealprep' ),
+			esc_attr( $token ),
+			esc_html__( 'Only needed if the repository is private. Create a fine-grained Personal Access Token with read access to the repo and paste it here. Leave blank for public repos. Tokens are stored in wp_options and never sent to the front-end.', 'fastnutrition-mealprep' )
+		);
+		echo '</tbody></table>';
+		submit_button( __( 'Save update settings', 'fastnutrition-mealprep' ) );
+		echo '</form>';
 		submit_button();
 		echo '</form>';
 

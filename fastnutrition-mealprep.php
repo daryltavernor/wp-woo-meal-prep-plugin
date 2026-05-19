@@ -40,6 +40,30 @@ if ( ! is_readable( $fn_autoload ) ) {
 }
 require $fn_autoload;
 
+// GitHub-backed self-updates from WP dashboard.
+if ( ! defined( 'FN_MEALPREP_GITHUB_REPO' ) ) {
+	define( 'FN_MEALPREP_GITHUB_REPO', 'https://github.com/daryltavernor/wp-woo-meal-prep-plugin/' );
+}
+if ( class_exists( \YahnisElsts\PluginUpdateChecker\v5\PucFactory::class ) ) {
+	$fn_update_checker = \YahnisElsts\PluginUpdateChecker\v5\PucFactory::buildUpdateChecker(
+		FN_MEALPREP_GITHUB_REPO,
+		FN_MEALPREP_FILE,
+		'fastnutrition-mealprep'
+	);
+	// Allow the branch + private-repo token to be configured from the Settings page (or via constants).
+	$fn_branch = defined( 'FN_MEALPREP_UPDATE_BRANCH' )
+		? FN_MEALPREP_UPDATE_BRANCH
+		: ( get_option( 'fn_update_branch' ) ?: 'main' );
+	$fn_update_checker->setBranch( (string) $fn_branch );
+
+	$fn_token = defined( 'FN_MEALPREP_GITHUB_TOKEN' )
+		? FN_MEALPREP_GITHUB_TOKEN
+		: (string) get_option( 'fn_update_token', '' );
+	if ( $fn_token ) {
+		$fn_update_checker->setAuthentication( $fn_token );
+	}
+}
+
 add_action(
 	'before_woocommerce_init',
 	static function (): void {
