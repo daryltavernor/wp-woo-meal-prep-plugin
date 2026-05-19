@@ -44,9 +44,19 @@ final class OrderItemMeta {
 			}
 		}
 		if ( ! empty( $selection['addons'] ) && is_array( $selection['addons'] ) ) {
-			$labels = array_filter( array_map( static fn( $a ) => (string) ( $a['label'] ?? '' ), $selection['addons'] ) );
-			if ( ! empty( $labels ) ) {
-				$item->add_meta_data( __( 'Add-ons', 'fastnutrition-mealprep' ), implode( ', ', $labels ) );
+			$parts = [];
+			foreach ( $selection['addons'] as $addon ) {
+				$label = isset( $addon['label'] ) ? (string) $addon['label'] : '';
+				if ( '' === $label ) {
+					continue;
+				}
+				$price   = isset( $addon['price'] ) ? (float) $addon['price'] : 0;
+				$parts[] = $price > 0
+					? sprintf( '%s (+%s)', $label, wp_strip_all_tags( wc_price( $price ) ) )
+					: $label;
+			}
+			if ( ! empty( $parts ) ) {
+				$item->add_meta_data( __( 'Add-ons', 'fastnutrition-mealprep' ), implode( ', ', $parts ) );
 			}
 		}
 

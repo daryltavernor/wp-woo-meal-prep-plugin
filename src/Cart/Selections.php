@@ -131,12 +131,21 @@ final class Selections {
 			}
 		}
 		if ( ! empty( $selection['addons'] ) && is_array( $selection['addons'] ) ) {
-			$labels = array_map( static fn( $a ) => (string) ( $a['label'] ?? '' ), $selection['addons'] );
-			$labels = array_filter( $labels );
-			if ( ! empty( $labels ) ) {
+			$parts = [];
+			foreach ( $selection['addons'] as $addon ) {
+				$label = isset( $addon['label'] ) ? (string) $addon['label'] : '';
+				if ( '' === $label ) {
+					continue;
+				}
+				$price = isset( $addon['price'] ) ? (float) $addon['price'] : 0;
+				$parts[] = $price > 0
+					? sprintf( '%s (+%s)', $label, wp_strip_all_tags( wc_price( $price ) ) )
+					: $label;
+			}
+			if ( ! empty( $parts ) ) {
 				$item_data[] = [
 					'key'   => __( 'Add-ons', 'fastnutrition-mealprep' ),
-					'value' => implode( ', ', $labels ),
+					'value' => implode( ', ', $parts ),
 				];
 			}
 		}
