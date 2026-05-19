@@ -149,77 +149,6 @@
 	margin-right: 0.35rem;
 }
 
-/* ---- CTA row (qty stepper + add-to-basket) ------------------------------- */
-.fn-meal-builder .fn-cta-row {
-	display: flex;
-	align-items: stretch;
-	justify-content: center;
-	gap: 1rem;
-	margin: 1.75rem 0 0;
-	flex-wrap: wrap;
-}
-.fn-meal-builder .fn-qty {
-	display: inline-flex;
-	align-items: stretch;
-	border: 1px solid #d8d8d8;
-	border-radius: 999px;
-	overflow: hidden;
-	background: #fff;
-	min-height: 54px;
-}
-.fn-meal-builder .fn-qty button {
-	background: transparent;
-	color: #000;
-	border: none;
-	width: 44px;
-	font: 800 1.3rem/1 'Kanit', sans-serif;
-	cursor: pointer;
-	padding: 0;
-}
-.fn-meal-builder .fn-qty button:hover { background: #f4f4f4; }
-.fn-meal-builder .fn-qty input {
-	width: 50px;
-	border: none;
-	background: transparent;
-	color: #000;
-	text-align: center;
-	font: 800 italic 1.05rem/1 'Kanit', sans-serif;
-	border-left: 1px solid #e8e8e8;
-	border-right: 1px solid #e8e8e8;
-	-moz-appearance: textfield;
-	appearance: textfield;
-	padding: 0;
-	height: auto;
-	box-shadow: none;
-	outline: none;
-}
-.fn-meal-builder .fn-qty input::-webkit-outer-spin-button,
-.fn-meal-builder .fn-qty input::-webkit-inner-spin-button {
-	-webkit-appearance: none;
-	margin: 0;
-}
-.fn-meal-builder .fn-cta {
-	background: #c5e643;
-	color: #fff;
-	border: none;
-	border-radius: 999px;
-	padding: 0 3rem;
-	min-height: 54px;
-	font: 800 italic 1.05rem/1 'Kanit', sans-serif;
-	text-transform: uppercase;
-	letter-spacing: 0.06em;
-	cursor: pointer;
-	transition: background 0.15s;
-	text-shadow: none;
-	box-shadow: none;
-}
-.fn-meal-builder .fn-cta:hover:not(:disabled) { background: #b8da34; }
-.fn-meal-builder .fn-cta:disabled {
-	background: #e4e4e4;
-	color: #999;
-	cursor: not-allowed;
-}
-
 /* ---- Inline status -------------------------------------------------------*/
 .fn-meal-builder .fn-status {
 	margin: 1rem auto 0;
@@ -243,5 +172,4 @@
 	.fn-meal-builder .fn-row-label { flex-basis: 100%; min-width: 0; }
 	.fn-meal-builder .fn-row-help { padding-left: 0; }
 	.fn-meal-builder .fn-row-price { margin-left: auto; }
-	.fn-meal-builder .fn-cta { padding: 0 2rem; }
 }
