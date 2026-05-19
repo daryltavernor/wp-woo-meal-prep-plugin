@@ -7,14 +7,6 @@ const SET_MEAL_PREFIX = 'set:';
 const CARB_PREFIX     = 'carb:';
 const GREENS_PREFIX   = 'greens:';
 
-const matchesDiet = ( ingredient, diet ) => {
-	if ( diet === 'all' ) return true;
-	const tags = ingredient.allergens || [];
-	if ( diet === 'vegan' ) return tags.includes( 'vegan' );
-	if ( diet === 'vegetarian' ) return tags.includes( 'vegetarian' ) || tags.includes( 'vegan' );
-	return true;
-};
-
 const priceLabel = ( n ) => `£${ Number( n || 0 ).toFixed( 2 ) }`;
 
 function MealBuilder( { productId } ) {
@@ -22,7 +14,6 @@ function MealBuilder( { productId } ) {
 	const [ ingredients, setIngredients ] = useState( {
 		protein: [], carb: [], greens: [], set_meal: [], sweet: [],
 	} );
-	const [ diet, setDiet ] = useState( 'all' );
 	const [ qty, setQty ] = useState( 1 );
 	const [ mode, setMode ] = useState( 'meal' );
 	const [ selection, setSelection ] = useState( {
@@ -36,11 +27,6 @@ function MealBuilder( { productId } ) {
 	} );
 	const [ submitting, setSubmitting ] = useState( false );
 	const [ status, setStatus ] = useState( null );
-
-	useEffect( () => {
-		document.body.classList.add( 'fn-meal-builder-active' );
-		return () => document.body.classList.remove( 'fn-meal-builder-active' );
-	}, [] );
 
 	useEffect( () => {
 		apiFetch( { path: `fastnutrition/v1/meal-config/${ productId }` } ).then( ( cfg ) => {
@@ -64,8 +50,7 @@ function MealBuilder( { productId } ) {
 		const byAllow = ( list, allowList ) =>
 			! allowList || ! allowList.length ? list : list.filter( ( i ) => allowList.includes( i.id ) );
 		const byTier = ( list ) => list.filter( ( i ) => ! i.tier || i.tier === tier );
-		const byDiet = ( list ) => list.filter( ( i ) => matchesDiet( i, diet ) );
-		const apply = ( list, allowList ) => byDiet( byTier( byAllow( list || [], allowList ) ) );
+		const apply = ( list, allowList ) => byTier( byAllow( list || [], allowList ) );
 		return {
 			protein: apply( ingredients.protein, config.config.allowed_proteins ),
 			carb: apply( ingredients.carb, config.config.allowed_carbs ),
@@ -73,50 +58,22 @@ function MealBuilder( { productId } ) {
 			set_meal: apply( ingredients.set_meal, config.config.allowed_set_meals ),
 			sweet: apply( ingredients.sweet || [], config.config.allowed_sweets ),
 		};
-	}, [ config, ingredients, diet ] );
+	}, [ config, ingredients ] );
 
 	const isSetMeal = !! selection.set_meal_id;
-
 	const findById = ( id, list ) => list.find( ( i ) => i.id === id );
 
-	const slot1Price = useMemo( () => {
-		if ( isSetMeal ) return findById( selection.set_meal_id, ingredients.set_meal )?.price_delta || 0;
-		if ( selection.protein_id ) return findById( selection.protein_id, ingredients.protein )?.price_delta || 0;
-		return 0;
-	}, [ selection, ingredients, isSetMeal ] );
-	const slot2Price = useMemo( () => {
-		if ( ! selection.slot2_id ) return 0;
-		const list = selection.slot2_kind === 'carb' ? ingredients.carb : ingredients.greens;
-		return findById( selection.slot2_id, list )?.price_delta || 0;
-	}, [ selection, ingredients ] );
-	const slot3Price = useMemo( () => {
-		if ( ! selection.greens_id ) return 0;
-		return findById( selection.greens_id, ingredients.greens )?.price_delta || 0;
-	}, [ selection, ingredients ] );
-	const sweetPrice = useMemo( () => {
-		if ( ! selection.sweet_id ) return 0;
-		return findById( selection.sweet_id, ingredients.sweet || [] )?.price_delta || 0;
-	}, [ selection, ingredients ] );
+	const slot1Price = isSetMeal
+		? ( findById( selection.set_meal_id, ingredients.set_meal )?.price_delta || 0 )
+		: ( findById( selection.protein_id, ingredients.protein )?.price_delta || 0 );
 
-	const totals = useMemo( () => {
-		const zero = { kcal: 0, protein_g: 0, carbs_g: 0, fat_g: 0 };
-		const add = ( a, b ) => ( {
-			kcal: a.kcal + ( b?.kcal || 0 ),
-			protein_g: a.protein_g + ( b?.protein_g || 0 ),
-			carbs_g: a.carbs_g + ( b?.carbs_g || 0 ),
-			fat_g: a.fat_g + ( b?.fat_g || 0 ),
-		} );
-		let t = { ...zero };
-		if ( mode === 'sweet' && selection.sweet_id ) {
-			return add( t, findById( selection.sweet_id, ingredients.sweet || [] )?.macros );
-		}
-		if ( isSetMeal ) return add( t, findById( selection.set_meal_id, ingredients.set_meal )?.macros );
-		if ( selection.protein_id ) t = add( t, findById( selection.protein_id, ingredients.protein )?.macros );
-		if ( selection.slot2_kind === 'carb' && selection.slot2_id ) t = add( t, findById( selection.slot2_id, ingredients.carb )?.macros );
-		if ( selection.slot2_kind === 'greens' && selection.slot2_id ) t = add( t, findById( selection.slot2_id, ingredients.greens )?.macros );
-		if ( selection.greens_id ) t = add( t, findById( selection.greens_id, ingredients.greens )?.macros );
-		return t;
-	}, [ selection, mode, ingredients, isSetMeal ] );
+	const slot2Price = ! selection.slot2_id
+		? 0
+		: ( findById( selection.slot2_id, selection.slot2_kind === 'carb' ? ingredients.carb : ingredients.greens )?.price_delta || 0 );
+
+	const slot3Price = findById( selection.greens_id, ingredients.greens )?.price_delta || 0;
+
+	const sweetPrice = findById( selection.sweet_id, ingredients.sweet || [] )?.price_delta || 0;
 
 	const isValid = useMemo( () => {
 		if ( ! config ) return false;
@@ -152,9 +109,9 @@ function MealBuilder( { productId } ) {
 		}
 	};
 
-	const setAddon = ( addon, on ) => {
-		const others = selection.addons.filter( ( a ) => a.id !== addon.id );
-		const addons = on ? [ ...others, addon ] : others;
+	const toggleAddon = ( addon ) => {
+		const on = selection.addons.some( ( a ) => a.id === addon.id );
+		const addons = on ? selection.addons.filter( ( a ) => a.id !== addon.id ) : [ ...selection.addons, addon ];
 		setSelection( { ...selection, addons } );
 	};
 
@@ -164,8 +121,7 @@ function MealBuilder( { productId } ) {
 			document.querySelectorAll( sel ).forEach( ( node ) => {
 				const wrap = document.createElement( 'div' );
 				wrap.innerHTML = fragments[ sel ];
-				const replacement = wrap.firstElementChild;
-				if ( replacement ) node.replaceWith( replacement );
+				if ( wrap.firstElementChild ) node.replaceWith( wrap.firstElementChild );
 			} );
 		} );
 		document.body.dispatchEvent( new CustomEvent( 'wc_fragments_refreshed' ) );
@@ -179,7 +135,6 @@ function MealBuilder( { productId } ) {
 	const submit = async () => {
 		if ( ! isValid || submitting ) return;
 		setSubmitting( true );
-
 		let payload;
 		if ( mode === 'sweet' ) {
 			payload = { mode: 'sweet', sweet_id: selection.sweet_id, addons: selection.addons };
@@ -197,24 +152,14 @@ function MealBuilder( { productId } ) {
 				addons: selection.addons,
 			};
 		}
-
 		try {
 			const result = await apiFetch( {
 				path: 'fastnutrition/v1/cart/add',
 				method: 'POST',
-				data: {
-					product_id: productId,
-					quantity: Math.max( 1, parseInt( qty, 10 ) || 1 ),
-					selection: payload,
-				},
+				data: { product_id: productId, quantity: Math.max( 1, parseInt( qty, 10 ) || 1 ), selection: payload },
 			} );
 			applyFragments( result?.fragments );
-			setStatus( {
-				type: 'ok',
-				text: __( 'Added to basket', 'fastnutrition-mealprep' ),
-				count: result?.cart_count || 0,
-				cartUrl: result?.cart_url || '',
-			} );
+			setStatus( { type: 'ok', text: __( 'Added to basket', 'fastnutrition-mealprep' ), count: result?.cart_count || 0, cartUrl: result?.cart_url || '' } );
 			reset();
 		} catch ( err ) {
 			setStatus( { type: 'err', text: err?.message || __( 'Could not add to cart.', 'fastnutrition-mealprep' ) } );
@@ -225,11 +170,10 @@ function MealBuilder( { productId } ) {
 	};
 
 	if ( ! config ) {
-		return <div>{ __( 'Loading…', 'fastnutrition-mealprep' ) }</div>;
+		return <div className="fn-meal-builder">{ __( 'Loading…', 'fastnutrition-mealprep' ) }</div>;
 	}
 
 	const offerSweetMode = config.config.allow_sweet_mode && ( allowed.sweet || [] ).length > 0;
-	const hasDietTags = Object.values( ingredients ).some( ( list ) => list.some( ( i ) => ( i.allergens || [] ).some( ( t ) => t === 'vegetarian' || t === 'vegan' ) ) );
 	const slot1Value = isSetMeal ? SET_MEAL_PREFIX + selection.set_meal_id : ( selection.protein_id ? String( selection.protein_id ) : '' );
 	const slot2Value = selection.slot2_id ? ( selection.slot2_kind === 'carb' ? CARB_PREFIX : GREENS_PREFIX ) + selection.slot2_id : '';
 
@@ -247,33 +191,17 @@ function MealBuilder( { productId } ) {
 			) }
 
 			{ mode === 'sweet' ? (
-				<PillRow
-					label={ __( 'Pick a Sweet', 'fastnutrition-mealprep' ) }
-					required
-					price={ sweetPrice }
-				>
+				<Row label={ __( 'Pick a Sweet', 'fastnutrition-mealprep' ) } required price={ sweetPrice }>
 					<select value={ selection.sweet_id || '' } onChange={ ( e ) => setSelection( { ...selection, sweet_id: parseInt( e.target.value, 10 ) || 0 } ) }>
 						<option value="">{ __( 'Choose a sweet…', 'fastnutrition-mealprep' ) }</option>
 						{ allowed.sweet.map( ( i ) => (
 							<option key={ i.id } value={ i.id }>{ i.name }</option>
 						) ) }
 					</select>
-				</PillRow>
+				</Row>
 			) : (
 				<>
-					{ hasDietTags && (
-						<div className="fn-diet-filter">
-							{ [
-								[ 'all', __( 'All', 'fastnutrition-mealprep' ) ],
-								[ 'vegetarian', __( 'Vegetarian', 'fastnutrition-mealprep' ) ],
-								[ 'vegan', __( 'Vegan', 'fastnutrition-mealprep' ) ],
-							].map( ( [ k, label ] ) => (
-								<button key={ k } type="button" className={ diet === k ? 'is-active' : '' } onClick={ () => setDiet( k ) }>{ label }</button>
-							) ) }
-						</div>
-					) }
-
-					<PillRow label={ __( 'Pick a Protein', 'fastnutrition-mealprep' ) } required price={ slot1Price }>
+					<Row label={ __( 'Pick a Protein', 'fastnutrition-mealprep' ) } required price={ slot1Price }>
 						<select value={ slot1Value } onChange={ ( e ) => onSlot1Change( e.target.value ) }>
 							<option value="">{ __( 'Meat, Fish or Quorn', 'fastnutrition-mealprep' ) }</option>
 							{ allowed.protein.length > 0 && (
@@ -284,18 +212,23 @@ function MealBuilder( { productId } ) {
 								</optgroup>
 							) }
 							{ config.config.allow_set_meal_mode && allowed.set_meal.length > 0 && (
-								<optgroup label={ __( 'Set Meals (no carb / greens needed)', 'fastnutrition-mealprep' ) }>
+								<optgroup label={ __( 'Set Meals', 'fastnutrition-mealprep' ) }>
 									{ allowed.set_meal.map( ( i ) => (
 										<option key={ 'sm' + i.id } value={ SET_MEAL_PREFIX + i.id }>{ i.name }</option>
 									) ) }
 								</optgroup>
 							) }
 						</select>
-					</PillRow>
+					</Row>
 
 					{ ! isSetMeal && (
 						<>
-							<PillRow label={ __( 'Pick Your Carbs', 'fastnutrition-mealprep' ) } required price={ slot2Price } help={ __( 'Or pick a 2nd greens here to swap in 2× greens instead of a carb.', 'fastnutrition-mealprep' ) }>
+							<Row
+								label={ __( 'Pick Your Carbs', 'fastnutrition-mealprep' ) }
+								required
+								price={ slot2Price }
+								help={ config.config.allow_double_greens ? __( 'Or pick a 2nd greens here to swap in 2× greens instead of a carb.', 'fastnutrition-mealprep' ) : '' }
+							>
 								<select value={ slot2Value } onChange={ ( e ) => onSlot2Change( e.target.value ) }>
 									<option value="">{ __( 'Carbs or Double Greens', 'fastnutrition-mealprep' ) }</option>
 									{ allowed.carb.length > 0 && (
@@ -313,9 +246,9 @@ function MealBuilder( { productId } ) {
 										</optgroup>
 									) }
 								</select>
-							</PillRow>
+							</Row>
 
-							<PillRow
+							<Row
 								label={ selection.slot2_kind === 'greens' ? __( 'Pick Your 2nd Greens', 'fastnutrition-mealprep' ) : __( 'Pick Your Greens', 'fastnutrition-mealprep' ) }
 								required
 								price={ slot3Price }
@@ -328,7 +261,7 @@ function MealBuilder( { productId } ) {
 											<option key={ 'g3' + i.id } value={ i.id }>{ i.name }</option>
 										) ) }
 								</select>
-							</PillRow>
+							</Row>
 						</>
 					) }
 				</>
@@ -340,14 +273,13 @@ function MealBuilder( { productId } ) {
 						const on = selection.addons.some( ( a ) => a.id === addon.id );
 						return (
 							<div key={ addon.id }>
-								<p className="fn-addons-title">{ addon.label }</p>
+								<p className="fn-addons-title">{ addon.label } { __( 'for a Protein Boost', 'fastnutrition-mealprep' ) }</p>
 								<div className="fn-addon-row">
-									<span className="fn-addon-label">{ __( 'Add to your meal?', 'fastnutrition-mealprep' ) }</span>
-									<div className="fn-yesno" role="group" aria-label={ addon.label }>
-										<button type="button" className={ `is-no ${ ! on ? 'is-active' : '' }` } onClick={ () => setAddon( addon, false ) }>{ __( 'No', 'fastnutrition-mealprep' ) }</button>
-										<button type="button" className={ `is-yes ${ on ? 'is-active' : '' }` } onClick={ () => setAddon( addon, true ) }>{ __( 'Yes', 'fastnutrition-mealprep' ) }</button>
-									</div>
-									<span className="fn-addon-price">+{ priceLabel( addon.price ) }</span>
+									<label>
+										<input type="checkbox" checked={ on } onChange={ () => toggleAddon( addon ) } />
+										{ __( 'Add', 'fastnutrition-mealprep' ) } { addon.label }
+									</label>
+									<span className="fn-addon-price">{ priceLabel( addon.price ) }</span>
 								</div>
 							</div>
 						);
@@ -366,12 +298,6 @@ function MealBuilder( { productId } ) {
 				</button>
 			</div>
 
-			{ ( totals.kcal > 0 || totals.protein_g > 0 ) && (
-				<p className="fn-macros-line">
-					{ totals.kcal.toFixed( 0 ) } kcal · P { totals.protein_g.toFixed( 1 ) }g · C { totals.carbs_g.toFixed( 1 ) }g · F { totals.fat_g.toFixed( 1 ) }g
-				</p>
-			) }
-
 			{ status && (
 				<div className={ `fn-status ${ status.type === 'ok' ? 'is-ok' : 'is-err' }` } role="status" aria-live="polite">
 					{ status.text }
@@ -384,7 +310,7 @@ function MealBuilder( { productId } ) {
 	);
 }
 
-function PillRow( { label, required, price, help, children } ) {
+function Row( { label, required, price, help, children } ) {
 	return (
 		<div className="fn-row">
 			<span className="fn-row-label">
