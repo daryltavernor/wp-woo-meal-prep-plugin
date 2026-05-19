@@ -1,5 +1,5 @@
 import apiFetch from '@wordpress/api-fetch';
-import { createRoot, useEffect, useState, useMemo, useRef } from '@wordpress/element';
+import { createRoot, useEffect, useState, useMemo } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
 import './style.css';
 
@@ -24,8 +24,6 @@ function MealBuilder( { productId } ) {
 		greens_id: 0,
 		addons: [],
 	} );
-	const [ submitting, setSubmitting ] = useState( false );
-	const [ status, setStatus ] = useState( null );
 
 	useEffect( () => {
 		apiFetch( { path: `fastnutrition/v1/meal-config/${ productId }` } ).then( ( cfg ) => {
@@ -71,6 +69,26 @@ function MealBuilder( { productId } ) {
 	const slot3Price = findById( selection.greens_id, ingredients.greens )?.price_delta || 0;
 	const sweetPrice = findById( selection.sweet_id, ingredients.sweet || [] )?.price_delta || 0;
 
+	const totals = useMemo( () => {
+		const zero = { kcal: 0, protein_g: 0, carbs_g: 0, fat_g: 0 };
+		const add = ( a, b ) => ( {
+			kcal: a.kcal + ( b?.kcal || 0 ),
+			protein_g: a.protein_g + ( b?.protein_g || 0 ),
+			carbs_g: a.carbs_g + ( b?.carbs_g || 0 ),
+			fat_g: a.fat_g + ( b?.fat_g || 0 ),
+		} );
+		let t = { ...zero };
+		if ( mode === 'sweet' && selection.sweet_id ) {
+			return add( t, findById( selection.sweet_id, ingredients.sweet || [] )?.macros );
+		}
+		if ( isSetMeal ) return add( t, findById( selection.set_meal_id, ingredients.set_meal )?.macros );
+		if ( selection.protein_id ) t = add( t, findById( selection.protein_id, ingredients.protein )?.macros );
+		if ( selection.slot2_kind === 'carb' && selection.slot2_id ) t = add( t, findById( selection.slot2_id, ingredients.carb )?.macros );
+		if ( selection.slot2_kind === 'greens' && selection.slot2_id ) t = add( t, findById( selection.slot2_id, ingredients.greens )?.macros );
+		if ( selection.greens_id ) t = add( t, findById( selection.greens_id, ingredients.greens )?.macros );
+		return t;
+	}, [ selection, mode, ingredients, isSetMeal ] );
+
 	const isValid = useMemo( () => {
 		if ( ! config ) return false;
 		if ( mode === 'sweet' ) return !! selection.sweet_id;
@@ -83,32 +101,9 @@ function MealBuilder( { productId } ) {
 	}, [ config, mode, selection, isSetMeal ] );
 
 	// --- Theme add-to-cart integration ---------------------------------------
-	const isValidRef    = useRef( isValid );
-	const selectionRef  = useRef( selection );
-	const modeRef       = useRef( mode );
-	const submittingRef = useRef( submitting );
-	const submitRef     = useRef( null );
-
-	useEffect( () => { isValidRef.current = isValid; }, [ isValid ] );
-	useEffect( () => { selectionRef.current = selection; }, [ selection ] );
-	useEffect( () => { modeRef.current = mode; }, [ mode ] );
-	useEffect( () => { submittingRef.current = submitting; }, [ submitting ] );
-
-	const applyFragments = ( fragments ) => {
-		if ( ! fragments || typeof fragments !== 'object' ) return;
-		Object.keys( fragments ).forEach( ( sel ) => {
-			document.querySelectorAll( sel ).forEach( ( node ) => {
-				const wrap = document.createElement( 'div' );
-				wrap.innerHTML = fragments[ sel ];
-				if ( wrap.firstElementChild ) node.replaceWith( wrap.firstElementChild );
-			} );
-		} );
-		document.body.dispatchEvent( new CustomEvent( 'wc_fragments_refreshed' ) );
-	};
-
-	const reset = () => {
-		setSelection( { protein_id: 0, set_meal_id: 0, sweet_id: 0, slot2_kind: '', slot2_id: 0, greens_id: 0, addons: [] } );
-	};
+	// The theme owns the actual Add-to-Cart submission (AJAX or otherwise).
+	// We just (a) reflect validity onto its button, and (b) sync the selection
+	// JSON into a hidden field inside form.cart so it rides along on submit.
 
 	const buildPayload = ( sel, m ) => {
 		if ( m === 'sweet' ) return { mode: 'sweet', sweet_id: sel.sweet_id, addons: sel.addons };
@@ -125,75 +120,25 @@ function MealBuilder( { productId } ) {
 		};
 	};
 
-	const submitAjax = async ( qty ) => {
-		if ( ! isValidRef.current || submittingRef.current ) return;
-		setSubmitting( true );
-		const payload = buildPayload( selectionRef.current, modeRef.current );
-		try {
-			const result = await apiFetch( {
-				path: 'fastnutrition/v1/cart/add',
-				method: 'POST',
-				data: { product_id: productId, quantity: Math.max( 1, parseInt( qty, 10 ) || 1 ), selection: payload },
-			} );
-			applyFragments( result?.fragments );
-			setStatus( {
-				type: 'ok',
-				text: __( 'Added to basket', 'fastnutrition-mealprep' ),
-				count: result?.cart_count || 0,
-				cartUrl: result?.cart_url || '',
-			} );
-			reset();
-		} catch ( err ) {
-			setStatus( { type: 'err', text: err?.message || __( 'Could not add to cart.', 'fastnutrition-mealprep' ) } );
-		} finally {
-			setSubmitting( false );
-			window.setTimeout( () => setStatus( null ), 5000 );
-		}
-	};
-	submitRef.current = submitAjax;
-
-	// Hook into the theme's add-to-cart form and button.
+	// Inject (or update) a hidden fn_selection input inside form.cart on every change.
 	useEffect( () => {
-		if ( ! config ) return undefined;
-		const form   = document.querySelector( 'form.cart' );
-		const button = form ? form.querySelector( '.single_add_to_cart_button, button[type="submit"]' ) : null;
-		if ( ! form || ! button ) return undefined;
-
-		const onSubmit = ( e ) => {
-			e.preventDefault();
-			e.stopImmediatePropagation();
-			if ( ! isValidRef.current ) return;
-			const qtyInput = form.querySelector( 'input.qty, input[name="quantity"]' );
-			const qty = qtyInput ? parseInt( qtyInput.value, 10 ) || 1 : 1;
-			if ( submitRef.current ) submitRef.current( qty );
-		};
-		const onClick = ( e ) => {
-			if ( ! isValidRef.current ) {
-				e.preventDefault();
-				e.stopImmediatePropagation();
-				return;
-			}
-			e.preventDefault();
-			e.stopImmediatePropagation();
-			const qtyInput = form.querySelector( 'input.qty, input[name="quantity"]' );
-			const qty = qtyInput ? parseInt( qtyInput.value, 10 ) || 1 : 1;
-			if ( submitRef.current ) submitRef.current( qty );
-		};
-
-		form.addEventListener( 'submit', onSubmit, true );
-		button.addEventListener( 'click', onClick, true );
-
-		return () => {
-			form.removeEventListener( 'submit', onSubmit, true );
-			button.removeEventListener( 'click', onClick, true );
-		};
-	}, [ config ] );
+		const form = document.querySelector( 'form.cart' );
+		if ( ! form ) return;
+		let hidden = form.querySelector( 'input[name="fn_selection"]' );
+		if ( ! hidden ) {
+			hidden = document.createElement( 'input' );
+			hidden.type = 'hidden';
+			hidden.name = 'fn_selection';
+			form.appendChild( hidden );
+		}
+		hidden.value = isValid ? JSON.stringify( buildPayload( selection, mode ) ) : '';
+	}, [ selection, mode, isValid ] );
 
 	// Reflect validity onto the theme button.
 	useEffect( () => {
 		const button = document.querySelector( 'form.cart .single_add_to_cart_button, form.cart button[type="submit"]' );
 		if ( ! button ) return;
-		if ( ! isValid || submitting ) {
+		if ( ! isValid ) {
 			button.setAttribute( 'disabled', 'disabled' );
 			button.classList.add( 'disabled' );
 			button.setAttribute( 'aria-disabled', 'true' );
@@ -202,16 +147,28 @@ function MealBuilder( { productId } ) {
 			button.classList.remove( 'disabled' );
 			button.removeAttribute( 'aria-disabled' );
 		}
-		if ( submitting ) {
-			if ( ! button.dataset.fnOriginalText ) {
-				button.dataset.fnOriginalText = button.textContent.trim();
+	}, [ isValid ] );
+
+	// Push live macros to any [data-fn-macros] elements on the page (shortcode).
+	useEffect( () => {
+		const nodes = document.querySelectorAll( '[data-fn-macros]' );
+		if ( ! nodes.length ) return;
+		const anyPicked = totals.kcal > 0 || totals.protein_g > 0 || totals.carbs_g > 0 || totals.fat_g > 0;
+		nodes.forEach( ( node ) => {
+			if ( ! anyPicked ) {
+				const empty = node.getAttribute( 'data-fn-macros-empty' ) || '';
+				node.innerHTML = `<span class="fn-macro-empty">${ empty }</span>`;
+				return;
 			}
-			button.textContent = __( 'Adding…', 'fastnutrition-mealprep' );
-		} else if ( button.dataset.fnOriginalText ) {
-			button.textContent = button.dataset.fnOriginalText;
-			delete button.dataset.fnOriginalText;
-		}
-	}, [ isValid, submitting ] );
+			const label = node.getAttribute( 'data-fn-macros-label' ) || '';
+			node.innerHTML =
+				( label ? `<strong class="fn-macro-label">${ label }</strong> ` : '' ) +
+				`<span class="fn-macro-kv"><span class="fn-macro-n">${ totals.kcal.toFixed( 0 ) }</span> kcal</span>` +
+				`<span class="fn-macro-kv"><span class="fn-macro-n">${ totals.protein_g.toFixed( 1 ) }g</span> protein</span>` +
+				`<span class="fn-macro-kv"><span class="fn-macro-n">${ totals.carbs_g.toFixed( 1 ) }g</span> carbs</span>` +
+				`<span class="fn-macro-kv"><span class="fn-macro-n">${ totals.fat_g.toFixed( 1 ) }g</span> fat</span>`;
+		} );
+	}, [ totals ] );
 
 	// -------------------------------------------------------------------------
 
@@ -366,15 +323,6 @@ function MealBuilder( { productId } ) {
 				<p className="fn-row-help" style={ { paddingLeft: 0, marginTop: '0.6rem' } }>
 					{ __( 'Finish your selection to enable Add to Basket.', 'fastnutrition-mealprep' ) }
 				</p>
-			) }
-
-			{ status && (
-				<div className={ `fn-status ${ status.type === 'ok' ? 'is-ok' : 'is-err' }` } role="status" aria-live="polite">
-					{ status.text }
-					{ status.type === 'ok' && status.cartUrl && (
-						<a href={ status.cartUrl }>{ __( 'View basket', 'fastnutrition-mealprep' ) } ({ status.count })</a>
-					) }
-				</div>
 			) }
 		</div>
 	);

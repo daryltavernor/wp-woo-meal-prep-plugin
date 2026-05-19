@@ -19,6 +19,32 @@ final class MealProduct {
 		add_action( 'woocommerce_process_product_meta', [ $this, 'save' ] );
 		add_action( 'wp', [ $this, 'apply_placement' ] );
 		add_shortcode( 'fn_meal_builder', [ $this, 'shortcode' ] );
+		add_shortcode( 'fn_macros', [ $this, 'macros_shortcode' ] );
+	}
+
+	/**
+	 * [fn_macros] — placeholder where the current meal's live macros are rendered.
+	 *
+	 * The meal builder JS finds every element with [data-fn-macros] on the page
+	 * and updates them with kcal / protein / carbs / fat as the selection changes.
+	 */
+	public function macros_shortcode( array|string $atts = [] ): string {
+		$atts = shortcode_atts(
+			[
+				'layout' => 'inline', // 'inline' | 'stacked'
+				'label'  => __( 'Macros', 'fastnutrition-mealprep' ),
+				'empty'  => __( 'Pick your ingredients to see macros…', 'fastnutrition-mealprep' ),
+			],
+			is_array( $atts ) ? $atts : [],
+			'fn_macros'
+		);
+		$class = 'fn-macro-display fn-macro-' . ( $atts['layout'] === 'stacked' ? 'stacked' : 'inline' );
+		return sprintf(
+			'<div class="%1$s" data-fn-macros data-fn-macros-empty="%2$s" data-fn-macros-label="%3$s"><span class="fn-macro-empty">%2$s</span></div>',
+			esc_attr( $class ),
+			esc_attr( $atts['empty'] ),
+			esc_attr( $atts['label'] )
+		);
 	}
 
 	public function apply_placement(): void {
