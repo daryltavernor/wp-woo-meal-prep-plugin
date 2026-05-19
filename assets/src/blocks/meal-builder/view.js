@@ -3,13 +3,10 @@ import { createRoot, useEffect, useState, useMemo } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
 import './style.css';
 
-const splitSetMealName = ( name ) => {
-	const m = /^(.+?)\s+served\s+with\s+(.+)$/i.exec( name || '' );
-	if ( m ) {
-		return { title: m[ 1 ].trim(), sub: 'Served with ' + m[ 2 ].trim() };
-	}
-	return { title: name || '', sub: '' };
-};
+const SET_MEAL_PREFIX = 'set:';
+const SWEET_PREFIX    = 'sweet:';
+const CARB_PREFIX     = 'carb:';
+const GREENS_PREFIX   = 'greens:';
 
 const matchesDiet = ( ingredient, diet ) => {
 	if ( diet === 'all' ) return true;
@@ -19,27 +16,29 @@ const matchesDiet = ( ingredient, diet ) => {
 	return true;
 };
 
-function MealBuilder( { productId, minimal } ) {
+const priceStr = ( n ) => ( n ? ` (+£${ Number( n ).toFixed( 2 ) })` : '' );
+
+function MealBuilder( { productId } ) {
 	const [ config, setConfig ] = useState( null );
 	const [ ingredients, setIngredients ] = useState( {
-		protein: [],
-		carb: [],
-		greens: [],
-		set_meal: [],
-		sweet: [],
+		protein: [], carb: [], greens: [], set_meal: [], sweet: [],
 	} );
-	const [ mode, setMode ] = useState( 'build' );
 	const [ diet, setDiet ] = useState( 'all' );
-	const [ lowCarb, setLowCarb ] = useState( false );
 	const [ qty, setQty ] = useState( 1 );
+	const [ mode, setMode ] = useState( 'meal' ); // 'meal' (protein/set meal) or 'sweet'
 	const [ selection, setSelection ] = useState( {
 		protein_id: 0,
-		carb_id: 0,
-		greens_ids: [],
 		set_meal_id: 0,
 		sweet_id: 0,
+		// Slot 2 — either a carb OR a green (when double greens).
+		slot2_kind: '',    // 'carb' | 'greens' | ''
+		slot2_id: 0,
+		// Slot 3 — always a green.
+		greens_id: 0,
 		addons: [],
 	} );
+	const [ submitting, setSubmitting ] = useState( false );
+	const [ toast, setToast ] = useState( null );
 
 	useEffect( () => {
 		document.body.classList.add( 'fn-meal-builder-active' );
@@ -49,7 +48,7 @@ function MealBuilder( { productId, minimal } ) {
 	useEffect( () => {
 		apiFetch( { path: `fastnutrition/v1/meal-config/${ productId }` } ).then( ( cfg ) => {
 			setConfig( cfg );
-			if ( cfg && cfg.config && cfg.config.allow_sweet_mode && ! cfg.config.allow_set_meal_mode ) {
+			if ( cfg?.config?.allow_sweet_mode && ! cfg.config.allow_set_meal_mode && ( cfg.config.allowed_proteins || [] ).length === 0 ) {
 				setMode( 'sweet' );
 			}
 		} );
@@ -63,9 +62,7 @@ function MealBuilder( { productId, minimal } ) {
 	}, [ productId ] );
 
 	const allowed = useMemo( () => {
-		if ( ! config ) {
-			return ingredients;
-		}
+		if ( ! config ) return ingredients;
 		const tier = config.config.tier || 'standard';
 		const byAllow = ( list, allowList ) =>
 			! allowList || ! allowList.length ? list : list.filter( ( i ) => allowList.includes( i.id ) );
@@ -81,6 +78,9 @@ function MealBuilder( { productId, minimal } ) {
 		};
 	}, [ config, ingredients, diet ] );
 
+	// Are we currently in "set meal" mode (i.e. set meal chosen in dropdown 1)?
+	const isSetMeal = !! selection.set_meal_id;
+
 	const totals = useMemo( () => {
 		const zero = { kcal: 0, protein_g: 0, carbs_g: 0, fat_g: 0 };
 		const lookup = ( id, list ) => list.find( ( i ) => i.id === id );
@@ -91,37 +91,58 @@ function MealBuilder( { productId, minimal } ) {
 			fat_g: a.fat_g + ( b?.fat_g || 0 ),
 		} );
 		let t = { ...zero };
-		if ( mode === 'set' && selection.set_meal_id ) {
-			t = add( t, lookup( selection.set_meal_id, ingredients.set_meal )?.macros );
-		} else if ( mode === 'sweet' && selection.sweet_id ) {
-			t = add( t, lookup( selection.sweet_id, ingredients.sweet || [] )?.macros );
-		} else {
-			t = add( t, lookup( selection.protein_id, ingredients.protein )?.macros );
-			t = add( t, lookup( selection.carb_id, ingredients.carb )?.macros );
-			selection.greens_ids.forEach( ( gid ) => {
-				t = add( t, lookup( gid, ingredients.greens )?.macros );
-			} );
+		if ( mode === 'sweet' && selection.sweet_id ) {
+			return add( t, lookup( selection.sweet_id, ingredients.sweet || [] )?.macros );
 		}
+		if ( isSetMeal ) {
+			return add( t, lookup( selection.set_meal_id, ingredients.set_meal )?.macros );
+		}
+		if ( selection.protein_id ) t = add( t, lookup( selection.protein_id, ingredients.protein )?.macros );
+		if ( selection.slot2_kind === 'carb' && selection.slot2_id ) t = add( t, lookup( selection.slot2_id, ingredients.carb )?.macros );
+		if ( selection.slot2_kind === 'greens' && selection.slot2_id ) t = add( t, lookup( selection.slot2_id, ingredients.greens )?.macros );
+		if ( selection.greens_id ) t = add( t, lookup( selection.greens_id, ingredients.greens )?.macros );
 		return t;
-	}, [ selection, mode, ingredients ] );
+	}, [ selection, mode, ingredients, isSetMeal ] );
 
 	const isValid = useMemo( () => {
 		if ( ! config ) return false;
-		if ( mode === 'set' ) return !! selection.set_meal_id;
 		if ( mode === 'sweet' ) return !! selection.sweet_id;
+		if ( isSetMeal ) return true;
 		if ( ! selection.protein_id ) return false;
-		if ( lowCarb ) return selection.greens_ids.length === 2;
-		return ( !! selection.carb_id && selection.greens_ids.length >= 1 ) || selection.greens_ids.length === 2;
-	}, [ config, mode, selection, lowCarb ] );
+		if ( ! selection.slot2_id || ! selection.slot2_kind ) return false;
+		if ( ! selection.greens_id ) return false;
+		// Two greens must be different.
+		if ( selection.slot2_kind === 'greens' && selection.slot2_id === selection.greens_id ) return false;
+		return true;
+	}, [ config, mode, selection, isSetMeal ] );
 
-	const toggleGreens = ( id ) => {
-		const max = lowCarb ? 2 : ( selection.greens_ids.length === 1 && ! selection.carb_id ? 2 : 1 );
-		const current = selection.greens_ids.includes( id )
-			? selection.greens_ids.filter( ( g ) => g !== id )
-			: [ ...selection.greens_ids, id ].slice( -2 );
-		const trimmed = current.slice( 0, lowCarb ? 2 : 2 );
-		const nextCarb = trimmed.length === 2 ? 0 : selection.carb_id;
-		setSelection( { ...selection, greens_ids: trimmed, carb_id: nextCarb } );
+	const onSlot1Change = ( value ) => {
+		if ( value.startsWith( SET_MEAL_PREFIX ) ) {
+			const id = parseInt( value.slice( SET_MEAL_PREFIX.length ), 10 ) || 0;
+			setSelection( { ...selection, protein_id: 0, set_meal_id: id, slot2_kind: '', slot2_id: 0, greens_id: 0 } );
+		} else {
+			const id = parseInt( value, 10 ) || 0;
+			setSelection( { ...selection, protein_id: id, set_meal_id: 0 } );
+		}
+	};
+
+	const onSlot2Change = ( value ) => {
+		if ( value.startsWith( CARB_PREFIX ) ) {
+			const id = parseInt( value.slice( CARB_PREFIX.length ), 10 ) || 0;
+			setSelection( { ...selection, slot2_kind: 'carb', slot2_id: id } );
+		} else if ( value.startsWith( GREENS_PREFIX ) ) {
+			const id = parseInt( value.slice( GREENS_PREFIX.length ), 10 ) || 0;
+			// Clear greens slot if it duplicates the new pick.
+			const greens_id = id === selection.greens_id ? 0 : selection.greens_id;
+			setSelection( { ...selection, slot2_kind: 'greens', slot2_id: id, greens_id } );
+		} else {
+			setSelection( { ...selection, slot2_kind: '', slot2_id: 0 } );
+		}
+	};
+
+	const onSweetChange = ( value ) => {
+		const id = parseInt( value, 10 ) || 0;
+		setSelection( { ...selection, sweet_id: id } );
 	};
 
 	const toggleAddon = ( addon ) => {
@@ -130,46 +151,47 @@ function MealBuilder( { productId, minimal } ) {
 		setSelection( { ...selection, addons } );
 	};
 
-	const toggleLowCarb = () => {
-		const next = ! lowCarb;
-		setLowCarb( next );
-		if ( next ) {
-			setSelection( { ...selection, carb_id: 0 } );
-		}
-	};
-
-	const [ submitting, setSubmitting ] = useState( false );
-	const [ toast, setToast ] = useState( null );
-
 	const applyFragments = ( fragments ) => {
 		if ( ! fragments || typeof fragments !== 'object' ) return;
 		Object.keys( fragments ).forEach( ( sel ) => {
 			document.querySelectorAll( sel ).forEach( ( node ) => {
-				const wrapper = document.createElement( 'div' );
-				wrapper.innerHTML = fragments[ sel ];
-				const replacement = wrapper.firstElementChild;
-				if ( replacement ) {
-					node.replaceWith( replacement );
-				}
+				const wrap = document.createElement( 'div' );
+				wrap.innerHTML = fragments[ sel ];
+				const replacement = wrap.firstElementChild;
+				if ( replacement ) node.replaceWith( replacement );
 			} );
 		} );
 		document.body.dispatchEvent( new CustomEvent( 'wc_fragments_refreshed' ) );
 	};
 
-	const resetSelection = () => {
-		setSelection( { protein_id: 0, carb_id: 0, greens_ids: [], set_meal_id: 0, sweet_id: 0, addons: [] } );
-		setLowCarb( false );
+	const reset = () => {
+		setSelection( { protein_id: 0, set_meal_id: 0, sweet_id: 0, slot2_kind: '', slot2_id: 0, greens_id: 0, addons: [] } );
 		setQty( 1 );
 	};
 
 	const submit = async () => {
 		if ( ! isValid || submitting ) return;
 		setSubmitting( true );
-		const payload = {
-			mode,
-			...selection,
-			greens_ids: selection.greens_ids.filter( Boolean ),
-		};
+
+		// Build the payload the server already understands.
+		let payload;
+		if ( mode === 'sweet' ) {
+			payload = { mode: 'sweet', sweet_id: selection.sweet_id, addons: selection.addons };
+		} else if ( isSetMeal ) {
+			payload = { mode: 'set', set_meal_id: selection.set_meal_id, addons: selection.addons };
+		} else {
+			const greens_ids = [];
+			if ( selection.slot2_kind === 'greens' && selection.slot2_id ) greens_ids.push( selection.slot2_id );
+			if ( selection.greens_id ) greens_ids.push( selection.greens_id );
+			payload = {
+				mode: 'build',
+				protein_id: selection.protein_id,
+				carb_id: selection.slot2_kind === 'carb' ? selection.slot2_id : 0,
+				greens_ids,
+				addons: selection.addons,
+			};
+		}
+
 		try {
 			const result = await apiFetch( {
 				path: 'fastnutrition/v1/cart/add',
@@ -187,7 +209,7 @@ function MealBuilder( { productId, minimal } ) {
 				count: result?.cart_count || 0,
 				cartUrl: result?.cart_url || '',
 			} );
-			resetSelection();
+			reset();
 		} catch ( err ) {
 			setToast( { type: 'err', text: err?.message || __( 'Could not add to cart.', 'fastnutrition-mealprep' ) } );
 		} finally {
@@ -200,163 +222,129 @@ function MealBuilder( { productId, minimal } ) {
 		return <div>{ __( 'Loading…', 'fastnutrition-mealprep' ) }</div>;
 	}
 
-	if ( minimal ) {
-		return <MinimalView
-			config={ config }
-			allowed={ allowed }
-			mode={ mode }
-			setMode={ setMode }
-			selection={ selection }
-			setSelection={ setSelection }
-			doubleGreens={ lowCarb }
-			setDoubleGreens={ setLowCarb }
-			productId={ productId }
-			qty={ qty }
-			setQty={ setQty }
-		/>;
-	}
+	const offerSweetMode = config.config.allow_sweet_mode && ( allowed.sweet || [] ).length > 0;
+	const hasDietTags = Object.values( ingredients ).some( ( list ) => list.some( ( i ) => ( i.allergens || [] ).some( ( t ) => t === 'vegetarian' || t === 'vegan' ) ) );
 
-	const dietRelevant = mode === 'build' || mode === 'set' || mode === 'sweet';
-	const hasDietTags = ( allergens ) => Object.values( ingredients ).some( ( list ) => list.some( ( i ) => ( i.allergens || [] ).some( ( t ) => allergens.includes( t ) ) ) );
-	const showDietFilter = dietRelevant && hasDietTags( [ 'vegetarian', 'vegan' ] );
+	// Slot 1 selected value.
+	const slot1Value = isSetMeal ? SET_MEAL_PREFIX + selection.set_meal_id : ( selection.protein_id ? String( selection.protein_id ) : '' );
+	// Slot 2 selected value.
+	const slot2Value = selection.slot2_id ? ( selection.slot2_kind === 'carb' ? CARB_PREFIX : GREENS_PREFIX ) + selection.slot2_id : '';
 
 	return (
 		<>
 			<div className="fn-meal-builder">
-				{ ( config.config.allow_set_meal_mode || config.config.allow_sweet_mode ) && (
+				{ offerSweetMode && ( config.config.allow_set_meal_mode || ( allowed.protein || [] ).length > 0 ) && (
 					<div className="fn-mode-toggle">
-						{ ! config.config.allow_sweet_mode && (
-							<button type="button" className={ mode === 'build' ? 'is-active' : '' } onClick={ () => setMode( 'build' ) }>
-								{ __( 'Build your meal', 'fastnutrition-mealprep' ) }
-							</button>
-						) }
-						{ config.config.allow_set_meal_mode && (
-							<button type="button" className={ mode === 'set' ? 'is-active' : '' } onClick={ () => setMode( 'set' ) }>
-								{ __( 'Choose a set meal', 'fastnutrition-mealprep' ) }
-							</button>
-						) }
-						{ config.config.allow_sweet_mode && (
-							<button type="button" className={ mode === 'sweet' ? 'is-active' : '' } onClick={ () => setMode( 'sweet' ) }>
-								{ __( 'Choose a sweet', 'fastnutrition-mealprep' ) }
-							</button>
-						) }
+						<button type="button" className={ mode === 'meal' ? 'is-active' : '' } onClick={ () => setMode( 'meal' ) }>
+							{ __( 'Meal', 'fastnutrition-mealprep' ) }
+						</button>
+						<button type="button" className={ mode === 'sweet' ? 'is-active' : '' } onClick={ () => setMode( 'sweet' ) }>
+							{ __( 'Sweet', 'fastnutrition-mealprep' ) }
+						</button>
 					</div>
 				) }
 
-				{ showDietFilter && (
-					<div className="fn-section">
-						<div className="fn-section-head">
-							<h3>{ __( 'Diet', 'fastnutrition-mealprep' ) }</h3>
+				{ mode === 'sweet' ? (
+					<div className="fn-row">
+						<label className="fn-row-label" htmlFor="fn-sweet"><span style={ { color: 'red' } }>*</span> { __( 'Pick a Sweet', 'fastnutrition-mealprep' ) }</label>
+						<select id="fn-sweet" value={ selection.sweet_id || '' } onChange={ ( e ) => onSweetChange( e.target.value ) }>
+							<option value="">{ __( 'Choose a sweet…', 'fastnutrition-mealprep' ) }</option>
+							{ allowed.sweet.map( ( i ) => (
+								<option key={ i.id } value={ i.id }>{ i.name }{ priceStr( i.price_delta ) }</option>
+							) ) }
+						</select>
+					</div>
+				) : (
+					<>
+						{ hasDietTags && (
 							<div className="fn-diet-filter">
 								{ [
 									[ 'all', __( 'All', 'fastnutrition-mealprep' ) ],
 									[ 'vegetarian', __( 'Vegetarian', 'fastnutrition-mealprep' ) ],
 									[ 'vegan', __( 'Vegan', 'fastnutrition-mealprep' ) ],
 								].map( ( [ k, label ] ) => (
-									<button key={ k } type="button" className={ diet === k ? 'is-active' : '' } onClick={ () => setDiet( k ) }>
-										{ label }
-									</button>
+									<button key={ k } type="button" className={ diet === k ? 'is-active' : '' } onClick={ () => setDiet( k ) }>{ label }</button>
 								) ) }
 							</div>
-						</div>
-					</div>
-				) }
+						) }
 
-				{ mode === 'set' ? (
-					<div className="fn-section">
-						<h3>{ __( 'Set meal', 'fastnutrition-mealprep' ) }</h3>
-						<div className="fn-cards">
-							{ allowed.set_meal.map( ( i ) => {
-								const { title, sub } = splitSetMealName( i.name );
-								return (
-									<label key={ i.id } className={ selection.set_meal_id === i.id ? 'is-selected' : '' }>
-										<input type="radio" name="set_meal" value={ i.id } checked={ selection.set_meal_id === i.id } onChange={ () => setSelection( { ...selection, set_meal_id: i.id } ) } />
-										<span className="fn-card-title">{ title }</span>
-										{ sub && <span className="fn-card-sub">{ sub }</span> }
-									</label>
-								);
-							} ) }
-						</div>
-					</div>
-				) : mode === 'sweet' ? (
-					<div className="fn-section">
-						<h3>{ __( 'Sweet', 'fastnutrition-mealprep' ) }</h3>
-						<div className="fn-cards">
-							{ ( allowed.sweet || [] ).map( ( i ) => (
-								<label key={ i.id } className={ selection.sweet_id === i.id ? 'is-selected' : '' }>
-									<input type="radio" name="sweet" value={ i.id } checked={ selection.sweet_id === i.id } onChange={ () => setSelection( { ...selection, sweet_id: i.id } ) } />
-									<span className="fn-card-title">{ i.name }</span>
-								</label>
-							) ) }
-						</div>
-					</div>
-				) : (
-					<>
-						<div className="fn-section">
-							<h3>{ __( 'Protein', 'fastnutrition-mealprep' ) }</h3>
-							<div className="fn-grid">
-								{ allowed.protein.map( ( i ) => (
-									<label key={ i.id } className={ selection.protein_id === i.id ? 'is-selected' : '' }>
-										<input type="radio" name="protein" checked={ selection.protein_id === i.id } onChange={ () => setSelection( { ...selection, protein_id: i.id } ) } />
-										{ i.name }
-									</label>
-								) ) }
-							</div>
-						</div>
-
-						<div className="fn-section">
-							<div className="fn-section-head">
-								<h3>{ __( 'Carb', 'fastnutrition-mealprep' ) }</h3>
-								{ config.config.allow_double_greens && (
-									<label className="fn-section-toggle">
-										<input type="checkbox" checked={ lowCarb } onChange={ toggleLowCarb } />
-										{ __( 'Low carb (swap for 2 greens)', 'fastnutrition-mealprep' ) }
-									</label>
+						<div className="fn-row">
+							<label className="fn-row-label" htmlFor="fn-slot-1"><span style={ { color: 'red' } }>*</span> { __( 'Pick a Protein', 'fastnutrition-mealprep' ) }</label>
+							<select id="fn-slot-1" value={ slot1Value } onChange={ ( e ) => onSlot1Change( e.target.value ) }>
+								<option value="">{ __( 'Meat, Fish or Quorn', 'fastnutrition-mealprep' ) }</option>
+								{ allowed.protein.length > 0 && (
+									<optgroup label={ __( 'Proteins', 'fastnutrition-mealprep' ) }>
+										{ allowed.protein.map( ( i ) => (
+											<option key={ 'p' + i.id } value={ i.id }>{ i.name }{ priceStr( i.price_delta ) }</option>
+										) ) }
+									</optgroup>
 								) }
-							</div>
-							<div className="fn-grid">
-								{ allowed.carb.map( ( i ) => {
-									const classes = [];
-									if ( selection.carb_id === i.id ) classes.push( 'is-selected' );
-									if ( lowCarb ) classes.push( 'is-disabled' );
-									return (
-										<label key={ i.id } className={ classes.join( ' ' ) }>
-											<input type="radio" name="carb" disabled={ lowCarb } checked={ selection.carb_id === i.id } onChange={ () => setSelection( { ...selection, carb_id: i.id } ) } />
-											{ i.name }
-										</label>
-									);
-								} ) }
-							</div>
+								{ config.config.allow_set_meal_mode && allowed.set_meal.length > 0 && (
+									<optgroup label={ __( 'Set Meals (no carb / greens needed)', 'fastnutrition-mealprep' ) }>
+										{ allowed.set_meal.map( ( i ) => (
+											<option key={ 'sm' + i.id } value={ SET_MEAL_PREFIX + i.id }>{ i.name }{ priceStr( i.price_delta ) }</option>
+										) ) }
+									</optgroup>
+								) }
+							</select>
 						</div>
 
-						<div className="fn-section">
-							<h3>{ lowCarb ? __( 'Greens (pick 2)', 'fastnutrition-mealprep' ) : __( 'Greens', 'fastnutrition-mealprep' ) }</h3>
-							<div className="fn-grid">
-								{ allowed.greens.map( ( i ) => (
-									<label key={ i.id } className={ selection.greens_ids.includes( i.id ) ? 'is-selected' : '' }>
-										<input type="checkbox" checked={ selection.greens_ids.includes( i.id ) } onChange={ () => toggleGreens( i.id ) } />
-										{ i.name }
+						{ ! isSetMeal && (
+							<>
+								<div className="fn-row">
+									<label className="fn-row-label" htmlFor="fn-slot-2"><span style={ { color: 'red' } }>*</span> { __( 'Pick a Carb — or a 2nd Greens', 'fastnutrition-mealprep' ) }</label>
+									<select id="fn-slot-2" value={ slot2Value } onChange={ ( e ) => onSlot2Change( e.target.value ) }>
+										<option value="">{ __( 'Carbs or Double Greens', 'fastnutrition-mealprep' ) }</option>
+										{ allowed.carb.length > 0 && (
+											<optgroup label={ __( 'Carbs', 'fastnutrition-mealprep' ) }>
+												{ allowed.carb.map( ( i ) => (
+													<option key={ 'c' + i.id } value={ CARB_PREFIX + i.id }>{ i.name }{ priceStr( i.price_delta ) }</option>
+												) ) }
+											</optgroup>
+										) }
+										{ config.config.allow_double_greens && allowed.greens.length > 0 && (
+											<optgroup label={ __( 'Greens (low carb option)', 'fastnutrition-mealprep' ) }>
+												{ allowed.greens.map( ( i ) => (
+													<option key={ 'g2' + i.id } value={ GREENS_PREFIX + i.id }>{ i.name }{ priceStr( i.price_delta ) }</option>
+												) ) }
+											</optgroup>
+										) }
+									</select>
+									<span className="fn-row-help">{ __( 'Pick a carb for a balanced meal, or pick a greens here to swap in 2× greens instead.', 'fastnutrition-mealprep' ) }</span>
+								</div>
+
+								<div className="fn-row">
+									<label className="fn-row-label" htmlFor="fn-slot-3">
+										<span style={ { color: 'red' } }>*</span>{ ' ' }
+										{ selection.slot2_kind === 'greens' ? __( 'Pick Your 2nd Greens', 'fastnutrition-mealprep' ) : __( 'Pick Your Greens', 'fastnutrition-mealprep' ) }
 									</label>
-								) ) }
-							</div>
-						</div>
+									<select id="fn-slot-3" value={ selection.greens_id || '' } onChange={ ( e ) => setSelection( { ...selection, greens_id: parseInt( e.target.value, 10 ) || 0 } ) }>
+										<option value="">{ __( 'Choose Your Greens', 'fastnutrition-mealprep' ) }</option>
+										{ allowed.greens
+											.filter( ( i ) => ! ( selection.slot2_kind === 'greens' && selection.slot2_id === i.id ) )
+											.map( ( i ) => (
+												<option key={ 'g3' + i.id } value={ i.id }>{ i.name }{ priceStr( i.price_delta ) }</option>
+											) ) }
+									</select>
+								</div>
+							</>
+						) }
 					</>
 				) }
 
 				{ config.addons && config.addons.length > 0 && (
-					<div className="fn-section">
-						<h3>{ __( 'Optional add-ons', 'fastnutrition-mealprep' ) }</h3>
-						<div className="fn-addons">
-							{ config.addons.map( ( addon ) => {
-								const selected = selection.addons.some( ( a ) => a.id === addon.id );
-								return (
-									<label key={ addon.id } className={ selected ? 'is-selected' : '' }>
-										<input type="checkbox" checked={ selected } onChange={ () => toggleAddon( addon ) } />
-										{ addon.label } (+£{ Number( addon.price ).toFixed( 2 ) })
+					<div className="fn-row">
+						<span className="fn-row-label">{ __( 'Optional add-ons', 'fastnutrition-mealprep' ) }</span>
+						<ul className="fn-addons-list">
+							{ config.addons.map( ( addon ) => (
+								<li key={ addon.id }>
+									<label>
+										<input type="checkbox" checked={ selection.addons.some( ( a ) => a.id === addon.id ) } onChange={ () => toggleAddon( addon ) } />
+										{ addon.label } — £{ Number( addon.price ).toFixed( 2 ) }
 									</label>
-								);
-							} ) }
-						</div>
+								</li>
+							) ) }
+						</ul>
 					</div>
 				) }
 			</div>
@@ -390,229 +378,9 @@ function MealBuilder( { productId, minimal } ) {
 	);
 }
 
-function MinimalView( { config, allowed, mode, setMode, selection, setSelection, doubleGreens, setDoubleGreens, productId, qty, setQty } ) {
-	const [ submitting, setSubmitting ] = useState( false );
-	const [ msg, setMsg ] = useState( null );
-	const DOUBLE_GREENS_VALUE = 'double';
-	const carbValue = doubleGreens ? DOUBLE_GREENS_VALUE : String( selection.carb_id || '' );
-
-	const applyFragments = ( fragments ) => {
-		if ( ! fragments || typeof fragments !== 'object' ) return;
-		Object.keys( fragments ).forEach( ( sel ) => {
-			document.querySelectorAll( sel ).forEach( ( node ) => {
-				const wrapper = document.createElement( 'div' );
-				wrapper.innerHTML = fragments[ sel ];
-				const replacement = wrapper.firstElementChild;
-				if ( replacement ) {
-					node.replaceWith( replacement );
-				}
-			} );
-		} );
-		document.body.dispatchEvent( new CustomEvent( 'wc_fragments_refreshed' ) );
-	};
-
-	const onCarbChange = ( e ) => {
-		if ( e.target.value === DOUBLE_GREENS_VALUE ) {
-			setDoubleGreens( true );
-			setSelection( { ...selection, carb_id: 0 } );
-		} else {
-			setDoubleGreens( false );
-			setSelection( { ...selection, carb_id: parseInt( e.target.value, 10 ) || 0, greens_ids: selection.greens_ids.slice( 0, 1 ) } );
-		}
-	};
-
-	const onGreensChange = ( idx, value ) => {
-		const id = parseInt( value, 10 ) || 0;
-		const next = selection.greens_ids.slice();
-		if ( id > 0 ) {
-			next[ idx ] = id;
-		} else {
-			next.splice( idx, 1 );
-		}
-		setSelection( { ...selection, greens_ids: next.filter( Boolean ) } );
-	};
-
-	const toggleAddon = ( addon ) => {
-		const has = selection.addons.some( ( a ) => a.id === addon.id );
-		const addons = has ? selection.addons.filter( ( a ) => a.id !== addon.id ) : [ ...selection.addons, addon ];
-		setSelection( { ...selection, addons } );
-	};
-
-	const priceStr = ( n ) => `£${ Number( n || 0 ).toFixed( 2 ) }`;
-
-	const onSubmit = async ( e ) => {
-		e.preventDefault();
-		if ( submitting ) return;
-		setSubmitting( true );
-		const payload = {
-			mode,
-			...selection,
-			greens_ids: selection.greens_ids.filter( Boolean ),
-		};
-		try {
-			const result = await apiFetch( {
-				path: 'fastnutrition/v1/cart/add',
-				method: 'POST',
-				data: {
-					product_id: productId,
-					quantity: Math.max( 1, parseInt( qty, 10 ) || 1 ),
-					selection: payload,
-				},
-			} );
-			applyFragments( result?.fragments );
-			setMsg( { type: 'ok', text: __( 'Added — view cart', 'fastnutrition-mealprep' ) + ` (${ result?.cart_count || 0 })`, url: result?.cart_url || '' } );
-			setSelection( { protein_id: 0, carb_id: 0, greens_ids: [], set_meal_id: 0, sweet_id: 0, addons: [] } );
-			setDoubleGreens( false );
-			setQty( 1 );
-		} catch ( err ) {
-			setMsg( { type: 'err', text: err?.message || __( 'Could not add to cart.', 'fastnutrition-mealprep' ) } );
-		} finally {
-			setSubmitting( false );
-			window.setTimeout( () => setMsg( null ), 4500 );
-		}
-	};
-
-	return (
-		<form className="fn-meal-builder-minimal fn-builder-form" method="post" action="" onSubmit={ onSubmit }>
-			<input type="hidden" name="add-to-cart" value={ productId } />
-			<input type="hidden" name="fn_selection" value="" />
-			<input type="hidden" name="quantity" value={ qty } />
-
-			{ ( config.config.allow_set_meal_mode || config.config.allow_sweet_mode ) && (
-				<p>
-					{ ! config.config.allow_sweet_mode && (
-						<><label>
-							<input type="radio" name="fn_mode" checked={ mode === 'build' } onChange={ () => setMode( 'build' ) } /> { __( 'Build your meal', 'fastnutrition-mealprep' ) }
-						</label>{ ' ' }</>
-					) }
-					{ config.config.allow_set_meal_mode && (
-						<><label>
-							<input type="radio" name="fn_mode" checked={ mode === 'set' } onChange={ () => setMode( 'set' ) } /> { __( 'Choose a set meal', 'fastnutrition-mealprep' ) }
-						</label>{ ' ' }</>
-					) }
-					{ config.config.allow_sweet_mode && (
-						<label>
-							<input type="radio" name="fn_mode" checked={ mode === 'sweet' } onChange={ () => setMode( 'sweet' ) } /> { __( 'Choose a sweet', 'fastnutrition-mealprep' ) }
-						</label>
-					) }
-				</p>
-			) }
-
-			{ mode === 'set' ? (
-				<p>
-					<label><span style={ { color: 'red' } }>*</span> { __( 'Set meal', 'fastnutrition-mealprep' ) }{ ' ' }
-						<select name="set_meal" required value={ selection.set_meal_id || '' } onChange={ ( e ) => setSelection( { ...selection, set_meal_id: parseInt( e.target.value, 10 ) || 0 } ) }>
-							<option value="">— { __( 'Pick a set meal', 'fastnutrition-mealprep' ) } —</option>
-							{ allowed.set_meal.map( ( i ) => (
-								<option key={ i.id } value={ i.id }>{ i.name }</option>
-							) ) }
-						</select>
-					</label>
-				</p>
-			) : mode === 'sweet' ? (
-				<p>
-					<label><span style={ { color: 'red' } }>*</span> { __( 'Sweet', 'fastnutrition-mealprep' ) }{ ' ' }
-						<select name="sweet" required value={ selection.sweet_id || '' } onChange={ ( e ) => setSelection( { ...selection, sweet_id: parseInt( e.target.value, 10 ) || 0 } ) }>
-							<option value="">— { __( 'Pick a sweet', 'fastnutrition-mealprep' ) } —</option>
-							{ ( allowed.sweet || [] ).map( ( i ) => (
-								<option key={ i.id } value={ i.id }>{ i.name }{ i.price_delta ? ` (+£${ Number( i.price_delta ).toFixed( 2 ) })` : '' }</option>
-							) ) }
-						</select>
-					</label>
-				</p>
-			) : (
-				<>
-					<p>
-						<label><span style={ { color: 'red' } }>*</span> { __( 'Pick a Protein', 'fastnutrition-mealprep' ) }{ ' ' }
-							<select name="protein" required value={ selection.protein_id || '' } onChange={ ( e ) => setSelection( { ...selection, protein_id: parseInt( e.target.value, 10 ) || 0 } ) }>
-								<option value="">{ __( 'Meat, Fish or Quorn', 'fastnutrition-mealprep' ) }</option>
-								{ allowed.protein.map( ( i ) => (
-									<option key={ i.id } value={ i.id }>{ i.name }{ i.price_delta ? ` (+${ priceStr( i.price_delta ) })` : '' }</option>
-								) ) }
-							</select>
-						</label>
-					</p>
-
-					<p>
-						<label><span style={ { color: 'red' } }>*</span> { __( 'Pick Your Carbs', 'fastnutrition-mealprep' ) }{ ' ' }
-							<select name="carb" required value={ carbValue } onChange={ onCarbChange }>
-								<option value="">{ config.config.allow_double_greens ? __( 'Carbs or Double Greens', 'fastnutrition-mealprep' ) : __( 'Pick a carb', 'fastnutrition-mealprep' ) }</option>
-								{ allowed.carb.map( ( i ) => (
-									<option key={ i.id } value={ i.id }>{ i.name }{ i.price_delta ? ` (+${ priceStr( i.price_delta ) })` : '' }</option>
-								) ) }
-								{ config.config.allow_double_greens && (
-									<option value={ DOUBLE_GREENS_VALUE }>{ __( '— Double greens (no carb)', 'fastnutrition-mealprep' ) }</option>
-								) }
-							</select>
-						</label>
-					</p>
-
-					<p>
-						<label><span style={ { color: 'red' } }>*</span> { doubleGreens ? __( 'Pick Your First Greens', 'fastnutrition-mealprep' ) : __( 'Pick Your Greens', 'fastnutrition-mealprep' ) }{ ' ' }
-							<select name="greens_1" required value={ selection.greens_ids[ 0 ] || '' } onChange={ ( e ) => onGreensChange( 0, e.target.value ) }>
-								<option value="">{ __( 'Choose Your Greens', 'fastnutrition-mealprep' ) }</option>
-								{ allowed.greens.map( ( i ) => (
-									<option key={ i.id } value={ i.id }>{ i.name }{ i.price_delta ? ` (+${ priceStr( i.price_delta ) })` : '' }</option>
-								) ) }
-							</select>
-						</label>
-					</p>
-
-					{ doubleGreens && (
-						<p>
-							<label><span style={ { color: 'red' } }>*</span> { __( 'Pick Your Second Greens', 'fastnutrition-mealprep' ) }{ ' ' }
-								<select name="greens_2" required value={ selection.greens_ids[ 1 ] || '' } onChange={ ( e ) => onGreensChange( 1, e.target.value ) }>
-									<option value="">{ __( 'Choose Your Second Greens', 'fastnutrition-mealprep' ) }</option>
-									{ allowed.greens.filter( ( i ) => i.id !== selection.greens_ids[ 0 ] ).map( ( i ) => (
-										<option key={ i.id } value={ i.id }>{ i.name }{ i.price_delta ? ` (+${ priceStr( i.price_delta ) })` : '' }</option>
-									) ) }
-								</select>
-							</label>
-						</p>
-					) }
-				</>
-			) }
-
-			{ config.addons && config.addons.length > 0 && (
-				<fieldset style={ { border: 'none', padding: 0, margin: '1em 0' } }>
-					<legend><strong>{ __( 'Optional add-ons', 'fastnutrition-mealprep' ) }</strong></legend>
-					{ config.addons.map( ( addon ) => (
-						<p key={ addon.id }>
-							<label>
-								<input type="checkbox" checked={ selection.addons.some( ( a ) => a.id === addon.id ) } onChange={ () => toggleAddon( addon ) } />
-								{ ' ' }{ addon.label } — { priceStr( addon.price ) }
-							</label>
-						</p>
-					) ) }
-				</fieldset>
-			) }
-
-			<p>
-				<label>{ __( 'Quantity', 'fastnutrition-mealprep' ) }{ ' ' }
-					<input type="number" min="1" value={ qty } onChange={ ( e ) => setQty( Math.max( 1, parseInt( e.target.value, 10 ) || 1 ) ) } style={ { width: 80 } } />
-				</label>
-			</p>
-
-			{ msg && (
-				<p className="fn-min-msg" style={ { color: msg.type === 'ok' ? '#006400' : '#a00', fontWeight: 600 } } role="status" aria-live="polite">
-					{ msg.text }{ ' ' }
-					{ msg.type === 'ok' && msg.url && <a href={ msg.url }>{ __( '→', 'fastnutrition-mealprep' ) }</a> }
-				</p>
-			) }
-
-			<p>
-				<button type="submit" className="single_add_to_cart_button button alt" disabled={ submitting }>
-					{ submitting ? __( 'Adding…', 'fastnutrition-mealprep' ) : __( 'Add to basket', 'fastnutrition-mealprep' ) }
-				</button>
-			</p>
-		</form>
-	);
-}
-
 document.querySelectorAll( '[data-fn-meal-builder]' ).forEach( ( el ) => {
 	const productId = parseInt( el.getAttribute( 'data-product-id' ) || '0', 10 );
-	const minimal   = !! ( window.fnMealBuilder && window.fnMealBuilder.minimalStyling );
 	if ( productId ) {
-		createRoot( el ).render( <MealBuilder productId={ productId } minimal={ minimal } /> );
+		createRoot( el ).render( <MealBuilder productId={ productId } /> );
 	}
 } );
