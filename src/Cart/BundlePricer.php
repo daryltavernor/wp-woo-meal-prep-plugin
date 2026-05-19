@@ -9,6 +9,8 @@ use WC_Cart;
 final class BundlePricer {
 
 	public function register(): void {
+		// Run AFTER AddOnPricer (priority 10) so we can override the base portion
+		// with the bundle price while preserving each line's selection delta.
 		add_action( 'woocommerce_before_calculate_totals', [ $this, 'apply' ], 20 );
 		add_filter( 'woocommerce_get_item_data', [ $this, 'render_notice' ], 20, 2 );
 	}
@@ -16,9 +18,6 @@ final class BundlePricer {
 	public function apply( WC_Cart $cart ): void {
 		if ( is_admin() && ! defined( 'DOING_AJAX' ) ) {
 			return;
-		}
-		if ( did_action( 'woocommerce_before_calculate_totals' ) >= 2 ) {
-			// Avoid loops.
 		}
 
 		$groups = [];
@@ -39,7 +38,7 @@ final class BundlePricer {
 
 			$applied = $this->allocate( $total_qty, $bundles );
 			if ( empty( $applied['units'] ) ) {
-				// No bundle threshold met — keep base pricing but clear any prior override.
+				// No bundle threshold met — clear any prior override flag, leave AddOnPricer's price alone.
 				foreach ( $items as $key => $item ) {
 					$cart->cart_contents[ $key ]['fn_bundle'] = null;
 				}
@@ -50,16 +49,18 @@ final class BundlePricer {
 			$bundled_qty        = $applied['units'];
 			$remainder_qty      = $total_qty - $bundled_qty;
 
-			$product      = $items[ array_key_first( $items ) ]['data'];
-			$base_price   = (float) $product->get_price();
-			$base_price  += $this->first_selection_delta( $items );
+			// Use the unmodified catalog price as the BASE — AddOnPricer has already
+			// added the per-line delta to each cart item's price, so we read the
+			// catalog separately to avoid double-counting it.
+			$catalog_product = function_exists( 'wc_get_product' ) ? wc_get_product( (int) $product_id ) : null;
+			$base_price = $catalog_product ? (float) $catalog_product->get_price( 'edit' ) : 0.0;
+
 			$remainder_total = $remainder_qty * $base_price;
 			$effective_unit  = $total_qty > 0 ? ( $bundle_price_total + $remainder_total ) / $total_qty : $base_price;
 
 			foreach ( $items as $key => $item ) {
-				$delta       = Selections::compute_price_delta( $product_id, $item[ Selections::CART_KEY ] ?? [] );
-				$line_price  = $effective_unit + ( $delta - $this->first_selection_delta( $items ) );
-				// We keep each line's selection-driven delta but align the base component to the averaged bundle/remainder price.
+				$delta      = Selections::compute_price_delta( $product_id, $item[ Selections::CART_KEY ] ?? [] );
+				$line_price = $effective_unit + $delta;
 				$item['data']->set_price( max( 0, $line_price ) );
 				$cart->cart_contents[ $key ]['fn_bundle'] = [
 					'applied_tier'    => $applied['tier'],
@@ -70,11 +71,6 @@ final class BundlePricer {
 				];
 			}
 		}
-	}
-
-	private function first_selection_delta( array $items ): float {
-		$first = reset( $items );
-		return Selections::compute_price_delta( (int) $first['product_id'], $first[ Selections::CART_KEY ] ?? [] );
 	}
 
 	private function allocate( int $qty, array $bundles ): array {
@@ -104,13 +100,13 @@ final class BundlePricer {
 		if ( empty( $cart_item['fn_bundle'] ) || empty( $cart_item['fn_bundle']['applied_tier'] ) ) {
 			return $item_data;
 		}
-		$tier = $cart_item['fn_bundle']['applied_tier'];
+		$tier      = $cart_item['fn_bundle']['applied_tier'];
 		$effective = wc_price( (float) $cart_item['fn_bundle']['effective_unit'] );
 		$item_data[] = [
 			'key'   => __( 'Bundle', 'fastnutrition-mealprep' ),
 			'value' => sprintf(
 				/* translators: 1: bundle qty, 2: bundle price, 3: effective per-meal price */
-				esc_html__( '%1$d for %2$s (~%3$s each)', 'fastnutrition-mealprep' ),
+				esc_html__( '%1$d for %2$s (~%3$s each, add-ons extra)', 'fastnutrition-mealprep' ),
 				(int) $tier['qty'],
 				wc_price( (float) $tier['price'] ),
 				$effective
