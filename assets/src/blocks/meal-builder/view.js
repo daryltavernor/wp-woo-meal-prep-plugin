@@ -311,7 +311,7 @@ function MealBuilder( { productId } ) {
 						const on = selection.addons.some( ( a ) => a.id === addon.id );
 						return (
 							<div key={ addon.id }>
-								<p className="fn-addons-title">{ addon.label }</p>
+								{ addon.heading && <p className="fn-addons-title">{ addon.heading }</p> }
 								<div className="fn-addon-row">
 									<label>
 										<input type="checkbox" checked={ on } onChange={ () => toggleAddon( addon ) } />

@@ -32,6 +32,7 @@ final class AddOnMeta {
 		echo '</div>';
 		echo '<table class="widefat" id="fn-addons-table"><thead><tr>';
 		echo '<th>' . esc_html__( 'Label', 'fastnutrition-mealprep' ) . '</th>';
+		echo '<th>' . esc_html__( 'Heading (optional)', 'fastnutrition-mealprep' ) . '</th>';
 		echo '<th style="width:80px">' . esc_html__( 'Price (£)', 'fastnutrition-mealprep' ) . '</th>';
 		echo '<th style="width:70px" title="' . esc_attr__( 'Optional', 'fastnutrition-mealprep' ) . '">' . esc_html__( 'kcal', 'fastnutrition-mealprep' ) . '</th>';
 		echo '<th style="width:70px" title="' . esc_attr__( 'Optional', 'fastnutrition-mealprep' ) . '">' . esc_html__( 'Protein (g)', 'fastnutrition-mealprep' ) . '</th>';
@@ -43,7 +44,8 @@ final class AddOnMeta {
 		}
 		foreach ( $addons as $i => $row ) {
 			echo '<tr>';
-			printf( '<td><input type="text" name="fn_addons[%1$d][label]" value="%2$s" style="width:100%%" /></td>', (int) $i, esc_attr( (string) ( $row['label'] ?? '' ) ) );
+			printf( '<td><input type="text" name="fn_addons[%1$d][label]" value="%2$s" style="width:100%%" placeholder="%3$s" /></td>', (int) $i, esc_attr( (string) ( $row['label'] ?? '' ) ), esc_attr__( 'e.g. 2 Boiled Eggs', 'fastnutrition-mealprep' ) );
+			printf( '<td><input type="text" name="fn_addons[%1$d][heading]" value="%2$s" style="width:100%%" placeholder="%3$s" /></td>', (int) $i, esc_attr( (string) ( $row['heading'] ?? '' ) ), esc_attr__( 'Leave blank to hide heading', 'fastnutrition-mealprep' ) );
 			printf( '<td><input type="number" step="0.01" min="0" name="fn_addons[%1$d][price]" value="%2$s" style="width:100%%" /></td>', (int) $i, esc_attr( (string) ( $row['price'] ?? 0 ) ) );
 			printf( '<td><input type="number" step="0.1" min="0" name="fn_addons[%1$d][kcal]" value="%2$s" style="width:100%%" /></td>', (int) $i, esc_attr( (string) ( $row['kcal'] ?? '' ) ) );
 			printf( '<td><input type="number" step="0.1" min="0" name="fn_addons[%1$d][protein_g]" value="%2$s" style="width:100%%" /></td>', (int) $i, esc_attr( (string) ( $row['protein_g'] ?? '' ) ) );
@@ -65,6 +67,7 @@ final class AddOnMeta {
 				const tr = document.createElement('tr');
 				tr.innerHTML =
 					'<td><input type="text" name="fn_addons[' + i + '][label]" style="width:100%" /></td>' +
+					'<td><input type="text" name="fn_addons[' + i + '][heading]" style="width:100%" placeholder="Leave blank to hide heading" /></td>' +
 					'<td><input type="number" step="0.01" min="0" name="fn_addons[' + i + '][price]" style="width:100%" /></td>' +
 					'<td><input type="number" step="0.1" min="0" name="fn_addons[' + i + '][kcal]" style="width:100%" /></td>' +
 					'<td><input type="number" step="0.1" min="0" name="fn_addons[' + i + '][protein_g]" style="width:100%" /></td>' +
@@ -103,6 +106,7 @@ final class AddOnMeta {
 			$rows[] = [
 				'id'        => 'a' . ++$index,
 				'label'     => $label,
+				'heading'   => isset( $row['heading'] ) ? sanitize_text_field( (string) $row['heading'] ) : '',
 				'price'     => $price,
 				'kcal'      => isset( $row['kcal'] ) && '' !== $row['kcal'] ? max( 0, (float) $row['kcal'] ) : 0,
 				'protein_g' => isset( $row['protein_g'] ) && '' !== $row['protein_g'] ? max( 0, (float) $row['protein_g'] ) : 0,
@@ -118,8 +122,9 @@ final class AddOnMeta {
 		if ( ! is_array( $rows ) ) {
 			return [];
 		}
-		// Backfill macro fields on rows saved before this feature shipped.
+		// Backfill macro / heading fields on rows saved before those features shipped.
 		foreach ( $rows as &$row ) {
+			$row['heading']   = (string) ( $row['heading'] ?? '' );
 			$row['kcal']      = (float) ( $row['kcal'] ?? 0 );
 			$row['protein_g'] = (float) ( $row['protein_g'] ?? 0 );
 			$row['carbs_g']   = (float) ( $row['carbs_g'] ?? 0 );
