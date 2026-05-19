@@ -10,7 +10,7 @@
 	color: #000;
 	max-width: 780px;
 	margin: 1.5rem auto;
-	text-align: left;
+	text-align: center;
 	line-height: 1.4;
 }
 
@@ -42,6 +42,7 @@
 .fn-meal-builder .fn-row {
 	display: flex;
 	align-items: center;
+	justify-content: center;
 	gap: 1.25rem;
 	margin: 0 0 1.1rem;
 	flex-wrap: wrap;
@@ -102,10 +103,10 @@
 .fn-meal-builder .fn-row-help {
 	flex-basis: 100%;
 	margin: 0.3rem 0 0;
-	padding-left: calc(180px + 1.25rem);
 	font: 500 0.85rem/1.4 'Kanit', sans-serif;
 	color: #777;
 	font-style: italic;
+	text-align: center;
 }
 
 /* ---- Add-ons ------------------------------------------------------------- */
@@ -118,6 +119,7 @@
 .fn-meal-builder .fn-addon-row {
 	display: flex;
 	align-items: center;
+	justify-content: center;
 	gap: 0.75rem;
 	margin: 0 0 0.45rem;
 }
@@ -225,7 +227,6 @@
 /* ---- Mobile -------------------------------------------------------------- */
 @media (max-width: 620px) {
 	.fn-meal-builder .fn-row { gap: 0.4rem; }
-	.fn-meal-builder .fn-row-label { flex-basis: 100%; min-width: 0; }
-	.fn-meal-builder .fn-row-help { padding-left: 0; }
-	.fn-meal-builder .fn-row-price { margin-left: auto; }
+	.fn-meal-builder .fn-row-label { flex-basis: 100%; min-width: 0; text-align: center; }
+	.fn-meal-builder .fn-row-price { width: 100%; text-align: center; margin-left: 0; }
 }
