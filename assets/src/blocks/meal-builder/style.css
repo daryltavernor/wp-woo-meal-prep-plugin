@@ -3,25 +3,6 @@
 	color: inherit;
 	max-width: 720px;
 	margin: 0 auto;
-	padding-bottom: 7.5rem;
-}
-.fn-meal-builder .fn-row {
-	margin-bottom: 1rem;
-}
-.fn-meal-builder .fn-row label.fn-row-label {
-	display: block;
-	font-weight: 700;
-	margin-bottom: 0.35rem;
-}
-.fn-meal-builder .fn-row select {
-	width: 100%;
-	max-width: 480px;
-}
-.fn-meal-builder .fn-row .fn-row-help {
-	display: block;
-	font-size: 0.82rem;
-	color: #666;
-	margin-top: 0.3rem;
 }
 
 /* Diet filter — small segmented chips above the protein dropdown. */
@@ -34,7 +15,7 @@
 	margin-bottom: 1rem;
 }
 .fn-meal-builder .fn-diet-filter button {
-	padding: 0.32rem 0.8rem;
+	padding: 0.32rem 0.85rem;
 	border: none;
 	border-radius: 999px;
 	background: transparent;
@@ -50,7 +31,7 @@
 	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
 }
 
-/* Mode toggle (only renders when Sweet mode is enabled alongside Set Meal mode). */
+/* Mode toggle (only when both Sweet and Meal modes are enabled). */
 .fn-meal-builder .fn-mode-toggle {
 	display: flex;
 	flex-wrap: wrap;
@@ -75,150 +56,220 @@
 	border-color: #000;
 }
 
-/* Add-ons render as simple stacked checkbox rows so the theme controls type. */
-.fn-meal-builder .fn-addons-list {
-	margin: 0;
-	padding: 0;
-	list-style: none;
-}
-.fn-meal-builder .fn-addons-list li {
-	margin-bottom: 0.35rem;
-}
-.fn-meal-builder .fn-addons-list label {
-	display: inline-flex;
-	gap: 0.5rem;
-	align-items: center;
-	cursor: pointer;
-}
-
-/* Sticky single-CTA footer (kept from before). */
-.fn-meal-builder-footer {
-	position: fixed;
-	left: 0;
-	right: 0;
-	bottom: 0;
-	z-index: 9999;
-	background: #000;
-	color: #fff;
-	padding: 0.85rem 1rem;
-	box-shadow: 0 -6px 18px rgba(0, 0, 0, 0.18);
-	font-family: 'Kanit', system-ui, sans-serif;
-}
-.fn-meal-builder-footer-inner {
-	max-width: 720px;
-	margin: 0 auto;
+/* Pill row — label on left, dropdown stretched in middle, price on right. */
+.fn-meal-builder .fn-row {
 	display: flex;
 	align-items: center;
-	gap: 0.75rem;
+	justify-content: flex-start;
+	gap: 1rem;
+	margin: 0 0 0.85rem;
 	flex-wrap: wrap;
 }
-.fn-meal-builder-footer .fn-foot-macros {
-	flex: 1 1 200px;
-	color: #c5e643;
-	font-size: 0.88rem;
-	letter-spacing: 0.02em;
-	line-height: 1.3;
+.fn-meal-builder .fn-row-label {
+	flex: 0 0 auto;
+	font-weight: 800;
+	font-size: 1rem;
+	min-width: 140px;
 }
-.fn-meal-builder-footer .fn-foot-macros strong {
-	color: #fff;
-	display: block;
-	font-size: 0.7rem;
+.fn-meal-builder .fn-row-label .fn-required {
+	color: #c00;
+	margin-right: 0.2rem;
+}
+.fn-meal-builder .fn-row-control {
+	flex: 1 1 240px;
+	background: #f4f4f4;
+	border-radius: 999px;
+	padding: 0.15rem 0.5rem 0.15rem 1rem;
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+.fn-meal-builder .fn-row-control select {
+	flex: 1 1 auto;
+	background: transparent;
+	border: none;
+	box-shadow: none;
+	font: inherit;
 	font-weight: 700;
-	text-transform: uppercase;
-	letter-spacing: 0.08em;
-	margin-bottom: 0.15rem;
+	color: inherit;
+	padding: 0.55rem 0;
+	width: 100%;
+	min-height: 36px;
+	cursor: pointer;
+	appearance: none;
+	-webkit-appearance: none;
+	background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='10' viewBox='0 0 14 10'><path fill='%23000' d='M7 10 0 0h14z'/></svg>");
+	background-repeat: no-repeat;
+	background-position: right 0.5rem center;
+	padding-right: 1.5rem;
 }
-.fn-meal-builder-footer .fn-qty {
+.fn-meal-builder .fn-row-control select:focus {
+	outline: 2px solid #c5e643;
+	outline-offset: 2px;
+}
+.fn-meal-builder .fn-row-price {
+	flex: 0 0 auto;
+	font-weight: 800;
+	min-width: 56px;
+	text-align: right;
+}
+.fn-meal-builder .fn-row-help {
+	flex-basis: 100%;
+	margin: 0.2rem 0 0;
+	font-size: 0.82rem;
+	color: #666;
+	padding-left: 156px;
+}
+
+/* Add-ons */
+.fn-meal-builder .fn-addons {
+	margin-top: 1rem;
+}
+.fn-meal-builder .fn-addons-title {
+	font-style: italic;
+	font-weight: 700;
+	font-size: 0.95rem;
+	margin: 0 0 0.5rem;
+}
+.fn-meal-builder .fn-addon-row {
+	display: flex;
+	align-items: center;
+	gap: 1rem;
+	margin-bottom: 0.5rem;
+	flex-wrap: wrap;
+}
+.fn-meal-builder .fn-addon-label {
+	flex: 1 1 200px;
+	font-weight: 700;
+}
+.fn-meal-builder .fn-addon-price {
+	font-weight: 800;
+	min-width: 84px;
+	text-align: right;
+}
+.fn-meal-builder .fn-addon-price del {
+	opacity: 0.55;
+	font-weight: 500;
+	margin-right: 0.3rem;
+}
+
+/* Yes / No segmented pill */
+.fn-meal-builder .fn-yesno {
+	display: inline-flex;
+	background: #f4f4f4;
+	border-radius: 999px;
+	padding: 0.2rem;
+	gap: 0.2rem;
+}
+.fn-meal-builder .fn-yesno button {
+	border: none;
+	background: transparent;
+	padding: 0.35rem 0.95rem;
+	border-radius: 999px;
+	font-weight: 700;
+	cursor: pointer;
+	color: #555;
+	font-family: inherit;
+	font-size: 0.85rem;
+}
+.fn-meal-builder .fn-yesno button.is-active.is-yes {
+	background: #c5e643;
+	color: #000;
+}
+.fn-meal-builder .fn-yesno button.is-active.is-no {
+	background: #fff;
+	color: #000;
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+/* CTA row — qty + add-to-basket button inline, matching theme look. */
+.fn-meal-builder .fn-cta-row {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 1rem;
+	margin: 1.5rem 0 0.5rem;
+	flex-wrap: wrap;
+}
+.fn-meal-builder .fn-qty {
 	display: inline-flex;
 	align-items: stretch;
-	border: 1px solid #c5e643;
+	border: 2px solid #000;
 	border-radius: 999px;
 	overflow: hidden;
-	background: #000;
+	background: #fff;
 }
-.fn-meal-builder-footer .fn-qty button {
+.fn-meal-builder .fn-qty button {
 	background: transparent;
-	color: #c5e643;
+	color: #000;
 	border: none;
 	width: 36px;
 	font-size: 1.1rem;
 	cursor: pointer;
 	font-weight: 700;
+	font-family: inherit;
 }
-.fn-meal-builder-footer .fn-qty input {
+.fn-meal-builder .fn-qty input {
 	width: 44px;
 	border: none;
 	background: transparent;
-	color: #fff;
+	color: #000;
 	text-align: center;
 	font-size: 1rem;
 	font-weight: 700;
 	-moz-appearance: textfield;
 	appearance: textfield;
 }
-.fn-meal-builder-footer .fn-qty input::-webkit-outer-spin-button,
-.fn-meal-builder-footer .fn-qty input::-webkit-inner-spin-button {
+.fn-meal-builder .fn-qty input::-webkit-outer-spin-button,
+.fn-meal-builder .fn-qty input::-webkit-inner-spin-button {
 	-webkit-appearance: none;
 	margin: 0;
 }
-.fn-meal-builder-footer .fn-cta {
+.fn-meal-builder .fn-cta {
 	background: #c5e643;
 	color: #000;
 	font-weight: 800;
-	padding: 0.7rem 1.4rem;
-	border: none;
+	padding: 0.85rem 2.2rem;
+	border: 2px solid #000;
 	border-radius: 999px;
 	font-family: inherit;
-	font-size: 0.95rem;
+	font-size: 1rem;
 	cursor: pointer;
 	text-transform: uppercase;
-	letter-spacing: 0.05em;
-	flex: 1 1 180px;
+	letter-spacing: 0.04em;
 }
-.fn-meal-builder-footer .fn-cta:hover { background: #d6f266; }
-.fn-meal-builder-footer .fn-cta:disabled { background: #555; color: #aaa; cursor: not-allowed; }
-@media (max-width: 540px) {
-	.fn-meal-builder-footer .fn-foot-macros { flex-basis: 100%; text-align: center; }
+.fn-meal-builder .fn-cta:hover { background: #d6f266; }
+.fn-meal-builder .fn-cta:disabled { background: #eee; color: #888; cursor: not-allowed; border-color: #ccc; }
+
+/* Optional subtle macros line under the CTA. */
+.fn-meal-builder .fn-macros-line {
+	text-align: center;
+	color: #555;
+	font-size: 0.85rem;
+	margin-top: 0.4rem;
 }
 
-/* Toast */
-.fn-toast {
-	position: absolute;
-	left: 1rem;
-	right: 1rem;
-	bottom: 100%;
-	max-width: 720px;
-	margin: 0 auto 0.55rem;
-	padding: 0.55rem 0.85rem;
-	border-radius: 10px;
-	display: flex;
-	align-items: center;
-	gap: 0.6rem;
+/* Inline toast / status message. */
+.fn-meal-builder .fn-status {
+	margin: 0.85rem auto 0;
+	max-width: 480px;
+	text-align: center;
+	padding: 0.5rem 0.85rem;
+	border-radius: 8px;
+	font-weight: 700;
 	font-size: 0.9rem;
-	font-weight: 600;
-	box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
-	animation: fn-toast-in 0.18s ease-out;
 }
-.fn-toast.is-ok { background: #c5e643; color: #1a3d00; }
-.fn-toast.is-err { background: #ffe1e1; color: #7a0000; }
-.fn-toast-icon {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	width: 24px;
-	height: 24px;
-	border-radius: 50%;
-	background: rgba(0, 0, 0, 0.15);
-	font-weight: 800;
-}
-.fn-toast-link { margin-left: auto; color: inherit; text-decoration: underline; }
-@keyframes fn-toast-in {
-	from { transform: translateY(8px); opacity: 0; }
-	to   { transform: translateY(0); opacity: 1; }
-}
+.fn-meal-builder .fn-status.is-ok { background: #eaf6c8; color: #2a4d00; }
+.fn-meal-builder .fn-status.is-err { background: #fde2e2; color: #800; }
+.fn-meal-builder .fn-status a { color: inherit; text-decoration: underline; margin-left: 0.4rem; }
 
-/* Hide theme's default add-to-cart wherever a builder is mounted. */
+/* Hide the theme's default add-to-cart wherever a builder is mounted. */
 body.fn-meal-builder-active form.cart:not(.fn-builder-form),
 body.fn-meal-builder-active .single_add_to_cart_button:not(.fn-cta) {
 	display: none !important;
+}
+
+@media (max-width: 540px) {
+	.fn-meal-builder .fn-row-label { flex-basis: 100%; min-width: 0; }
+	.fn-meal-builder .fn-row-help { padding-left: 0; }
 }
