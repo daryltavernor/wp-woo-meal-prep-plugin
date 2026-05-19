@@ -244,9 +244,13 @@ final class Selections {
 			$id = is_array( $entry ) ? (string) ( $entry['id'] ?? '' ) : (string) $entry;
 			if ( isset( $available[ $id ] ) ) {
 				$chosen[] = [
-					'id'    => $available[ $id ]['id'],
-					'label' => (string) $available[ $id ]['label'],
-					'price' => (float) $available[ $id ]['price'],
+					'id'        => $available[ $id ]['id'],
+					'label'     => (string) $available[ $id ]['label'],
+					'price'     => (float) $available[ $id ]['price'],
+					'kcal'      => (float) ( $available[ $id ]['kcal'] ?? 0 ),
+					'protein_g' => (float) ( $available[ $id ]['protein_g'] ?? 0 ),
+					'carbs_g'   => (float) ( $available[ $id ]['carbs_g'] ?? 0 ),
+					'fat_g'     => (float) ( $available[ $id ]['fat_g'] ?? 0 ),
 				];
 			}
 		}

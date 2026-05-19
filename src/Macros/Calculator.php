@@ -21,10 +21,12 @@ final class Calculator {
 	public static function macros_for_selection( int $product_id, array $selection ): array {
 		$total = self::EMPTY;
 		if ( 'set' === ( $selection['mode'] ?? '' ) && ! empty( $selection['set_meal_id'] ) ) {
-			return self::add( $total, Ingredient::get_macros( (int) $selection['set_meal_id'] ) );
+			$total = self::add( $total, Ingredient::get_macros( (int) $selection['set_meal_id'] ) );
+			return self::add( $total, self::addons_total( $selection['addons'] ?? [] ) );
 		}
 		if ( 'sweet' === ( $selection['mode'] ?? '' ) && ! empty( $selection['sweet_id'] ) ) {
-			return self::add( $total, Ingredient::get_macros( (int) $selection['sweet_id'] ) );
+			$total = self::add( $total, Ingredient::get_macros( (int) $selection['sweet_id'] ) );
+			return self::add( $total, self::addons_total( $selection['addons'] ?? [] ) );
 		}
 		if ( ! empty( $selection['protein_id'] ) ) {
 			$total = self::add( $total, Ingredient::get_macros( (int) $selection['protein_id'] ) );
@@ -34,6 +36,28 @@ final class Calculator {
 		}
 		foreach ( ( $selection['greens_ids'] ?? [] ) as $id ) {
 			$total = self::add( $total, Ingredient::get_macros( (int) $id ) );
+		}
+		return self::add( $total, self::addons_total( $selection['addons'] ?? [] ) );
+	}
+
+	public static function addons_total( mixed $addons ): array {
+		$total = self::EMPTY;
+		if ( ! is_array( $addons ) ) {
+			return $total;
+		}
+		foreach ( $addons as $addon ) {
+			if ( ! is_array( $addon ) ) {
+				continue;
+			}
+			$total = self::add(
+				$total,
+				[
+					'kcal'      => (float) ( $addon['kcal'] ?? 0 ),
+					'protein_g' => (float) ( $addon['protein_g'] ?? 0 ),
+					'carbs_g'   => (float) ( $addon['carbs_g'] ?? 0 ),
+					'fat_g'     => (float) ( $addon['fat_g'] ?? 0 ),
+				]
+			);
 		}
 		return $total;
 	}

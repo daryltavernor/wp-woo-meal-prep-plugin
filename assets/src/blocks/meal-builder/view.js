@@ -79,13 +79,19 @@ function MealBuilder( { productId } ) {
 		} );
 		let t = { ...zero };
 		if ( mode === 'sweet' && selection.sweet_id ) {
-			return add( t, findById( selection.sweet_id, ingredients.sweet || [] )?.macros );
+			t = add( t, findById( selection.sweet_id, ingredients.sweet || [] )?.macros );
+		} else if ( isSetMeal ) {
+			t = add( t, findById( selection.set_meal_id, ingredients.set_meal )?.macros );
+		} else {
+			if ( selection.protein_id ) t = add( t, findById( selection.protein_id, ingredients.protein )?.macros );
+			if ( selection.slot2_kind === 'carb' && selection.slot2_id ) t = add( t, findById( selection.slot2_id, ingredients.carb )?.macros );
+			if ( selection.slot2_kind === 'greens' && selection.slot2_id ) t = add( t, findById( selection.slot2_id, ingredients.greens )?.macros );
+			if ( selection.greens_id ) t = add( t, findById( selection.greens_id, ingredients.greens )?.macros );
 		}
-		if ( isSetMeal ) return add( t, findById( selection.set_meal_id, ingredients.set_meal )?.macros );
-		if ( selection.protein_id ) t = add( t, findById( selection.protein_id, ingredients.protein )?.macros );
-		if ( selection.slot2_kind === 'carb' && selection.slot2_id ) t = add( t, findById( selection.slot2_id, ingredients.carb )?.macros );
-		if ( selection.slot2_kind === 'greens' && selection.slot2_id ) t = add( t, findById( selection.slot2_id, ingredients.greens )?.macros );
-		if ( selection.greens_id ) t = add( t, findById( selection.greens_id, ingredients.greens )?.macros );
+		// Add any selected add-ons' macros (each addon row carries optional kcal / protein / carbs / fat).
+		( selection.addons || [] ).forEach( ( a ) => {
+			t = add( t, a );
+		} );
 		return t;
 	}, [ selection, mode, ingredients, isSetMeal ] );
 
