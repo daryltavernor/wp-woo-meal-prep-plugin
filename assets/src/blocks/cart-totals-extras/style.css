@@ -1,12 +1,22 @@
-/* Hide the shipping section on the cart page only. Checkout still shows it.
-   Scoped to the cart block container rather than body.woocommerce-cart so it
-   works when the cart block sits on a non-default page. */
+/* ---------- Hide the shipping row on the CART page only ---------- */
+
+/* Block-based cart */
 .wp-block-woocommerce-cart .wp-block-woocommerce-cart-order-summary-shipping-block,
 body.woocommerce-cart .wp-block-woocommerce-cart-order-summary-shipping-block {
 	display: none;
 }
 
-/* Bundle savings + add-ons total rows injected by view.js */
+/* Classic shortcode cart (the .cart_totals table contains a <tr class="shipping">). */
+body.woocommerce-cart .cart_totals tr.shipping,
+body.woocommerce-cart .cart_totals .woocommerce-shipping-totals,
+body.woocommerce-cart .cart_totals .woocommerce-shipping-methods,
+body.woocommerce-cart .cart_totals .woocommerce-shipping-calculator {
+	display: none;
+}
+
+/* ---------- Bundle savings + add-ons total rows ---------- */
+
+/* Block cart/checkout (injected by view.js) */
 .fn-totals-row {
 	display: flex;
 	justify-content: space-between;
@@ -25,6 +35,15 @@ body.woocommerce-cart .wp-block-woocommerce-cart-order-summary-shipping-block {
 .fn-totals-row.fn-totals-savings .fn-totals-value {
 	color: #2a8a3a;
 }
-.fn-totals-row.fn-totals-addons .fn-totals-value {
-	color: #222;
+
+/* Classic cart/checkout (rendered server-side as <tr>). */
+.cart_totals .fn-cart-row th,
+.woocommerce-checkout-review-order-table .fn-cart-row th {
+	font-weight: 600;
+}
+.cart_totals .fn-cart-savings th,
+.cart_totals .fn-cart-savings td,
+.woocommerce-checkout-review-order-table .fn-cart-savings th,
+.woocommerce-checkout-review-order-table .fn-cart-savings td {
+	color: #2a8a3a;
 }

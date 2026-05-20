@@ -6,6 +6,7 @@ namespace FastNutrition\MealPrep\Checkout;
 use Automattic\WooCommerce\StoreApi\StoreApi;
 use Automattic\WooCommerce\StoreApi\Schemas\ExtendSchema;
 use FastNutrition\MealPrep\Cart\Selections;
+use FastNutrition\MealPrep\Cart\TotalsDisplay;
 use FastNutrition\MealPrep\Delivery\BlockedDates;
 use FastNutrition\MealPrep\Delivery\Profile;
 use FastNutrition\MealPrep\Delivery\ProfileResolver;
@@ -61,49 +62,30 @@ final class StoreApiExtensions {
 	}
 
 	public function cart_data(): array {
-		$totals         = Calculator::EMPTY;
-		$addon_total    = 0.0;
-		$bundle_savings = 0.0;
-		$bundle_seen    = [];
+		$totals = Calculator::EMPTY;
 
 		if ( WC()->cart ) {
 			foreach ( WC()->cart->get_cart() as $item ) {
 				$selection = $item[ Selections::CART_KEY ] ?? null;
-				$qty       = (float) ( $item['quantity'] ?? 0 );
-
-				if ( is_array( $selection ) ) {
-					$totals = Calculator::add(
-						$totals,
-						Calculator::scale(
-							Calculator::macros_for_selection( (int) $item['product_id'], $selection ),
-							$qty
-						)
-					);
-
-					foreach ( ( $selection['addons'] ?? [] ) as $addon ) {
-						$addon_total += (float) ( $addon['price'] ?? 0 ) * $qty;
-					}
+				if ( ! is_array( $selection ) ) {
+					continue;
 				}
-
-				$bundle = $item['fn_bundle'] ?? null;
-				if ( is_array( $bundle ) && ! empty( $bundle['applied_tier'] ) ) {
-					$product_id = (int) $item['product_id'];
-					if ( ! isset( $bundle_seen[ $product_id ] ) ) {
-						$bundle_seen[ $product_id ] = true;
-						$catalog                    = function_exists( 'wc_get_product' ) ? wc_get_product( $product_id ) : null;
-						$base                       = $catalog ? (float) $catalog->get_price( 'edit' ) : 0.0;
-						$bundled_qty                = (int) ( $bundle['bundle_units'] ?? 0 );
-						$bundle_total               = (float) ( $bundle['bundle_total'] ?? 0 );
-						$bundle_savings            += max( 0.0, ( $base * $bundled_qty ) - $bundle_total );
-					}
-				}
+				$totals = Calculator::add(
+					$totals,
+					Calculator::scale(
+						Calculator::macros_for_selection( (int) $item['product_id'], $selection ),
+						(float) $item['quantity']
+					)
+				);
 			}
 		}
 
+		$summary = TotalsDisplay::compute_summary();
+
 		return [
 			'macros'         => $totals,
-			'addon_total'    => $addon_total,
-			'bundle_savings' => $bundle_savings,
+			'addon_total'    => $summary['addon_total'],
+			'bundle_savings' => $summary['bundle_savings'],
 		];
 	}
 
