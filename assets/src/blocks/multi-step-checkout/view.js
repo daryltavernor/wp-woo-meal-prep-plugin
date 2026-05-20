@@ -39,6 +39,36 @@ const STEPS = [
 	},
 ];
 
+function defaultBillingSameAsShipping( checkout ) {
+	let done = false;
+	const trySetChecked = () => {
+		if ( done ) {
+			return true;
+		}
+		const cb = checkout.querySelector(
+			'.wc-block-checkout__use-address-for-billing input[type="checkbox"], input[type="checkbox"][id*="use-shipping-as-billing" i], input[type="checkbox"][name*="useShippingAsBilling" i]'
+		);
+		if ( ! cb ) {
+			return false;
+		}
+		if ( ! cb.checked ) {
+			cb.click();
+		}
+		done = true;
+		return true;
+	};
+	if ( trySetChecked() ) {
+		return;
+	}
+	const observer = new MutationObserver( () => {
+		if ( trySetChecked() ) {
+			observer.disconnect();
+		}
+	} );
+	observer.observe( checkout, { childList: true, subtree: true } );
+	window.setTimeout( () => observer.disconnect(), 8000 );
+}
+
 function mountSlotPicker( fieldsBlock ) {
 	if ( fieldsBlock.querySelector( '.fn-slot-picker-mount' ) ) {
 		return;
@@ -123,6 +153,9 @@ function SlotPicker() {
 			{ ! loading && ! postcode && (
 				<p className="fn-slot-empty">{ __( 'Enter your postcode above and availability will appear here.', 'fastnutrition-mealprep' ) }</p>
 			) }
+			{ ! loading && ! selected && options.length > 0 && (
+				<p className="fn-slot-hint">{ __( 'Pick a date and time below to continue.', 'fastnutrition-mealprep' ) }</p>
+			) }
 			<div className="fn-slot-dates">
 				{ options.map( ( day ) => (
 					<div key={ `${ day.date }-${ day.profile_id }` } className="fn-slot-day">
@@ -164,6 +197,7 @@ function apply( root ) {
 	}
 
 	mountSlotPicker( fields );
+	defaultBillingSameAsShipping( checkout );
 	checkout.dataset.fnMultistep = 'applied';
 
 	const nav = document.createElement( 'ol' );

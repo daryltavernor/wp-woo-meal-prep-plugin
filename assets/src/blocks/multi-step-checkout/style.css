@@ -1,8 +1,9 @@
+/* ---------- Step nav at the top ---------- */
 .fn-steps-nav {
 	display: flex;
 	gap: 0.5rem;
 	padding: 0;
-	margin: 0 0 1rem;
+	margin: 0 0 1.25rem;
 	list-style: none;
 	counter-reset: none;
 }
@@ -21,21 +22,140 @@
 	background: #c5e643;
 	color: #000;
 }
+
+/* ---------- Back / Next: match the theme's button look ---------- */
 .fn-step-actions {
-	margin-top: 1rem;
+	margin-top: 1.5rem;
 	display: flex;
 	justify-content: space-between;
+	gap: 0.75rem;
 }
 .fn-step-actions button {
-	padding: 0.6rem 1.2rem;
+	font-family: 'Kanit', sans-serif;
+	font-weight: 700;
+	font-size: 0.85em;
+	line-height: 1.6;
+	text-transform: uppercase;
+	letter-spacing: 0.03em;
+	padding: 0.6em 1.6em;
+	border-radius: 6px;
 	border: 2px solid #000;
-	border-radius: 999px;
-	font-weight: 800;
 	cursor: pointer;
-}
-.fn-step-actions .fn-step-next {
-	background: #c5e643;
+	transition: background 0.15s ease, color 0.15s ease;
+	display: inline-block;
 }
 .fn-step-actions .fn-step-back {
 	background: #fff;
+	color: #000;
+}
+.fn-step-actions .fn-step-back:hover:not(:disabled) {
+	background: #000;
+	color: #fff;
+}
+.fn-step-actions .fn-step-next {
+	background: #000;
+	color: #fff;
+}
+.fn-step-actions .fn-step-next:hover {
+	background: #c5e643;
+	color: #000;
+}
+.fn-step-actions .fn-step-back:disabled {
+	opacity: 0.35;
+	cursor: not-allowed;
+}
+
+/* ---------- Slot picker: framed so the user notices it ---------- */
+.fn-slot-picker-mount {
+	margin: 1.25rem 0;
+}
+.fn-slot-picker {
+	border: 1.5px solid #d4d4d4;
+	border-radius: 10px;
+	padding: 1.25rem 1.25rem 1rem;
+	background: #fafafa;
+	font-family: 'Kanit', system-ui, sans-serif;
+}
+.fn-slot-heading {
+	margin: 0 0 0.25rem;
+	font-family: 'Kanit', sans-serif;
+	font-weight: 700;
+	font-size: 1.05em;
+}
+.fn-slot-help,
+.fn-slot-hint {
+	margin: 0 0 0.9rem;
+	color: #777;
+	font-size: 0.8em;
+	font-style: italic;
+	line-height: 1.45;
+}
+.fn-slot-hint {
+	margin-top: 0.5rem;
+}
+
+.fn-slot-tabs {
+	display: flex;
+	gap: 0.5rem;
+	margin-bottom: 1rem;
+}
+.fn-slot-tabs button {
+	flex: 1;
+	padding: 0.5rem 1.1rem;
+	border: 2px solid #000;
+	border-radius: 999px;
+	background: #fff;
+	cursor: pointer;
+	font-family: 'Kanit', sans-serif;
+	font-weight: 700;
+}
+.fn-slot-tabs button.is-active {
+	background: #000;
+	color: #c5e643;
+}
+
+.fn-slot-dates {
+	display: flex;
+	flex-direction: column;
+	gap: 0.9rem;
+}
+.fn-slot-day h4 {
+	margin: 0 0 0.4rem;
+	font-family: 'Kanit', sans-serif;
+	font-weight: 700;
+	text-transform: uppercase;
+	font-size: 0.9em;
+}
+.fn-slot-day h4 small {
+	font-weight: 400;
+	color: #888;
+	text-transform: none;
+}
+.fn-slot-rows {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+	gap: 0.5rem;
+}
+.fn-slot-rows button {
+	padding: 0.5rem 0.75rem;
+	border: 1.5px solid #bbb;
+	border-radius: 6px;
+	background: #fff;
+	cursor: pointer;
+	font-family: 'Kanit', sans-serif;
+	transition: border-color 0.15s ease, background 0.15s ease;
+}
+.fn-slot-rows button:hover {
+	border-color: #000;
+}
+.fn-slot-rows button.is-active {
+	background: #c5e643;
+	border-color: #000;
+	font-weight: 700;
+}
+.fn-slot-empty {
+	padding: 0.75rem 0;
+	color: #777;
+	font-style: italic;
+	font-size: 0.85em;
 }
