@@ -1,12 +1,12 @@
-/* ---------- Hide the shipping row on the CART page only ---------- */
+/* ---------- Hide shipping on the CART page only ---------- */
 
-/* Block-based cart */
-.wp-block-woocommerce-cart .wp-block-woocommerce-cart-order-summary-shipping-block,
-body.woocommerce-cart .wp-block-woocommerce-cart-order-summary-shipping-block {
+/* Block cart — the real selector WC uses. Scoped to .wp-block-woocommerce-cart
+   so the checkout block (which uses the same totals classes) is unaffected. */
+.wp-block-woocommerce-cart .wc-block-components-totals-shipping {
 	display: none;
 }
 
-/* Classic shortcode cart (the .cart_totals table contains a <tr class="shipping">). */
+/* Classic shortcode cart fallback (in case anyone still uses it). */
 body.woocommerce-cart .cart_totals tr.shipping,
 body.woocommerce-cart .cart_totals .woocommerce-shipping-totals,
 body.woocommerce-cart .cart_totals .woocommerce-shipping-methods,
@@ -14,29 +14,17 @@ body.woocommerce-cart .cart_totals .woocommerce-shipping-calculator {
 	display: none;
 }
 
-/* ---------- Bundle savings + add-ons total rows ---------- */
+/* ---------- Style the injected "You saved" / "Add-ons total" rows ---------- */
 
-/* Block cart/checkout (injected by view.js) */
-.fn-totals-row {
-	display: flex;
-	justify-content: space-between;
-	align-items: baseline;
-	padding: 0.35rem 0;
-	font-family: 'Kanit', sans-serif;
-	font-size: 0.95em;
-}
-.fn-totals-row .fn-totals-label {
-	color: #444;
-}
-.fn-totals-row .fn-totals-value {
-	font-weight: 700;
-}
-.fn-totals-row.fn-totals-savings .fn-totals-label,
-.fn-totals-row.fn-totals-savings .fn-totals-value {
+/* Block cart/checkout: we use WC's own .wc-block-components-totals-item layout,
+   so we only override colours. */
+.fn-totals-row.fn-totals-savings .wc-block-components-totals-item__label,
+.fn-totals-row.fn-totals-savings .wc-block-components-totals-item__value strong,
+.fn-totals-row.fn-totals-savings .wc-block-components-totals-item__value {
 	color: #2a8a3a;
 }
 
-/* Classic cart/checkout (rendered server-side as <tr>). */
+/* Classic shortcode cart/checkout: <tr> styling. */
 .cart_totals .fn-cart-row th,
 .woocommerce-checkout-review-order-table .fn-cart-row th {
 	font-weight: 600;

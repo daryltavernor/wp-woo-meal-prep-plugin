@@ -21,7 +21,7 @@ function getExtensions() {
 	return {
 		addonTotal:     Number( ext.addon_total || 0 ),
 		bundleSavings:  Number( ext.bundle_savings || 0 ),
-		currencySymbol: cart?.totals?.currency_symbol || cart?.totals?.currency_prefix || '£',
+		currencySymbol: cart?.totals?.currency_symbol || '£',
 		currencyMinor:  Number( cart?.totals?.currency_minor_unit ?? 2 ),
 		currencyDec:    cart?.totals?.currency_decimal_separator || '.',
 		currencyThou:   cart?.totals?.currency_thousand_separator || ',',
@@ -46,43 +46,62 @@ function formatMoney( value, currency ) {
 	return `${ sign }${ symbol }${ num }${ currency.currencySuffix || '' }`;
 }
 
+// Find every "Total" / "Estimated total" footer row in the page.
+// Its parent .wc-block-components-totals-wrapper is the row we insert before,
+// so our additions sit just above the bottom-line total — works for both
+// the cart block (no subtotal row at all) and the checkout block (full breakdown).
 function findInjectionPoints() {
-	// Each summary section block contains a .wc-block-components-totals-wrapper.
-	// We anchor next to the subtotal block so our rows sit just under it.
-	const subtotalBlocks = document.querySelectorAll(
-		'.wp-block-woocommerce-cart-order-summary-subtotal-block, .wp-block-woocommerce-checkout-order-summary-subtotal-block'
-	);
 	const points = [];
-	subtotalBlocks.forEach( ( block ) => {
-		const wrapper = block.querySelector( '.wc-block-components-totals-wrapper' );
-		const summaryContainer = block.parentElement;
-		if ( summaryContainer ) {
-			points.push( { container: summaryContainer, after: block } );
-		} else if ( wrapper && wrapper.parentElement ) {
-			points.push( { container: wrapper.parentElement, after: wrapper } );
+	document.querySelectorAll( '.wc-block-components-totals-footer-item' ).forEach( ( footer ) => {
+		const wrapper = footer.closest( '.wc-block-components-totals-wrapper' );
+		if ( wrapper && wrapper.parentElement ) {
+			points.push( { container: wrapper.parentElement, anchor: wrapper } );
 		}
 	} );
 	return points;
 }
 
-function makeRow( extraClass, label, value ) {
-	const row = document.createElement( 'div' );
-	row.className = `fn-totals-row ${ extraClass }`;
-	row.dataset.fnRow = '1';
+function makeItem( extraClass, label, value ) {
+	const item = document.createElement( 'div' );
+	item.className = `wc-block-components-totals-item fn-totals-row ${ extraClass }`;
 	const labelEl = document.createElement( 'span' );
-	labelEl.className = 'fn-totals-label';
+	labelEl.className = 'wc-block-components-totals-item__label';
 	labelEl.textContent = label;
-	const valueEl = document.createElement( 'span' );
-	valueEl.className = 'fn-totals-value';
-	valueEl.textContent = value;
-	row.appendChild( labelEl );
-	row.appendChild( valueEl );
-	return row;
+	const valueEl = document.createElement( 'div' );
+	valueEl.className = 'wc-block-components-totals-item__value';
+	const strong = document.createElement( 'strong' );
+	strong.textContent = value;
+	valueEl.appendChild( strong );
+	item.appendChild( labelEl );
+	item.appendChild( valueEl );
+	return item;
 }
 
-let lastSerialized = '';
+function makeWrapper() {
+	const wrapper = document.createElement( 'div' );
+	wrapper.className = 'wc-block-components-totals-wrapper fn-totals-wrapper';
+	return wrapper;
+}
+
+function hideShippingInCart() {
+	// Only act inside the Cart block (not the Checkout block).
+	const cartBlock = document.querySelector( '.wp-block-woocommerce-cart' );
+	if ( ! cartBlock ) {
+		return;
+	}
+	cartBlock.querySelectorAll( '.wc-block-components-totals-shipping' ).forEach( ( el ) => {
+		const parentWrapper = el.closest( '.wc-block-components-totals-wrapper' );
+		if ( parentWrapper && parentWrapper.children.length === 1 && parentWrapper.contains( el ) ) {
+			parentWrapper.style.display = 'none';
+		} else {
+			el.style.display = 'none';
+		}
+	} );
+}
 
 function render() {
+	hideShippingInCart();
+
 	const ext = getExtensions();
 	if ( ! ext ) {
 		return;
@@ -96,14 +115,18 @@ function render() {
 		return;
 	}
 
-	points.forEach( ( { container, after } ) => {
-		// Wipe previous rows we own in this container before re-rendering.
-		container.querySelectorAll( ':scope > .fn-totals-row' ).forEach( ( el ) => el.remove() );
+	points.forEach( ( { container, anchor } ) => {
+		// Remove our previous wrapper(s) in this container so we don't stack duplicates.
+		container.querySelectorAll( ':scope > .fn-totals-wrapper' ).forEach( ( el ) => el.remove() );
 
-		const fragments = [];
+		if ( ! showSavings && ! showAddons ) {
+			return;
+		}
+
+		const wrapper = makeWrapper();
 		if ( showSavings ) {
-			fragments.push(
-				makeRow(
+			wrapper.appendChild(
+				makeItem(
 					'fn-totals-savings',
 					__( 'You saved (bundle)', 'fastnutrition-mealprep' ),
 					`-${ formatMoney( ext.bundleSavings, ext ) }`
@@ -111,54 +134,43 @@ function render() {
 			);
 		}
 		if ( showAddons ) {
-			fragments.push(
-				makeRow(
+			wrapper.appendChild(
+				makeItem(
 					'fn-totals-addons',
 					__( 'Add-ons total', 'fastnutrition-mealprep' ),
 					formatMoney( ext.addonTotal, ext )
 				)
 			);
 		}
-		// Insert in order, immediately after the subtotal block.
-		let cursor = after;
-		fragments.forEach( ( frag ) => {
-			cursor.parentElement.insertBefore( frag, cursor.nextSibling );
-			cursor = frag;
-		} );
+		container.insertBefore( wrapper, anchor );
 	} );
 }
 
+let lastSig = '';
+
 function init() {
 	const dataApi = window?.wp?.data;
-	if ( ! dataApi ) {
-		return;
-	}
 
-	// 1) Re-render whenever the cart data changes (debounced via signature).
-	if ( typeof dataApi.subscribe === 'function' ) {
+	if ( dataApi && typeof dataApi.subscribe === 'function' ) {
 		dataApi.subscribe( () => {
 			const ext = getExtensions();
-			if ( ! ext ) {
-				return;
-			}
-			const sig = `${ ext.bundleSavings }|${ ext.addonTotal }`;
-			if ( sig !== lastSerialized ) {
-				lastSerialized = sig;
+			const sig = ext ? `${ ext.bundleSavings }|${ ext.addonTotal }` : '';
+			if ( sig !== lastSig ) {
+				lastSig = sig;
 				render();
-			} else {
-				// DOM may have been re-rendered by WC; re-attach if our rows are gone.
-				if ( ! document.querySelector( '.fn-totals-row' ) && ( ext.bundleSavings > 0 || ext.addonTotal > 0 ) ) {
-					render();
-				}
+			} else if ( ! document.querySelector( '.fn-totals-wrapper' ) ) {
+				render();
 			}
 		} );
 	}
 
-	// 2) Watch the DOM in case Woo blocks remount without a wp.data change.
+	// Watch the DOM in case WC re-renders the totals area.
 	const observer = new MutationObserver( () => {
-		if ( ! document.querySelector( '.fn-totals-row' ) ) {
+		if ( ! document.querySelector( '.fn-totals-wrapper' ) ) {
 			render();
 		}
+		// And re-hide shipping if it gets re-rendered.
+		hideShippingInCart();
 	} );
 	observer.observe( document.body, { childList: true, subtree: true } );
 
