@@ -14,6 +14,35 @@ body.woocommerce-cart .cart_totals .woocommerce-shipping-calculator {
 	display: none;
 }
 
+/* ---------- Hide the per-line "SAVE £X" sale badge on cart line items ---------- */
+/* The bundle pricer drops each line's price below the catalog price, which WC
+   flags as on-sale; Flatsome (and core) then renders an .onsale badge next to
+   the price. The bundle row already says "Bundle: 10 for £35 (~£3.50 each)"
+   and the right column shows "SAVE £5.00", so the per-line badge is noise. */
+.wp-block-woocommerce-cart .wc-block-cart-items .onsale,
+.wp-block-woocommerce-cart .wc-block-cart-items__row .onsale,
+.wp-block-woocommerce-cart .wc-block-cart-item__product .onsale,
+.wp-block-woocommerce-cart .wc-block-cart-item__prices .onsale,
+body.woocommerce-cart .cart_item .onsale,
+body.woocommerce-cart .product-name .onsale {
+	display: none !important;
+}
+
+/* ---------- Center the quantity number in its stepper ---------- */
+.wp-block-woocommerce-cart .wc-block-components-quantity-selector {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+.wp-block-woocommerce-cart .wc-block-components-quantity-selector__input,
+.wp-block-woocommerce-cart .wc-block-components-quantity-selector input[type="number"],
+.wp-block-woocommerce-cart .wc-block-cart-item__quantity input {
+	text-align: center;
+	padding: 0 0.25rem;
+	line-height: normal;
+	vertical-align: middle;
+}
+
 /* ---------- Style the injected "You saved" / "Add-ons total" rows ---------- */
 
 /* Block cart/checkout: we use WC's own .wc-block-components-totals-item layout,
@@ -35,3 +64,4 @@ body.woocommerce-cart .cart_totals .woocommerce-shipping-calculator {
 .woocommerce-checkout-review-order-table .fn-cart-savings td {
 	color: #2a8a3a;
 }
+
