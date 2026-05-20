@@ -67,9 +67,15 @@
 
 /* ---------- Hide WC's native shipping/pickup pickers ----------
    The slot picker replaces them; the matching WC shipping method is set
-   server-side from StoreApiExtensions::apply_shipping_method_for_type(). */
+   server-side from StoreApiExtensions::apply_shipping_method_for_type().
+   We cover every known class/id WC uses across versions, and any third
+   instance the theme might mount that wraps just the rates control. */
+.wp-block-woocommerce-checkout #shipping-option,
+.wp-block-woocommerce-checkout .wp-block-woocommerce-checkout-shipping-methods-block,
 .wp-block-woocommerce-checkout .wp-block-woocommerce-checkout-shipping-method-block,
-.wp-block-woocommerce-checkout .wp-block-woocommerce-checkout-pickup-options-block {
+.wp-block-woocommerce-checkout .wp-block-woocommerce-checkout-pickup-options-block,
+.wp-block-woocommerce-checkout .wc-block-checkout__shipping-option,
+.wp-block-woocommerce-checkout .wc-block-components-shipping-rates-control {
 	display: none !important;
 }
 
@@ -199,4 +205,23 @@
 	color: #777;
 	font-style: italic;
 	font-size: 0.82em;
+}
+.fn-slot-more {
+	display: inline-block;
+	margin: 0.75rem 0 0;
+	padding: 0;
+	background: none;
+	border: 0;
+	color: #444;
+	font-family: 'Kanit', sans-serif;
+	font-size: 0.82em;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.03em;
+	cursor: pointer;
+	text-decoration: underline;
+	text-underline-offset: 3px;
+}
+.fn-slot-more:hover {
+	color: #000;
 }

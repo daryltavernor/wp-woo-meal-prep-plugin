@@ -1,7 +1,7 @@
 import './style.css';
 import { createRoot, useEffect, useState } from '@wordpress/element';
 import apiFetch from '@wordpress/api-fetch';
-import { __ } from '@wordpress/i18n';
+import { __, sprintf } from '@wordpress/i18n';
 
 const extensionCartUpdate = ( args ) => {
 	const fn = window?.wc?.blocksCheckout?.extensionCartUpdate;
@@ -84,12 +84,15 @@ function mountSlotPicker( fieldsBlock ) {
 	createRoot( mount ).render( <SlotPicker /> );
 }
 
+const VISIBLE_LIMIT = 4;
+
 function SlotPicker() {
 	const [ method, setMethod ] = useState( 'delivery' );
 	const [ postcode, setPostcode ] = useState( '' );
 	const [ options, setOptions ] = useState( [] );
 	const [ selected, setSelected ] = useState( null );
 	const [ loading, setLoading ] = useState( false );
+	const [ showAll, setShowAll ] = useState( false );
 
 	useEffect( () => {
 		const readPostcode = () => {
@@ -113,6 +116,11 @@ function SlotPicker() {
 			.then( ( r ) => setOptions( r.options || [] ) )
 			.finally( () => setLoading( false ) );
 	}, [ postcode, method ] );
+
+	// Collapse the list whenever the underlying options change.
+	useEffect( () => {
+		setShowAll( false );
+	}, [ method, postcode ] );
 
 	useEffect( () => {
 		if ( ! selected ) {
@@ -155,7 +163,7 @@ function SlotPicker() {
 				<p className="fn-slot-hint">{ __( 'Pick a date and time below to continue.', 'fastnutrition-mealprep' ) }</p>
 			) }
 			<div className="fn-slot-dates">
-				{ options.map( ( day ) => (
+				{ ( showAll ? options : options.slice( 0, VISIBLE_LIMIT ) ).map( ( day ) => (
 					<div key={ `${ day.date }-${ day.profile_id }` } className="fn-slot-day">
 						<h4>{ day.day_label } <small>({ day.profile_name })</small></h4>
 						<div className="fn-slot-rows">
@@ -177,6 +185,22 @@ function SlotPicker() {
 					</div>
 				) ) }
 			</div>
+			{ options.length > VISIBLE_LIMIT && (
+				<button
+					type="button"
+					className="fn-slot-more"
+					onClick={ () => setShowAll( ( v ) => ! v ) }
+				>
+					{ showAll
+						? __( 'Show fewer', 'fastnutrition-mealprep' )
+						: sprintf(
+							/* translators: %d: number of additional dates */
+							__( 'Show %d more', 'fastnutrition-mealprep' ),
+							options.length - VISIBLE_LIMIT
+						)
+					}
+				</button>
+			) }
 		</div>
 	);
 }
