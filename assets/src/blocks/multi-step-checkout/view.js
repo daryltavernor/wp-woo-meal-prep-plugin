@@ -257,6 +257,27 @@ function apply( root ) {
 		if ( next ) {
 			next.style.display = idx === STEPS.length - 1 ? 'none' : '';
 		}
+
+		// On the final (payment) step, host our BACK button inside WC's
+		// actions row so it sits beside Place Order. Otherwise restore it
+		// to our own action bar at the bottom of the form.
+		const wcActionsRow = checkout.querySelector( '.wc-block-checkout__actions_row' );
+		const onLastStep   = idx === STEPS.length - 1;
+		if ( onLastStep && wcActionsRow && back ) {
+			if ( ! wcActionsRow.contains( back ) ) {
+				wcActionsRow.insertBefore( back, wcActionsRow.firstChild );
+			}
+			if ( actions && actions.parentElement ) {
+				actions.style.display = 'none';
+			}
+		} else {
+			if ( back && actions && ! actions.contains( back ) ) {
+				actions.insertBefore( back, actions.firstChild );
+			}
+			if ( actions ) {
+				actions.style.display = '';
+			}
+		}
 	};
 
 	nav.addEventListener( 'click', ( e ) => {
