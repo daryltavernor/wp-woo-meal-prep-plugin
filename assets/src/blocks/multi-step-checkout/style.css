@@ -23,7 +23,7 @@
 	color: #000;
 }
 
-/* ---------- Back / Next: match the theme's button look ---------- */
+/* ---------- Back / Next ---------- */
 .fn-step-actions {
 	margin-top: 1.5rem;
 	display: flex;
@@ -65,85 +65,121 @@
 	cursor: not-allowed;
 }
 
-/* ---------- Slot picker: framed so the user notices it ---------- */
+/* ---------- Hide WC's native shipping/pickup pickers ----------
+   The slot picker replaces them; the matching WC shipping method is set
+   server-side from StoreApiExtensions::apply_shipping_method_for_type(). */
+.wp-block-woocommerce-checkout .wp-block-woocommerce-checkout-shipping-method-block,
+.wp-block-woocommerce-checkout .wp-block-woocommerce-checkout-pickup-options-block {
+	display: none !important;
+}
+
+/* ---------- Slot picker ---------- */
 .fn-slot-picker-mount {
-	margin: 1.25rem 0;
+	margin: 1rem 0;
 }
 .fn-slot-picker {
 	border: 1.5px solid #d4d4d4;
 	border-radius: 10px;
-	padding: 1.25rem 1.25rem 1rem;
+	padding: 0.9rem 1rem 0.75rem;
 	background: #fafafa;
 	font-family: 'Kanit', system-ui, sans-serif;
 }
-.fn-slot-heading {
-	margin: 0 0 0.25rem;
+
+/* Headings: force them down to match surrounding form labels so the
+   slot picker doesn't visually shout louder than the contact info above. */
+.fn-slot-picker .fn-slot-heading,
+.fn-slot-picker h3.fn-slot-heading {
+	margin: 0 0 0.15rem;
 	font-family: 'Kanit', sans-serif;
 	font-weight: 700;
-	font-size: 1.05em;
+	font-size: 1em;
+	line-height: 1.3;
 }
 .fn-slot-help,
 .fn-slot-hint {
-	margin: 0 0 0.9rem;
+	margin: 0 0 0.7rem;
 	color: #777;
-	font-size: 0.8em;
+	font-size: 0.78em;
 	font-style: italic;
-	line-height: 1.45;
+	line-height: 1.4;
 }
 .fn-slot-hint {
-	margin-top: 0.5rem;
+	margin-top: 0.4rem;
 }
 
+/* Delivery / Collection tab pills */
 .fn-slot-tabs {
 	display: flex;
-	gap: 0.5rem;
-	margin-bottom: 1rem;
+	gap: 0.4rem;
+	margin-bottom: 0.75rem;
 }
 .fn-slot-tabs button {
 	flex: 1;
-	padding: 0.5rem 1.1rem;
+	padding: 0.4rem 1rem;
 	border: 2px solid #000;
 	border-radius: 999px;
 	background: #fff;
 	cursor: pointer;
 	font-family: 'Kanit', sans-serif;
 	font-weight: 700;
+	font-size: 0.85em;
+	text-transform: uppercase;
+	letter-spacing: 0.03em;
 }
 .fn-slot-tabs button.is-active {
 	background: #000;
 	color: #c5e643;
 }
 
+/* Day groups — compact, day label small, slots wrap as pills */
 .fn-slot-dates {
 	display: flex;
 	flex-direction: column;
-	gap: 0.9rem;
+	gap: 0.55rem;
 }
-.fn-slot-day h4 {
-	margin: 0 0 0.4rem;
+.fn-slot-day {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.5rem;
+}
+.fn-slot-picker .fn-slot-day h4,
+.fn-slot-picker h4 {
+	margin: 0;
 	font-family: 'Kanit', sans-serif;
 	font-weight: 700;
 	text-transform: uppercase;
-	font-size: 0.9em;
+	font-size: 0.78em;
+	line-height: 1.2;
+	color: #444;
+	flex: 0 0 auto;
+	min-width: 110px;
 }
 .fn-slot-day h4 small {
+	display: block;
 	font-weight: 400;
 	color: #888;
 	text-transform: none;
+	font-size: 0.95em;
+	margin-top: 0.1rem;
 }
 .fn-slot-rows {
-	display: grid;
-	grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-	gap: 0.5rem;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.35rem;
+	flex: 1 1 auto;
 }
 .fn-slot-rows button {
-	padding: 0.5rem 0.75rem;
+	padding: 0.3rem 0.75rem;
 	border: 1.5px solid #bbb;
-	border-radius: 6px;
+	border-radius: 999px;
 	background: #fff;
 	cursor: pointer;
 	font-family: 'Kanit', sans-serif;
+	font-size: 0.82em;
+	line-height: 1.3;
 	transition: border-color 0.15s ease, background 0.15s ease;
+	white-space: nowrap;
 }
 .fn-slot-rows button:hover {
 	border-color: #000;
@@ -153,9 +189,14 @@
 	border-color: #000;
 	font-weight: 700;
 }
+.fn-slot-rows button small {
+	margin-left: 0.3em;
+	color: #888;
+	font-size: 0.85em;
+}
 .fn-slot-empty {
-	padding: 0.75rem 0;
+	padding: 0.4rem 0;
 	color: #777;
 	font-style: italic;
-	font-size: 0.85em;
+	font-size: 0.82em;
 }

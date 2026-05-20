@@ -149,6 +149,64 @@ final class StoreApiExtensions {
 				'slot'       => $slot,
 			]
 		);
+
+		// Auto-select the matching WC shipping method so the order carries a
+		// correct shipping line. We hide WC's native picker on the checkout
+		// because our slot picker fully replaces it.
+		$this->apply_shipping_method_for_type( $type );
+	}
+
+	private function apply_shipping_method_for_type( string $type ): void {
+		if ( ! function_exists( 'WC' ) || ! WC() || ! WC()->session || ! WC()->shipping() ) {
+			return;
+		}
+		$preferred = $this->pick_shipping_rate_id( $type );
+		if ( null === $preferred ) {
+			return;
+		}
+		$chosen = (array) WC()->session->get( 'chosen_shipping_methods', [] );
+		if ( ! $chosen ) {
+			$chosen = [];
+		}
+		$chosen[0] = $preferred;
+		WC()->session->set( 'chosen_shipping_methods', $chosen );
+		if ( WC()->cart ) {
+			WC()->cart->calculate_shipping();
+			WC()->cart->calculate_totals();
+		}
+	}
+
+	private function pick_shipping_rate_id( string $type ): ?string {
+		$packages = WC()->shipping()->get_packages();
+		if ( empty( $packages ) ) {
+			return null;
+		}
+		// Collection: prefer Local Pickup, fall back to the cheapest free rate.
+		// Delivery: prefer the first non-pickup rate.
+		$pickup_ids = [ 'local_pickup', 'pickup_location' ];
+		$candidate  = null;
+		foreach ( $packages as $package ) {
+			foreach ( ( $package['rates'] ?? [] ) as $rate ) {
+				$method_id = $rate->get_method_id();
+				$rate_id   = $rate->get_id();
+				$cost      = (float) $rate->get_cost();
+				$is_pickup = in_array( $method_id, $pickup_ids, true );
+
+				if ( 'collection' === $type ) {
+					if ( $is_pickup ) {
+						return $rate_id;
+					}
+					if ( null === $candidate && $cost <= 0.0001 ) {
+						$candidate = $rate_id;
+					}
+				} else {
+					if ( ! $is_pickup ) {
+						return $rate_id;
+					}
+				}
+			}
+		}
+		return $candidate;
 	}
 
 	public function apply_to_order( $order, $request ): void {

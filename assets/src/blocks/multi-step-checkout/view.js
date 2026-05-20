@@ -17,8 +17,6 @@ const STEPS = [
 			'.wp-block-woocommerce-checkout-contact-information-block',
 			'.wp-block-woocommerce-checkout-shipping-address-block',
 			'.wp-block-woocommerce-checkout-billing-address-block',
-			'.wp-block-woocommerce-checkout-shipping-method-block',
-			'.wp-block-woocommerce-checkout-pickup-options-block',
 		],
 	},
 	{
