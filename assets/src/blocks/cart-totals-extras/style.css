@@ -1,0 +1,27 @@
+/* Hide the shipping section on the cart page only. Checkout still shows it. */
+body.woocommerce-cart .wp-block-woocommerce-cart-order-summary-shipping-block {
+	display: none;
+}
+
+/* Bundle savings + add-ons total rows injected by view.js */
+.fn-totals-row {
+	display: flex;
+	justify-content: space-between;
+	align-items: baseline;
+	padding: 0.35rem 0;
+	font-family: 'Kanit', sans-serif;
+	font-size: 0.95em;
+}
+.fn-totals-row .fn-totals-label {
+	color: #444;
+}
+.fn-totals-row .fn-totals-value {
+	font-weight: 700;
+}
+.fn-totals-row.fn-totals-savings .fn-totals-label,
+.fn-totals-row.fn-totals-savings .fn-totals-value {
+	color: #2a8a3a;
+}
+.fn-totals-row.fn-totals-addons .fn-totals-value {
+	color: #222;
+}

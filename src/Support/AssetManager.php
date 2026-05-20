@@ -64,6 +64,7 @@ final class AssetManager {
 			'macro-calculator',
 			'multi-step-checkout',
 			'slot-picker',
+			'cart-totals-extras',
 		];
 		foreach ( $blocks as $slug ) {
 			$dir = FN_MEALPREP_DIR . 'assets/build/blocks/' . $slug;

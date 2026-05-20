@@ -1,0 +1,14 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "fastnutrition/cart-totals-extras",
+  "title": "Fast Nutrition Cart Totals Extras",
+  "category": "woocommerce",
+  "icon": "feedback",
+  "description": "Adds bundle savings + add-on totals rows to the cart and checkout summary, hides shipping on the cart page.",
+  "supports": { "html": false, "inserter": false },
+  "textdomain": "fastnutrition-mealprep",
+  "editorScript": "file:./index.js",
+  "viewScript": "file:./view.js",
+  "style": "file:./style.css"
+}

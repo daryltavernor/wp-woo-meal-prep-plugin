@@ -16,6 +16,7 @@ use FastNutrition\MealPrep\Cart\AddOnPricer;
 use FastNutrition\MealPrep\Cart\BundlePricer;
 use FastNutrition\MealPrep\Cart\OrderItemMeta;
 use FastNutrition\MealPrep\Cart\Selections;
+use FastNutrition\MealPrep\Cart\TotalsDisplay;
 use FastNutrition\MealPrep\Checkout\MultiStep;
 use FastNutrition\MealPrep\Checkout\StoreApiExtensions;
 use FastNutrition\MealPrep\Delivery\BlockedDates;
@@ -60,6 +61,7 @@ final class Plugin {
 		( new BundlePricer() )->register();
 		( new AddOnPricer() )->register();
 		( new OrderItemMeta() )->register();
+		( new TotalsDisplay() )->register();
 
 		( new Calculator() )->register();
 		( new ShortcodeCalculator() )->register();

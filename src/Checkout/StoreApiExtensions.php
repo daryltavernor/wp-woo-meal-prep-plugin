@@ -61,30 +61,69 @@ final class StoreApiExtensions {
 	}
 
 	public function cart_data(): array {
-		$totals = Calculator::EMPTY;
+		$totals         = Calculator::EMPTY;
+		$addon_total    = 0.0;
+		$bundle_savings = 0.0;
+		$bundle_seen    = [];
+
 		if ( WC()->cart ) {
 			foreach ( WC()->cart->get_cart() as $item ) {
 				$selection = $item[ Selections::CART_KEY ] ?? null;
-				if ( ! is_array( $selection ) ) {
-					continue;
+				$qty       = (float) ( $item['quantity'] ?? 0 );
+
+				if ( is_array( $selection ) ) {
+					$totals = Calculator::add(
+						$totals,
+						Calculator::scale(
+							Calculator::macros_for_selection( (int) $item['product_id'], $selection ),
+							$qty
+						)
+					);
+
+					foreach ( ( $selection['addons'] ?? [] ) as $addon ) {
+						$addon_total += (float) ( $addon['price'] ?? 0 ) * $qty;
+					}
 				}
-				$totals = Calculator::add(
-					$totals,
-					Calculator::scale(
-						Calculator::macros_for_selection( (int) $item['product_id'], $selection ),
-						(float) $item['quantity']
-					)
-				);
+
+				$bundle = $item['fn_bundle'] ?? null;
+				if ( is_array( $bundle ) && ! empty( $bundle['applied_tier'] ) ) {
+					$product_id = (int) $item['product_id'];
+					if ( ! isset( $bundle_seen[ $product_id ] ) ) {
+						$bundle_seen[ $product_id ] = true;
+						$catalog                    = function_exists( 'wc_get_product' ) ? wc_get_product( $product_id ) : null;
+						$base                       = $catalog ? (float) $catalog->get_price( 'edit' ) : 0.0;
+						$bundled_qty                = (int) ( $bundle['bundle_units'] ?? 0 );
+						$bundle_total               = (float) ( $bundle['bundle_total'] ?? 0 );
+						$bundle_savings            += max( 0.0, ( $base * $bundled_qty ) - $bundle_total );
+					}
+				}
 			}
 		}
-		return [ 'macros' => $totals ];
+
+		return [
+			'macros'         => $totals,
+			'addon_total'    => $addon_total,
+			'bundle_savings' => $bundle_savings,
+		];
 	}
 
 	public function cart_schema(): array {
 		return [
-			'macros' => [
+			'macros'         => [
 				'description' => __( 'Running macro totals for the cart.', 'fastnutrition-mealprep' ),
 				'type'        => 'object',
+				'context'     => [ 'view' ],
+				'readonly'    => true,
+			],
+			'addon_total'    => [
+				'description' => __( 'Sum of add-on prices across the cart.', 'fastnutrition-mealprep' ),
+				'type'        => 'number',
+				'context'     => [ 'view' ],
+				'readonly'    => true,
+			],
+			'bundle_savings' => [
+				'description' => __( 'Total saved due to bundle pricing tiers.', 'fastnutrition-mealprep' ),
+				'type'        => 'number',
 				'context'     => [ 'view' ],
 				'readonly'    => true,
 			],
