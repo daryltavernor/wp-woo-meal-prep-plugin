@@ -48,7 +48,8 @@ final class MenuRegistry {
 		);
 
 		// Delivery / collection config.
-		add_submenu_page( self::SLUG, __( 'Delivery & Collection Profiles', 'fastnutrition-mealprep' ), __( 'Delivery Profiles', 'fastnutrition-mealprep' ), 'manage_woocommerce', 'fn-delivery-profiles', [ ProfileAdmin::class, 'render_static' ] );
+		add_submenu_page( self::SLUG, __( 'Delivery Profiles', 'fastnutrition-mealprep' ), __( 'Delivery Profiles', 'fastnutrition-mealprep' ), 'manage_woocommerce', 'fn-delivery-profiles', [ ProfileAdmin::class, 'render_delivery_static' ] );
+		add_submenu_page( self::SLUG, __( 'Collection Profiles', 'fastnutrition-mealprep' ), __( 'Collection Profiles', 'fastnutrition-mealprep' ), 'manage_woocommerce', 'fn-collection-profiles', [ ProfileAdmin::class, 'render_collection_static' ] );
 		add_submenu_page( self::SLUG, __( 'Blocked Dates', 'fastnutrition-mealprep' ), __( 'Blocked Dates', 'fastnutrition-mealprep' ), 'manage_woocommerce', 'fn-blocked-dates', [ BlockedDatesAdmin::class, 'render_static' ] );
 
 		// Settings.

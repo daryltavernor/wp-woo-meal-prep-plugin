@@ -7,12 +7,22 @@ use FastNutrition\MealPrep\Delivery\Profile;
 
 final class ProfileAdmin {
 
+	private string $method;
+
+	public function __construct( string $method = Profile::METHOD_DELIVERY ) {
+		$this->method = Profile::METHOD_COLLECTION === $method ? Profile::METHOD_COLLECTION : Profile::METHOD_DELIVERY;
+	}
+
 	public function register(): void {
 		add_action( 'admin_init', [ $this, 'handle_save' ] );
 	}
 
-	public static function render_static(): void {
-		( new self() )->render();
+	public static function render_delivery_static(): void {
+		( new self( Profile::METHOD_DELIVERY ) )->render();
+	}
+
+	public static function render_collection_static(): void {
+		( new self( Profile::METHOD_COLLECTION ) )->render();
 	}
 
 	public function handle_save(): void {
@@ -25,6 +35,11 @@ final class ProfileAdmin {
 		if ( ! current_user_can( 'manage_woocommerce' ) ) {
 			return;
 		}
+
+		$method = isset( $_POST['method'] ) && Profile::METHOD_COLLECTION === sanitize_key( wp_unslash( (string) $_POST['method'] ) )
+			? Profile::METHOD_COLLECTION
+			: Profile::METHOD_DELIVERY;
+		$page   = Profile::METHOD_COLLECTION === $method ? 'fn-collection-profiles' : 'fn-delivery-profiles';
 
 		$action = isset( $_POST['fn_action'] ) ? sanitize_key( wp_unslash( (string) $_POST['fn_action'] ) ) : '';
 		if ( 'delete' === $action && ! empty( $_POST['profile_id'] ) ) {
@@ -43,25 +58,27 @@ final class ProfileAdmin {
 					$slots[] = array_filter( [ 'start' => $start, 'end' => $end, 'capacity' => $cap ], static fn( $v ) => null !== $v );
 				}
 			}
-			$postcodes = [];
-			$raw_pc    = isset( $_POST['postcodes'] ) ? (string) wp_unslash( $_POST['postcodes'] ) : '';
-			foreach ( preg_split( '/[\r\n,]+/', $raw_pc ) as $pc ) {
-				$pc = trim( (string) $pc );
-				if ( '' !== $pc ) {
-					$postcodes[] = strtoupper( preg_replace( '/\s+/', '', $pc ) ?? '' );
-				}
-			}
 
-			$zone_ids = [];
-			foreach ( (array) ( $_POST['zone_ids'] ?? [] ) as $zid ) {
-				$zone_ids[] = (int) $zid;
+			$postcodes = [];
+			$zone_ids  = [];
+			if ( Profile::METHOD_DELIVERY === $method ) {
+				$raw_pc = isset( $_POST['postcodes'] ) ? (string) wp_unslash( $_POST['postcodes'] ) : '';
+				foreach ( preg_split( '/[\r\n,]+/', $raw_pc ) as $pc ) {
+					$pc = trim( (string) $pc );
+					if ( '' !== $pc ) {
+						$postcodes[] = strtoupper( preg_replace( '/\s+/', '', $pc ) ?? '' );
+					}
+				}
+				foreach ( (array) ( $_POST['zone_ids'] ?? [] ) as $zid ) {
+					$zone_ids[] = (int) $zid;
+				}
 			}
 
 			Profile::save(
 				[
 					'id'        => isset( $_POST['profile_id'] ) ? (int) $_POST['profile_id'] : 0,
 					'name'      => isset( $_POST['name'] ) ? sanitize_text_field( wp_unslash( (string) $_POST['name'] ) ) : '',
-					'method'    => isset( $_POST['method'] ) ? sanitize_key( wp_unslash( (string) $_POST['method'] ) ) : 'delivery',
+					'method'    => $method,
 					'days'      => $days,
 					'slots'     => $slots,
 					'postcodes' => $postcodes,
@@ -71,7 +88,7 @@ final class ProfileAdmin {
 				]
 			);
 		}
-		wp_safe_redirect( admin_url( 'admin.php?page=fn-delivery-profiles' ) );
+		wp_safe_redirect( admin_url( 'admin.php?page=' . $page ) );
 		exit;
 	}
 
@@ -80,66 +97,93 @@ final class ProfileAdmin {
 			wp_die( esc_html__( 'You do not have permission to access this page.', 'fastnutrition-mealprep' ) );
 		}
 
-		$edit_id = isset( $_GET['edit'] ) ? (int) $_GET['edit'] : 0;
-		$editing = $edit_id ? Profile::get( $edit_id ) : null;
+		$is_collection = Profile::METHOD_COLLECTION === $this->method;
+		$page_slug     = $is_collection ? 'fn-collection-profiles' : 'fn-delivery-profiles';
+		$edit_id       = isset( $_GET['edit'] ) ? (int) $_GET['edit'] : 0;
+		$editing       = $edit_id ? Profile::get( $edit_id ) : null;
 
-		echo '<div class="wrap"><h1>' . esc_html__( 'Delivery & Collection Profiles', 'fastnutrition-mealprep' ) . '</h1>';
+		// If editing a row that belongs to the other method, redirect to its own page.
+		if ( $editing && $editing['method'] !== $this->method ) {
+			$other = Profile::METHOD_COLLECTION === $editing['method'] ? 'fn-collection-profiles' : 'fn-delivery-profiles';
+			wp_safe_redirect( admin_url( 'admin.php?page=' . $other . '&edit=' . $edit_id ) );
+			exit;
+		}
+
+		$title = $is_collection
+			? __( 'Collection Profiles', 'fastnutrition-mealprep' )
+			: __( 'Delivery Profiles', 'fastnutrition-mealprep' );
+
+		echo '<div class="wrap"><h1>' . esc_html( $title ) . '</h1>';
+
 		echo '<div style="background:#f0f6fc;border-left:4px solid #2271b1;padding:10px 14px;margin:14px 0;max-width:900px">';
-		echo '<p style="margin:0 0 6px"><strong>' . esc_html__( 'What a profile is', 'fastnutrition-mealprep' ) . '</strong><br>';
-		echo esc_html__( 'A profile groups one or more postcodes with the days of the week you deliver there and the time windows for each day. For example: one profile covering ST10/ST9/ST5/ST7 on Tue/Thu/Sun, another covering ST3/ST6/ST8 on Wed/Fri. Collection profiles apply to everyone regardless of postcode.', 'fastnutrition-mealprep' );
-		echo '</p>';
-		echo '<p style="margin:6px 0 0"><strong>' . esc_html__( 'Conflicts', 'fastnutrition-mealprep' ) . '</strong> — ';
-		echo esc_html__( 'If the same postcode is listed in more than one delivery profile, the Priority field decides which wins (lower = first). The dashboard widget also flags any WooCommerce shipping zone postcodes that no profile covers, so you can spot gaps before customers do.', 'fastnutrition-mealprep' );
-		echo '</p></div>';
+		if ( $is_collection ) {
+			echo '<p style="margin:0"><strong>' . esc_html__( 'About collection profiles', 'fastnutrition-mealprep' ) . '</strong><br>';
+			echo esc_html__( 'A collection profile is just a schedule: the days you offer collection and the time windows within those days. Postcodes are not required — every customer is offered the same collection options regardless of where they live.', 'fastnutrition-mealprep' );
+			echo '</p>';
+		} else {
+			echo '<p style="margin:0 0 6px"><strong>' . esc_html__( 'What a delivery profile is', 'fastnutrition-mealprep' ) . '</strong><br>';
+			echo esc_html__( 'A profile groups one or more postcodes with the days of the week you deliver there and the time windows for each day. For example: one profile covering ST10/ST9/ST5/ST7 on Tue/Thu/Sun, another covering ST3/ST6/ST8 on Wed/Fri.', 'fastnutrition-mealprep' );
+			echo '</p>';
+			echo '<p style="margin:6px 0 0"><strong>' . esc_html__( 'Conflicts', 'fastnutrition-mealprep' ) . '</strong> — ';
+			echo esc_html__( 'If the same postcode is listed in more than one delivery profile, the Priority field decides which wins (lower = first). The dashboard widget also flags any WooCommerce shipping zone postcodes that no profile covers, so you can spot gaps before customers do.', 'fastnutrition-mealprep' );
+			echo '</p>';
+		}
+		echo '</div>';
 
 		if ( $editing || isset( $_GET['new'] ) ) {
 			$this->render_form( $editing ?? [] );
 		}
 
-		echo '<h2>' . esc_html__( 'Existing profiles', 'fastnutrition-mealprep' ) . '</h2>';
-		echo '<p><a class="button button-primary" href="' . esc_url( admin_url( 'admin.php?page=fn-delivery-profiles&new=1' ) ) . '">' . esc_html__( 'Add profile', 'fastnutrition-mealprep' ) . '</a></p>';
+		echo '<h2>' . esc_html( $is_collection ? __( 'Existing collection profiles', 'fastnutrition-mealprep' ) : __( 'Existing delivery profiles', 'fastnutrition-mealprep' ) ) . '</h2>';
+		echo '<p><a class="button button-primary" href="' . esc_url( admin_url( 'admin.php?page=' . $page_slug . '&new=1' ) ) . '">' . esc_html( $is_collection ? __( 'Add collection profile', 'fastnutrition-mealprep' ) : __( 'Add delivery profile', 'fastnutrition-mealprep' ) ) . '</a></p>';
 
-		$profiles = Profile::all( false );
+		$profiles = array_values( array_filter( Profile::all( false ), fn( $p ) => $p['method'] === $this->method ) );
+
 		echo '<table class="widefat striped"><thead><tr>';
 		echo '<th>' . esc_html__( 'Name', 'fastnutrition-mealprep' ) . '</th>';
-		echo '<th>' . esc_html__( 'Method', 'fastnutrition-mealprep' ) . '</th>';
-		echo '<th>' . esc_html__( 'Coverage', 'fastnutrition-mealprep' ) . '</th>';
+		if ( ! $is_collection ) {
+			echo '<th>' . esc_html__( 'Coverage', 'fastnutrition-mealprep' ) . '</th>';
+		}
 		echo '<th>' . esc_html__( 'Days', 'fastnutrition-mealprep' ) . '</th>';
 		echo '<th>' . esc_html__( 'Slots', 'fastnutrition-mealprep' ) . '</th>';
 		echo '<th>' . esc_html__( 'Active', 'fastnutrition-mealprep' ) . '</th>';
 		echo '<th></th></tr></thead><tbody>';
+
+		$col_count = $is_collection ? 5 : 6;
 		if ( empty( $profiles ) ) {
-			echo '<tr><td colspan="7"><em>' . esc_html__( 'No profiles yet.', 'fastnutrition-mealprep' ) . '</em></td></tr>';
+			echo '<tr><td colspan="' . (int) $col_count . '"><em>' . esc_html__( 'No profiles yet.', 'fastnutrition-mealprep' ) . '</em></td></tr>';
 		}
+
 		foreach ( $profiles as $p ) {
 			echo '<tr>';
 			echo '<td>' . esc_html( $p['name'] ) . '</td>';
-			echo '<td>' . esc_html( $p['method'] ) . '</td>';
-			$zone_parts = [];
-			if ( class_exists( \WC_Shipping_Zones::class ) ) {
-				foreach ( (array) ( $p['zone_ids'] ?? [] ) as $zid ) {
-					$z = \WC_Shipping_Zones::get_zone( (int) $zid );
-					if ( $z ) {
-						$zone_parts[] = $z->get_zone_name();
+			if ( ! $is_collection ) {
+				$zone_parts = [];
+				if ( class_exists( \WC_Shipping_Zones::class ) ) {
+					foreach ( (array) ( $p['zone_ids'] ?? [] ) as $zid ) {
+						$z = \WC_Shipping_Zones::get_zone( (int) $zid );
+						if ( $z ) {
+							$zone_parts[] = $z->get_zone_name();
+						}
 					}
 				}
+				$manual = count( (array) ( $p['postcodes'] ?? [] ) );
+				$parts  = [];
+				if ( ! empty( $zone_parts ) ) {
+					$parts[] = sprintf( '<em>%s:</em> %s', esc_html__( 'Zones', 'fastnutrition-mealprep' ), esc_html( implode( ', ', $zone_parts ) ) );
+				}
+				if ( $manual ) {
+					$parts[] = sprintf( '%d %s', $manual, esc_html__( 'manual postcodes', 'fastnutrition-mealprep' ) );
+				}
+				echo '<td>' . ( $parts ? wp_kses_post( implode( '<br>', $parts ) ) : '—' ) . '</td>';
 			}
-			$manual = count( (array) ( $p['postcodes'] ?? [] ) );
-			$parts  = [];
-			if ( ! empty( $zone_parts ) ) {
-				$parts[] = sprintf( '<em>%s:</em> %s', esc_html__( 'Zones', 'fastnutrition-mealprep' ), esc_html( implode( ', ', $zone_parts ) ) );
-			}
-			if ( $manual ) {
-				$parts[] = sprintf( '%d %s', $manual, esc_html__( 'manual postcodes', 'fastnutrition-mealprep' ) );
-			}
-			echo '<td>' . ( $parts ? wp_kses_post( implode( '<br>', $parts ) ) : '—' ) . '</td>';
 			echo '<td>' . esc_html( self::days_label( (int) $p['days'] ) ) . '</td>';
 			echo '<td>' . esc_html( count( $p['slots'] ) . ' ' . _n( 'slot', 'slots', count( $p['slots'] ), 'fastnutrition-mealprep' ) ) . '</td>';
 			echo '<td>' . ( $p['active'] ? '✓' : '—' ) . '</td>';
-			echo '<td><a href="' . esc_url( admin_url( 'admin.php?page=fn-delivery-profiles&edit=' . (int) $p['id'] ) ) . '">' . esc_html__( 'Edit', 'fastnutrition-mealprep' ) . '</a>';
+			echo '<td><a href="' . esc_url( admin_url( 'admin.php?page=' . $page_slug . '&edit=' . (int) $p['id'] ) ) . '">' . esc_html__( 'Edit', 'fastnutrition-mealprep' ) . '</a>';
 			echo ' · <form method="post" style="display:inline">';
 			wp_nonce_field( 'fn_save_profile', 'fn_profile_nonce' );
-			echo '<input type="hidden" name="fn_action" value="delete" /><input type="hidden" name="profile_id" value="' . (int) $p['id'] . '" />';
+			echo '<input type="hidden" name="fn_action" value="delete" /><input type="hidden" name="profile_id" value="' . (int) $p['id'] . '" /><input type="hidden" name="method" value="' . esc_attr( $this->method ) . '" />';
 			echo '<button type="submit" class="button-link-delete" onclick="return confirm(\'Delete this profile?\')">' . esc_html__( 'Delete', 'fastnutrition-mealprep' ) . '</button></form>';
 			echo '</td></tr>';
 		}
@@ -149,8 +193,9 @@ final class ProfileAdmin {
 	}
 
 	private function render_form( array $p ): void {
-		$days   = (int) ( $p['days'] ?? 0 );
-		$slots  = (array) ( $p['slots'] ?? [] );
+		$is_collection = Profile::METHOD_COLLECTION === $this->method;
+		$days          = (int) ( $p['days'] ?? 0 );
+		$slots         = (array) ( $p['slots'] ?? [] );
 		if ( empty( $slots ) ) {
 			$slots = [ [ 'start' => '09:00', 'end' => '12:00', 'capacity' => '' ] ];
 		}
@@ -159,24 +204,20 @@ final class ProfileAdmin {
 		echo '<form method="post">';
 		wp_nonce_field( 'fn_save_profile', 'fn_profile_nonce' );
 		echo '<input type="hidden" name="fn_action" value="save" />';
+		echo '<input type="hidden" name="method" value="' . esc_attr( $this->method ) . '" />';
 		if ( ! empty( $p['id'] ) ) {
 			echo '<input type="hidden" name="profile_id" value="' . (int) $p['id'] . '" />';
 		}
 
 		echo '<table class="form-table"><tbody>';
-		printf( '<tr><th><label for="fn_name">%s</label></th><td><input id="fn_name" type="text" name="name" value="%s" class="regular-text" required /><p class="description">%s</p></td></tr>',
+		printf(
+			'<tr><th><label for="fn_name">%s</label></th><td><input id="fn_name" type="text" name="name" value="%s" class="regular-text" required /><p class="description">%s</p></td></tr>',
 			esc_html__( 'Name', 'fastnutrition-mealprep' ),
 			esc_attr( (string) ( $p['name'] ?? '' ) ),
-			esc_html__( 'Internal label, e.g. "North Staffs Tue/Thu/Sun". Only shown in admin.', 'fastnutrition-mealprep' )
-		);
-		printf(
-			'<tr><th><label for="fn_method">%s</label></th><td><select id="fn_method" name="method"><option value="delivery" %s>%s</option><option value="collection" %s>%s</option></select><p class="description">%s</p></td></tr>',
-			esc_html__( 'Method', 'fastnutrition-mealprep' ),
-			selected( (string) ( $p['method'] ?? 'delivery' ), 'delivery', false ),
-			esc_html__( 'Delivery', 'fastnutrition-mealprep' ),
-			selected( (string) ( $p['method'] ?? '' ), 'collection', false ),
-			esc_html__( 'Collection', 'fastnutrition-mealprep' ),
-			esc_html__( 'Delivery profiles are matched against the customer\'s postcode. Collection profiles are offered to everyone regardless of postcode.', 'fastnutrition-mealprep' )
+			esc_html( $is_collection
+				? __( 'Internal label, e.g. "Weekend Collection". Only shown in admin and beside each slot at checkout.', 'fastnutrition-mealprep' )
+				: __( 'Internal label, e.g. "North Staffs Tue/Thu/Sun". Only shown in admin.', 'fastnutrition-mealprep' )
+			)
 		);
 
 		echo '<tr><th>' . esc_html__( 'Days', 'fastnutrition-mealprep' ) . '</th><td>';
@@ -197,7 +238,11 @@ final class ProfileAdmin {
 				esc_html( $label )
 			);
 		}
-		echo '<p class="description">' . esc_html__( 'Tick every day of the week this profile operates. The slot picker at checkout will automatically offer matching dates within the next 14 days.', 'fastnutrition-mealprep' ) . '</p>';
+		echo '<p class="description">' . esc_html(
+			$is_collection
+				? __( 'Tick every day of the week you offer collection. The slot picker at checkout will automatically offer matching dates within the next 14 days.', 'fastnutrition-mealprep' )
+				: __( 'Tick every day of the week this profile operates. The slot picker at checkout will automatically offer matching dates within the next 14 days.', 'fastnutrition-mealprep' )
+		) . '</p>';
 		echo '</td></tr>';
 
 		echo '<tr><th>' . esc_html__( 'Time slots', 'fastnutrition-mealprep' ) . '</th><td><p class="description" style="margin-top:0">' . esc_html__( 'One row per time window you offer (e.g. 09:00–12:00, 17:00–20:00). Capacity limits the number of bookings per window — leave blank for unlimited.', 'fastnutrition-mealprep' ) . '</p><table id="fn-slots"><tbody>';
@@ -218,64 +263,65 @@ final class ProfileAdmin {
 		echo '</tbody></table>';
 		echo '<p><button type="button" class="button" id="fn-slot-add">' . esc_html__( 'Add slot', 'fastnutrition-mealprep' ) . '</button></p></td></tr>';
 
-		// WooCommerce shipping zones multi-select.
-		$selected_zones = array_map( 'intval', (array) ( $p['zone_ids'] ?? [] ) );
-		echo '<tr><th>' . esc_html__( 'WooCommerce shipping zones', 'fastnutrition-mealprep' ) . '</th><td>';
-		if ( class_exists( \WC_Shipping_Zones::class ) ) {
-			$zones = \WC_Shipping_Zones::get_zones();
-			if ( empty( $zones ) ) {
-				echo '<p class="description">' . esc_html__( 'No shipping zones configured yet. Add zones under WooCommerce → Settings → Shipping.', 'fastnutrition-mealprep' ) . '</p>';
-			} else {
-				echo '<p class="description" style="margin-top:0">' . esc_html__( 'Tick one or more zones to automatically inherit their postcodes. Useful when you already maintain postcodes in shipping zones — you do not need to duplicate them below.', 'fastnutrition-mealprep' ) . '</p>';
-				echo '<div style="max-height:260px;overflow:auto;border:1px solid #ccc;padding:8px;max-width:600px">';
-				foreach ( $zones as $zone ) {
-					$zone_id   = (int) ( $zone['id'] ?? $zone['zone_id'] ?? 0 );
-					$zone_name = (string) ( $zone['zone_name'] ?? '' );
-					$postcodes_in_zone = [];
-					foreach ( (array) ( $zone['zone_locations'] ?? [] ) as $location ) {
-						if ( is_object( $location ) && 'postcode' === ( $location->type ?? '' ) ) {
-							$postcodes_in_zone[] = (string) $location->code;
+		if ( ! $is_collection ) {
+			$selected_zones = array_map( 'intval', (array) ( $p['zone_ids'] ?? [] ) );
+			echo '<tr><th>' . esc_html__( 'WooCommerce shipping zones', 'fastnutrition-mealprep' ) . '</th><td>';
+			if ( class_exists( \WC_Shipping_Zones::class ) ) {
+				$zones = \WC_Shipping_Zones::get_zones();
+				if ( empty( $zones ) ) {
+					echo '<p class="description">' . esc_html__( 'No shipping zones configured yet. Add zones under WooCommerce → Settings → Shipping.', 'fastnutrition-mealprep' ) . '</p>';
+				} else {
+					echo '<p class="description" style="margin-top:0">' . esc_html__( 'Tick one or more zones to automatically inherit their postcodes. Useful when you already maintain postcodes in shipping zones — you do not need to duplicate them below.', 'fastnutrition-mealprep' ) . '</p>';
+					echo '<div style="max-height:260px;overflow:auto;border:1px solid #ccc;padding:8px;max-width:600px">';
+					foreach ( $zones as $zone ) {
+						$zone_id   = (int) ( $zone['id'] ?? $zone['zone_id'] ?? 0 );
+						$zone_name = (string) ( $zone['zone_name'] ?? '' );
+						$postcodes_in_zone = [];
+						foreach ( (array) ( $zone['zone_locations'] ?? [] ) as $location ) {
+							if ( is_object( $location ) && 'postcode' === ( $location->type ?? '' ) ) {
+								$postcodes_in_zone[] = (string) $location->code;
+							}
 						}
-					}
-					$methods = [];
-					foreach ( (array) ( $zone['shipping_methods'] ?? [] ) as $m ) {
-						if ( is_object( $m ) && method_exists( $m, 'get_title' ) ) {
-							$methods[] = $m->get_title();
+						$methods = [];
+						foreach ( (array) ( $zone['shipping_methods'] ?? [] ) as $m ) {
+							if ( is_object( $m ) && method_exists( $m, 'get_title' ) ) {
+								$methods[] = $m->get_title();
+							}
 						}
+						printf(
+							'<label style="display:block;padding:6px;border-bottom:1px solid #eee">
+								<input type="checkbox" name="zone_ids[]" value="%1$d" %2$s />
+								<strong>%3$s</strong>
+								%4$s
+								%5$s
+							</label>',
+							$zone_id,
+							checked( in_array( $zone_id, $selected_zones, true ), true, false ),
+							esc_html( $zone_name ),
+							! empty( $postcodes_in_zone ) ? '<br><small style="color:#555">' . esc_html__( 'Postcodes:', 'fastnutrition-mealprep' ) . ' <code>' . esc_html( implode( ', ', array_slice( $postcodes_in_zone, 0, 12 ) ) ) . ( count( $postcodes_in_zone ) > 12 ? ' …' : '' ) . '</code></small>' : '<br><small style="color:#888">' . esc_html__( 'No postcode restrictions on this zone.', 'fastnutrition-mealprep' ) . '</small>',
+							! empty( $methods ) ? '<br><small style="color:#555">' . esc_html__( 'Methods:', 'fastnutrition-mealprep' ) . ' ' . esc_html( implode( ', ', $methods ) ) . '</small>' : ''
+						);
 					}
-					printf(
-						'<label style="display:block;padding:6px;border-bottom:1px solid #eee">
-							<input type="checkbox" name="zone_ids[]" value="%1$d" %2$s />
-							<strong>%3$s</strong>
-							%4$s
-							%5$s
-						</label>',
-						$zone_id,
-						checked( in_array( $zone_id, $selected_zones, true ), true, false ),
-						esc_html( $zone_name ),
-						! empty( $postcodes_in_zone ) ? '<br><small style="color:#555">' . esc_html__( 'Postcodes:', 'fastnutrition-mealprep' ) . ' <code>' . esc_html( implode( ', ', array_slice( $postcodes_in_zone, 0, 12 ) ) ) . ( count( $postcodes_in_zone ) > 12 ? ' …' : '' ) . '</code></small>' : '<br><small style="color:#888">' . esc_html__( 'No postcode restrictions on this zone.', 'fastnutrition-mealprep' ) . '</small>',
-						! empty( $methods ) ? '<br><small style="color:#555">' . esc_html__( 'Methods:', 'fastnutrition-mealprep' ) . ' ' . esc_html( implode( ', ', $methods ) ) . '</small>' : ''
-					);
+					echo '</div>';
 				}
-				echo '</div>';
+			} else {
+				echo '<p class="description">' . esc_html__( 'WooCommerce not available — can\'t load zones.', 'fastnutrition-mealprep' ) . '</p>';
 			}
-		} else {
-			echo '<p class="description">' . esc_html__( 'WooCommerce not available — can\'t load zones.', 'fastnutrition-mealprep' ) . '</p>';
+			echo '</td></tr>';
+
+			printf( '<tr><th><label for="fn_postcodes">%s</label></th><td><textarea id="fn_postcodes" name="postcodes" rows="4" cols="40" placeholder="%s">%s</textarea><p class="description">%s</p></td></tr>',
+				esc_html__( 'Additional postcodes (optional)', 'fastnutrition-mealprep' ),
+				esc_attr__( 'One per line. Use * for wildcard (e.g. ST10*) or a prefix (e.g. ST10).', 'fastnutrition-mealprep' ),
+				esc_textarea( implode( "\n", (array) ( $p['postcodes'] ?? [] ) ) ),
+				esc_html__( 'Manual list, combined with any postcodes inherited from the zones above. Leave empty if zones cover everything.', 'fastnutrition-mealprep' )
+			);
+
+			printf( '<tr><th><label for="fn_priority">%s</label></th><td><input id="fn_priority" type="number" name="priority" value="%d" /><p class="description">%s</p></td></tr>',
+				esc_html__( 'Priority', 'fastnutrition-mealprep' ),
+				(int) ( $p['priority'] ?? 10 ),
+				esc_html__( 'Lower numbers are matched first when postcodes overlap.', 'fastnutrition-mealprep' )
+			);
 		}
-		echo '</td></tr>';
-
-		printf( '<tr><th><label for="fn_postcodes">%s</label></th><td><textarea id="fn_postcodes" name="postcodes" rows="4" cols="40" placeholder="%s">%s</textarea><p class="description">%s</p></td></tr>',
-			esc_html__( 'Additional postcodes (optional)', 'fastnutrition-mealprep' ),
-			esc_attr__( 'One per line. Use * for wildcard (e.g. ST10*) or a prefix (e.g. ST10).', 'fastnutrition-mealprep' ),
-			esc_textarea( implode( "\n", (array) ( $p['postcodes'] ?? [] ) ) ),
-			esc_html__( 'Manual list, combined with any postcodes inherited from the zones above. Leave empty if zones cover everything. Collection profiles ignore postcode matching entirely.', 'fastnutrition-mealprep' )
-		);
-
-		printf( '<tr><th><label for="fn_priority">%s</label></th><td><input id="fn_priority" type="number" name="priority" value="%d" /><p class="description">%s</p></td></tr>',
-			esc_html__( 'Priority', 'fastnutrition-mealprep' ),
-			(int) ( $p['priority'] ?? 10 ),
-			esc_html__( 'Lower numbers are matched first when postcodes overlap.', 'fastnutrition-mealprep' )
-		);
 
 		printf( '<tr><th>%s</th><td><label><input type="checkbox" name="active" value="1" %s /> %s</label></td></tr>',
 			esc_html__( 'Active', 'fastnutrition-mealprep' ),
