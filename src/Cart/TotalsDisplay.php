@@ -12,10 +12,7 @@ final class TotalsDisplay {
 	}
 
 	public function enqueue_frontend(): void {
-		if ( ! function_exists( 'is_cart' ) || ! function_exists( 'is_checkout' ) ) {
-			return;
-		}
-		if ( ! is_cart() && ! is_checkout() ) {
+		if ( ! $this->page_is_relevant() ) {
 			return;
 		}
 
@@ -47,5 +44,21 @@ final class TotalsDisplay {
 				FN_MEALPREP_VERSION
 			);
 		}
+	}
+
+	private function page_is_relevant(): bool {
+		if ( function_exists( 'is_cart' ) && is_cart() ) {
+			return true;
+		}
+		if ( function_exists( 'is_checkout' ) && is_checkout() ) {
+			return true;
+		}
+		global $post;
+		if ( $post && function_exists( 'has_block' ) ) {
+			if ( has_block( 'woocommerce/cart', $post ) || has_block( 'woocommerce/checkout', $post ) ) {
+				return true;
+			}
+		}
+		return false;
 	}
 }

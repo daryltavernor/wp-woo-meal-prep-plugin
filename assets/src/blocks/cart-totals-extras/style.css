@@ -1,4 +1,7 @@
-/* Hide the shipping section on the cart page only. Checkout still shows it. */
+/* Hide the shipping section on the cart page only. Checkout still shows it.
+   Scoped to the cart block container rather than body.woocommerce-cart so it
+   works when the cart block sits on a non-default page. */
+.wp-block-woocommerce-cart .wp-block-woocommerce-cart-order-summary-shipping-block,
 body.woocommerce-cart .wp-block-woocommerce-cart-order-summary-shipping-block {
 	display: none;
 }
