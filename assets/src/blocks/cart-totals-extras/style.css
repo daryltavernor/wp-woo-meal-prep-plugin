@@ -14,11 +14,13 @@ body.woocommerce-cart .cart_totals .woocommerce-shipping-calculator {
 	display: none;
 }
 
-/* ---------- Hide the per-line "SAVE £X" sale badge on cart line items ---------- */
+/* ---------- Hide the per-line "Save £X" sale badge on cart line items ---------- */
 /* The bundle pricer drops each line's price below the catalog price, which WC
-   flags as on-sale; Flatsome (and core) then renders an .onsale badge next to
-   the price. The bundle row already says "Bundle: 10 for £35 (~£3.50 each)"
+   flags as on-sale; the cart block then renders a .wc-block-components-sale-badge
+   next to the price. The bundle row already says "Bundle: 10 for £35 (~£3.50 each)"
    and the right column shows "SAVE £5.00", so the per-line badge is noise. */
+.wp-block-woocommerce-cart .wc-block-components-sale-badge,
+.wp-block-woocommerce-cart .wc-block-components-product-badge,
 .wp-block-woocommerce-cart .wc-block-cart-items .onsale,
 .wp-block-woocommerce-cart .wc-block-cart-items__row .onsale,
 .wp-block-woocommerce-cart .wc-block-cart-item__product .onsale,
