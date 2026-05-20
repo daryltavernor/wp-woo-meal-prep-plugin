@@ -17,7 +17,11 @@ final class StoreApiExtensions {
 	public const NAMESPACE = 'fastnutrition-mealprep';
 
 	public function register(): void {
-		add_action( 'woocommerce_blocks_loaded', [ $this, 'extend' ] );
+		if ( did_action( 'woocommerce_blocks_loaded' ) ) {
+			$this->extend();
+		} else {
+			add_action( 'woocommerce_blocks_loaded', [ $this, 'extend' ] );
+		}
 		add_action( 'woocommerce_store_api_checkout_update_order_from_request', [ $this, 'apply_to_order' ], 10, 2 );
 	}
 

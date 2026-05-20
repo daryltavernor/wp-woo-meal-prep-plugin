@@ -12,24 +12,26 @@ const STEPS = [
 	{
 		key: 'address',
 		label: __( 'Your details', 'fastnutrition-mealprep' ),
-		matchers: [
+		selectors: [
+			'.wp-block-woocommerce-checkout-express-payment-block',
 			'.wp-block-woocommerce-checkout-contact-information-block',
 			'.wp-block-woocommerce-checkout-shipping-address-block',
 			'.wp-block-woocommerce-checkout-billing-address-block',
 			'.wp-block-woocommerce-checkout-shipping-method-block',
+			'.wp-block-woocommerce-checkout-pickup-options-block',
 		],
 	},
 	{
 		key: 'slot',
 		label: __( 'Delivery or collection', 'fastnutrition-mealprep' ),
-		matchers: [ '.fn-slot-picker-mount' ],
+		selectors: [ '.fn-slot-picker-mount' ],
 	},
 	{
 		key: 'payment',
 		label: __( 'Payment', 'fastnutrition-mealprep' ),
-		matchers: [
+		selectors: [
 			'.wp-block-woocommerce-checkout-payment-block',
-			'.wp-block-woocommerce-checkout-order-summary-block',
+			'.wp-block-woocommerce-checkout-additional-information-block',
 			'.wp-block-woocommerce-checkout-order-note-block',
 			'.wp-block-woocommerce-checkout-terms-block',
 			'.wp-block-woocommerce-checkout-actions-block',
@@ -164,7 +166,6 @@ function apply( root ) {
 	mountSlotPicker( fields );
 	checkout.dataset.fnMultistep = 'applied';
 
-	// Build step nav.
 	const nav = document.createElement( 'ol' );
 	nav.className = 'fn-steps-nav';
 	STEPS.forEach( ( s, i ) => {
@@ -175,23 +176,6 @@ function apply( root ) {
 	} );
 	checkout.prepend( nav );
 
-	// Tag children by step.
-	const tagChildren = () => {
-		const all = Array.from( fields.children );
-		let currentStep = 'address';
-		all.forEach( ( node ) => {
-			const matched = STEPS.find( ( s ) => s.matchers.some( ( sel ) => node.matches( sel ) || node.querySelector( sel ) ) );
-			if ( matched ) {
-				currentStep = matched.key;
-				node.dataset.fnStep = matched.key;
-			} else if ( ! node.dataset.fnStep ) {
-				node.dataset.fnStep = currentStep;
-			}
-		} );
-	};
-	tagChildren();
-
-	// Add navigation controls.
 	const actions = document.createElement( 'div' );
 	actions.className = 'fn-step-actions';
 	actions.innerHTML = `<button type="button" class="fn-step-back">${ __( 'Back', 'fastnutrition-mealprep' ) }</button> <button type="button" class="fn-step-next">${ __( 'Next', 'fastnutrition-mealprep' ) }</button>`;
@@ -200,15 +184,23 @@ function apply( root ) {
 	let active = 'address';
 	const render = () => {
 		nav.querySelectorAll( 'li' ).forEach( ( li ) => li.classList.toggle( 'is-active', li.dataset.step === active ) );
-		Array.from( fields.children ).forEach( ( node ) => {
-			if ( node === actions ) {
-				return;
-			}
-			node.style.display = node.dataset.fnStep === active ? '' : 'none';
+		STEPS.forEach( ( step ) => {
+			const show = step.key === active;
+			step.selectors.forEach( ( sel ) => {
+				fields.querySelectorAll( sel ).forEach( ( el ) => {
+					el.style.display = show ? '' : 'none';
+				} );
+			} );
 		} );
 		const idx = STEPS.findIndex( ( s ) => s.key === active );
-		checkout.querySelector( '.fn-step-back' ).disabled = idx === 0;
-		checkout.querySelector( '.fn-step-next' ).style.display = idx === STEPS.length - 1 ? 'none' : '';
+		const back = checkout.querySelector( '.fn-step-back' );
+		const next = checkout.querySelector( '.fn-step-next' );
+		if ( back ) {
+			back.disabled = idx === 0;
+		}
+		if ( next ) {
+			next.style.display = idx === STEPS.length - 1 ? 'none' : '';
+		}
 	};
 
 	nav.addEventListener( 'click', ( e ) => {
@@ -223,7 +215,6 @@ function apply( root ) {
 			if ( idx < STEPS.length - 1 ) {
 				active = STEPS[ idx + 1 ].key;
 				render();
-				tagChildren();
 			}
 		}
 		if ( e.target.classList.contains( 'fn-step-back' ) ) {
@@ -235,9 +226,8 @@ function apply( root ) {
 		}
 	} );
 
-	// Re-tag if Woo mutates the DOM (e.g. express payment buttons appearing).
-	const observer = new MutationObserver( () => tagChildren() );
-	observer.observe( fields, { childList: true, subtree: false } );
+	const observer = new MutationObserver( () => render() );
+	observer.observe( fields, { childList: true, subtree: true } );
 
 	render();
 	return true;
