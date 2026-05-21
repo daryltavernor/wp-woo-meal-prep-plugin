@@ -27,8 +27,13 @@ body.woocommerce-cart .cart_totals .woocommerce-shipping-calculator {
    Only differences: lime fill instead of black, black text instead of
    white, and horizontal padding bumped 20% (1.6em → 1.92em) so the
    primary CTA reads a touch wider without breaking the family. */
-.wc-block-cart__submit-button,
-.wc-block-components-checkout-place-order-button {
+body .wc-block-cart__submit-button,
+body a.wc-block-cart__submit-button,
+body .wp-block-woocommerce-cart .wc-block-cart__submit-button,
+body .wc-block-cart__submit-container .wc-block-cart__submit-button,
+body .wc-block-components-checkout-place-order-button,
+body button.wc-block-components-checkout-place-order-button,
+body .wp-block-woocommerce-checkout .wc-block-components-checkout-place-order-button {
 	display: inline-block !important;
 	background: #c5e643 !important;
 	color: #000 !important;
@@ -42,22 +47,29 @@ body.woocommerce-cart .cart_totals .woocommerce-shipping-calculator {
 	letter-spacing: 0.03em !important;
 	padding: 0.6em 1.92em !important;
 	text-align: center !important;
+	text-decoration: none !important;
 	box-shadow: none !important;
+	min-width: 0 !important;
+	min-height: 0 !important;
+	width: auto !important;
+	height: auto !important;
 	transition: background 0.15s ease, color 0.15s ease, transform 0.1s ease !important;
 }
-.wc-block-cart__submit-button:hover,
-.wc-block-components-checkout-place-order-button:hover {
+body .wc-block-cart__submit-button:hover,
+body a.wc-block-cart__submit-button:hover,
+body .wc-block-components-checkout-place-order-button:hover,
+body button.wc-block-components-checkout-place-order-button:hover {
 	background: #000 !important;
 	color: #c5e643 !important;
 }
-.wc-block-cart__submit-button:active,
-.wc-block-components-checkout-place-order-button:active {
+body .wc-block-cart__submit-button:active,
+body .wc-block-components-checkout-place-order-button:active {
 	transform: translateY( 1px );
 }
-.wc-block-cart__submit-button:disabled,
-.wc-block-components-checkout-place-order-button:disabled {
-	opacity: 0.45;
-	cursor: not-allowed;
+body .wc-block-cart__submit-button:disabled,
+body .wc-block-components-checkout-place-order-button:disabled {
+	opacity: 0.45 !important;
+	cursor: not-allowed !important;
 }
 
 /* The inner text wrappers should inherit colour from the button. */
