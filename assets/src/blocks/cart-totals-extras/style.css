@@ -41,7 +41,7 @@ body .wp-block-woocommerce-checkout .wc-block-components-checkout-place-order-bu
 	border-radius: 6px !important;
 	font-family: 'Kanit', sans-serif !important;
 	font-weight: 700 !important;
-	font-size: 0.85em !important;
+	font-size: 0.85rem !important;
 	line-height: 1.6 !important;
 	text-transform: uppercase !important;
 	letter-spacing: 0.03em !important;
@@ -51,8 +51,15 @@ body .wp-block-woocommerce-checkout .wc-block-components-checkout-place-order-bu
 	box-shadow: none !important;
 	min-width: 0 !important;
 	min-height: 0 !important;
+	max-width: none !important;
+	max-height: none !important;
 	width: auto !important;
 	height: auto !important;
+	margin: 0 !important;
+	box-sizing: border-box !important;
+	cursor: pointer !important;
+	flex: 0 0 auto !important;
+	vertical-align: middle !important;
 	transition: background 0.15s ease, color 0.15s ease, transform 0.1s ease !important;
 }
 body .wc-block-cart__submit-button:hover,
@@ -71,14 +78,26 @@ body .wc-block-components-checkout-place-order-button:disabled {
 	opacity: 0.45 !important;
 	cursor: not-allowed !important;
 }
-
-/* The inner text wrappers should inherit colour from the button. */
-.wc-block-cart__submit-button .wc-block-components-button__text,
-.wc-block-components-checkout-place-order-button .wc-block-components-button__text,
-.wc-block-components-checkout-place-order-button__text {
+/* Neutralise WC's nested text wrappers so they don't inflate height. */
+body .wc-block-cart__submit-button .wc-block-components-button__text,
+body .wc-block-cart__submit-button > *,
+body .wc-block-components-checkout-place-order-button .wc-block-components-button__text,
+body .wc-block-components-checkout-place-order-button .wc-block-components-checkout-place-order-button__text,
+body .wc-block-components-checkout-place-order-button > * {
+	display: inline !important;
+	margin: 0 !important;
+	padding: 0 !important;
+	line-height: inherit !important;
+	font: inherit !important;
 	color: inherit !important;
-	font-weight: inherit !important;
-	font-family: inherit !important;
+	background: transparent !important;
+	border: 0 !important;
+	text-transform: inherit !important;
+	letter-spacing: inherit !important;
+	text-align: inherit !important;
+	height: auto !important;
+	min-height: 0 !important;
+	box-shadow: none !important;
 }
 
 /* WC's actions row on the payment step holds Place Order; on that step we

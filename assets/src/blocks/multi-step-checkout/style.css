@@ -33,7 +33,7 @@
 .fn-step-actions button {
 	font-family: 'Kanit', sans-serif;
 	font-weight: 700;
-	font-size: 0.85em;
+	font-size: 0.85rem;
 	line-height: 1.6;
 	text-transform: uppercase;
 	letter-spacing: 0.03em;
@@ -65,10 +65,10 @@
 	cursor: not-allowed;
 }
 
-/* ---------- Place Order: NEXT pill, lime fill, 20% wider ----------
-   Lives here too (not just in cart-totals-extras) so it cannot fail to
-   load on the checkout page — this stylesheet is enqueued specifically
-   on is_checkout() via MultiStep::enqueue_frontend. */
+/* ---------- Place Order: identical render to NEXT, lime fill, 20% wider ----------
+   font-size in rem so it's parent-context-independent. Inner WC text
+   wrappers are forced to display:inline + font:inherit so they don't
+   inject block-level height of their own. */
 body .wc-block-components-checkout-place-order-button,
 body button.wc-block-components-checkout-place-order-button,
 body .wc-block-checkout__actions_row .wc-block-components-checkout-place-order-button,
@@ -80,7 +80,7 @@ body .wp-block-woocommerce-checkout-actions-block .wc-block-components-checkout-
 	border-radius: 6px !important;
 	font-family: 'Kanit', sans-serif !important;
 	font-weight: 700 !important;
-	font-size: 0.85em !important;
+	font-size: 0.85rem !important;
 	line-height: 1.6 !important;
 	text-transform: uppercase !important;
 	letter-spacing: 0.03em !important;
@@ -90,9 +90,15 @@ body .wp-block-woocommerce-checkout-actions-block .wc-block-components-checkout-
 	box-shadow: none !important;
 	min-width: 0 !important;
 	min-height: 0 !important;
+	max-width: none !important;
+	max-height: none !important;
 	width: auto !important;
 	height: auto !important;
 	margin: 0 !important;
+	box-sizing: border-box !important;
+	cursor: pointer !important;
+	flex: 0 0 auto !important;
+	vertical-align: middle !important;
 	transition: background 0.15s ease, color 0.15s ease, transform 0.1s ease !important;
 }
 body .wc-block-components-checkout-place-order-button:hover,
@@ -103,15 +109,27 @@ body button.wc-block-components-checkout-place-order-button:hover {
 body .wc-block-components-checkout-place-order-button:active {
 	transform: translateY( 1px );
 }
+/* Neutralise WC's nested text wrappers — they're block-level divs that
+   would otherwise wrap onto their own line and bloat the button height.
+   Force inline + inherit so the text reads as if it were a direct child
+   of the button (matching NEXT, which has its text directly inside). */
 body .wc-block-components-checkout-place-order-button .wc-block-components-button__text,
-body .wc-block-components-checkout-place-order-button__text {
+body .wc-block-components-checkout-place-order-button .wc-block-components-checkout-place-order-button__text,
+body .wc-block-components-checkout-place-order-button > * {
+	display: inline !important;
+	margin: 0 !important;
+	padding: 0 !important;
+	line-height: inherit !important;
+	font: inherit !important;
 	color: inherit !important;
-	font-family: inherit !important;
-	font-weight: inherit !important;
-	font-size: inherit !important;
-	letter-spacing: inherit !important;
-	text-transform: inherit !important;
 	background: transparent !important;
+	border: 0 !important;
+	text-transform: inherit !important;
+	letter-spacing: inherit !important;
+	text-align: inherit !important;
+	height: auto !important;
+	min-height: 0 !important;
+	box-shadow: none !important;
 }
 
 /* ---------- Hide WC's native shipping/pickup pickers ----------
