@@ -22,9 +22,11 @@ body.woocommerce-cart .cart_totals .woocommerce-shipping-calculator {
 }
 
 /* ---------- Primary CTA: "Proceed to Checkout" + "Place Order" ----------
-   Same dimensions as the BACK/NEXT pills (so the action row reads as one
-   visual family). Only differences: lime fill, bolder weight, slightly
-   wider horizontal padding so the primary action is unmistakable. */
+   Identical dimensions to the NEXT pill (.fn-step-next): 0.85em font,
+   weight 700, 6px corners, 0.6em vertical padding, 2px black border.
+   Only differences: lime fill instead of black, black text instead of
+   white, and horizontal padding bumped 20% (1.6em → 1.92em) so the
+   primary CTA reads a touch wider without breaking the family. */
 .wc-block-cart__submit-button,
 .wc-block-components-checkout-place-order-button {
 	display: inline-block !important;
@@ -33,12 +35,12 @@ body.woocommerce-cart .cart_totals .woocommerce-shipping-calculator {
 	border: 2px solid #000 !important;
 	border-radius: 6px !important;
 	font-family: 'Kanit', sans-serif !important;
-	font-weight: 900 !important;
+	font-weight: 700 !important;
 	font-size: 0.85em !important;
 	line-height: 1.6 !important;
 	text-transform: uppercase !important;
-	letter-spacing: 0.04em !important;
-	padding: 0.6em 2.4em !important;
+	letter-spacing: 0.03em !important;
+	padding: 0.6em 1.92em !important;
 	text-align: center !important;
 	box-shadow: none !important;
 	transition: background 0.15s ease, color 0.15s ease, transform 0.1s ease !important;
