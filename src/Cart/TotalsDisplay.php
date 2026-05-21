@@ -15,6 +15,69 @@ final class TotalsDisplay {
 		add_action( 'woocommerce_review_order_before_order_total', [ $this, 'render_classic_cart_rows' ] );
 		// Hide shipping from the cart page totals (data-level, theme-independent).
 		add_action( 'wp', [ $this, 'maybe_hide_cart_shipping' ] );
+		// Inline the primary-CTA CSS in <head> so it cannot miss load due to
+		// page detection / caching / template-part rendering quirks.
+		add_action( 'wp_head', [ $this, 'inline_primary_cta_css' ], 999 );
+	}
+
+	public function inline_primary_cta_css(): void {
+		if ( is_admin() ) {
+			return;
+		}
+		?>
+<style id="fn-primary-cta-css">
+body .wc-block-cart__submit-button,
+body a.wc-block-cart__submit-button,
+body .wc-block-cart__submit-container .wc-block-cart__submit-button,
+body .wp-block-woocommerce-proceed-to-checkout-block .wc-block-cart__submit-button,
+body .wc-block-components-checkout-place-order-button,
+body button.wc-block-components-checkout-place-order-button,
+body .wc-block-checkout__actions_row .wc-block-components-checkout-place-order-button {
+	display: inline-block !important;
+	background: #c5e643 !important;
+	color: #000 !important;
+	border: 2px solid #000 !important;
+	border-radius: 6px !important;
+	font-family: 'Kanit', sans-serif !important;
+	font-weight: 700 !important;
+	font-size: 0.85em !important;
+	line-height: 1.6 !important;
+	text-transform: uppercase !important;
+	letter-spacing: 0.03em !important;
+	padding: 0.6em 1.92em !important;
+	text-align: center !important;
+	text-decoration: none !important;
+	box-shadow: none !important;
+	min-width: 0 !important;
+	min-height: 0 !important;
+	width: auto !important;
+	height: auto !important;
+	margin: 0 !important;
+	transition: background 0.15s ease, color 0.15s ease, transform 0.1s ease !important;
+}
+body .wc-block-cart__submit-button:hover,
+body a.wc-block-cart__submit-button:hover,
+body .wc-block-components-checkout-place-order-button:hover,
+body button.wc-block-components-checkout-place-order-button:hover {
+	background: #000 !important;
+	color: #c5e643 !important;
+}
+body .wc-block-cart__submit-button:active,
+body .wc-block-components-checkout-place-order-button:active {
+	transform: translateY( 1px );
+}
+body .wc-block-cart__submit-button .wc-block-components-button__text,
+body .wc-block-components-checkout-place-order-button .wc-block-components-button__text,
+body .wc-block-components-checkout-place-order-button__text {
+	color: inherit !important;
+	font-family: inherit !important;
+	font-weight: inherit !important;
+	font-size: inherit !important;
+	letter-spacing: inherit !important;
+	text-transform: inherit !important;
+}
+</style>
+		<?php
 	}
 
 	public function maybe_hide_cart_shipping(): void {
