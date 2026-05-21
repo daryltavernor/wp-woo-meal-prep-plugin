@@ -280,15 +280,42 @@ function apply( root ) {
 		}
 	};
 
-	nav.addEventListener( 'click', ( e ) => {
-		if ( e.target.tagName === 'LI' ) {
-			active = e.target.dataset.step;
-			render();
+	const slotIsSelected = () => !! checkout.querySelector( '.fn-slot-rows button.is-active' );
+	const SLOT_STEP_IDX = STEPS.findIndex( ( s ) => s.key === 'slot' );
+	const flashSlotRequired = () => {
+		const picker = checkout.querySelector( '.fn-slot-picker' );
+		if ( ! picker ) {
+			return;
 		}
+		picker.classList.add( 'fn-slot-required' );
+		picker.scrollIntoView( { behavior: 'smooth', block: 'center' } );
+		window.setTimeout( () => picker.classList.remove( 'fn-slot-required' ), 2400 );
+	};
+
+	nav.addEventListener( 'click', ( e ) => {
+		if ( e.target.tagName !== 'LI' ) {
+			return;
+		}
+		const target    = e.target.dataset.step;
+		const targetIdx = STEPS.findIndex( ( s ) => s.key === target );
+		// Block jumping past the slot step without a selection.
+		if ( targetIdx > SLOT_STEP_IDX && ! slotIsSelected() ) {
+			active = 'slot';
+			render();
+			flashSlotRequired();
+			return;
+		}
+		active = target;
+		render();
 	} );
 	checkout.addEventListener( 'click', ( e ) => {
 		if ( e.target.classList.contains( 'fn-step-next' ) ) {
 			const idx = STEPS.findIndex( ( s ) => s.key === active );
+			// Slot picker is mandatory: can't leave the slot step without a pick.
+			if ( active === 'slot' && ! slotIsSelected() ) {
+				flashSlotRequired();
+				return;
+			}
 			if ( idx < STEPS.length - 1 ) {
 				active = STEPS[ idx + 1 ].key;
 				render();
