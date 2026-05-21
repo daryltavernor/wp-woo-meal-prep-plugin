@@ -128,18 +128,18 @@ final class TotalsDisplay {
 	}
 
 	private function page_is_relevant(): bool {
-		if ( function_exists( 'is_cart' ) && is_cart() ) {
-			return true;
+		if ( is_admin() ) {
+			return false;
 		}
-		if ( function_exists( 'is_checkout' ) && is_checkout() ) {
-			return true;
+		if ( ! class_exists( 'WooCommerce' ) ) {
+			return false;
 		}
-		global $post;
-		if ( $post && function_exists( 'has_block' ) ) {
-			if ( has_block( 'woocommerce/cart', $post ) || has_block( 'woocommerce/checkout', $post ) ) {
-				return true;
-			}
-		}
-		return false;
+		// Always enqueue on the WC-active frontend. is_cart()/is_checkout()
+		// and has_block($post) both miss when the cart/checkout block is
+		// rendered from a Site Editor template part or when the page isn't
+		// the one set in WC Settings → Advanced. The CSS only matches
+		// specific WC-block classes, and the JS has its own DOM guards,
+		// so loading on every page is safe and ~2 KB.
+		return true;
 	}
 }
