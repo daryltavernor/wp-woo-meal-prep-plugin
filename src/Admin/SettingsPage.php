@@ -13,6 +13,11 @@ final class SettingsPage {
 	public const OPTION_BUILDER_PLACEMENT = 'fn_builder_placement';
 	public const OPTION_UPDATE_BRANCH     = 'fn_update_branch';
 	public const OPTION_UPDATE_TOKEN      = 'fn_update_token';
+	public const OPTION_BRAND_LOGO_ID     = 'fn_brand_logo_id';
+	public const OPTION_BRAND_WEB         = 'fn_brand_web';
+	public const OPTION_BRAND_EMAIL       = 'fn_brand_email';
+	public const OPTION_BRAND_PHONE       = 'fn_brand_phone';
+	public const OPTION_BRAND_ADDRESS     = 'fn_brand_address';
 
 	/**
 	 * @return array<string,array{label:string,hook:string,priority:int}>
@@ -76,6 +81,13 @@ final class SettingsPage {
 				sprintf( 'Seeded %d ingredients (existing entries skipped).', $count ),
 				30
 			);
+		} elseif ( 'save_brand' === $action ) {
+			update_option( self::OPTION_BRAND_LOGO_ID, isset( $_POST['fn_brand_logo_id'] ) ? (int) $_POST['fn_brand_logo_id'] : 0 );
+			update_option( self::OPTION_BRAND_WEB, isset( $_POST['fn_brand_web'] ) ? esc_url_raw( wp_unslash( (string) $_POST['fn_brand_web'] ) ) : '' );
+			update_option( self::OPTION_BRAND_EMAIL, isset( $_POST['fn_brand_email'] ) ? sanitize_email( wp_unslash( (string) $_POST['fn_brand_email'] ) ) : '' );
+			update_option( self::OPTION_BRAND_PHONE, isset( $_POST['fn_brand_phone'] ) ? sanitize_text_field( wp_unslash( (string) $_POST['fn_brand_phone'] ) ) : '' );
+			update_option( self::OPTION_BRAND_ADDRESS, isset( $_POST['fn_brand_address'] ) ? sanitize_textarea_field( wp_unslash( (string) $_POST['fn_brand_address'] ) ) : '' );
+			set_transient( 'fn_settings_notice', __( 'Brand details saved.', 'fastnutrition-mealprep' ), 30 );
 		}
 		wp_safe_redirect( admin_url( 'admin.php?page=fn-settings' ) );
 		exit;
@@ -192,6 +204,78 @@ final class SettingsPage {
 		submit_button();
 		echo '</form>';
 
+		// Brand info (used on printed labels + emails).
+		$brand        = self::brand_info();
+		$logo_id      = $brand['logo_id'];
+		$logo_preview = $logo_id ? wp_get_attachment_image_url( $logo_id, 'medium' ) : '';
+		wp_enqueue_media();
+		echo '<h2>' . esc_html__( 'Branding (labels & emails)', 'fastnutrition-mealprep' ) . '</h2>';
+		echo '<p class="description">' . esc_html__( 'These details are printed on every label (meal labels + order summaries) and used wherever the plugin needs to reference your business.', 'fastnutrition-mealprep' ) . '</p>';
+		echo '<form method="post">';
+		wp_nonce_field( 'fn_save_settings', 'fn_settings_nonce' );
+		echo '<input type="hidden" name="fn_action" value="save_brand" />';
+		echo '<table class="form-table"><tbody>';
+		echo '<tr><th>' . esc_html__( 'Logo', 'fastnutrition-mealprep' ) . '</th><td>';
+		echo '<input type="hidden" id="fn_brand_logo_id" name="fn_brand_logo_id" value="' . (int) $logo_id . '" />';
+		echo '<div id="fn-brand-logo-preview" style="margin-bottom:8px;min-height:48px">';
+		if ( $logo_preview ) {
+			echo '<img src="' . esc_url( $logo_preview ) . '" style="max-width:240px;max-height:120px;border:1px solid #ddd;padding:4px;background:#fff" />';
+		}
+		echo '</div>';
+		echo '<button type="button" class="button" id="fn-brand-logo-choose">' . esc_html__( 'Choose image', 'fastnutrition-mealprep' ) . '</button> ';
+		echo '<button type="button" class="button" id="fn-brand-logo-remove"' . disabled( 0 === $logo_id, true, false ) . '>' . esc_html__( 'Remove', 'fastnutrition-mealprep' ) . '</button>';
+		echo '<p class="description">' . esc_html__( 'Recommended: a square or wide-rectangle PNG/SVG with a transparent background. Will be scaled to fit the label header.', 'fastnutrition-mealprep' ) . '</p>';
+		echo '</td></tr>';
+		printf(
+			'<tr><th><label for="fn_brand_web">%s</label></th><td><input type="url" id="fn_brand_web" name="fn_brand_web" value="%s" class="regular-text" placeholder="https://www.fastnutrition.co.uk" /></td></tr>',
+			esc_html__( 'Web address', 'fastnutrition-mealprep' ),
+			esc_attr( $brand['web'] )
+		);
+		printf(
+			'<tr><th><label for="fn_brand_email">%s</label></th><td><input type="email" id="fn_brand_email" name="fn_brand_email" value="%s" class="regular-text" placeholder="hello@fastnutrition.co.uk" /></td></tr>',
+			esc_html__( 'Email', 'fastnutrition-mealprep' ),
+			esc_attr( $brand['email'] )
+		);
+		printf(
+			'<tr><th><label for="fn_brand_phone">%s</label></th><td><input type="text" id="fn_brand_phone" name="fn_brand_phone" value="%s" class="regular-text" placeholder="07712 345 678" /></td></tr>',
+			esc_html__( 'Phone', 'fastnutrition-mealprep' ),
+			esc_attr( $brand['phone'] )
+		);
+		printf(
+			'<tr><th><label for="fn_brand_address">%s</label></th><td><textarea id="fn_brand_address" name="fn_brand_address" rows="3" class="large-text" placeholder="Unit 4, Some Industrial Estate, Stoke ST3 4EY">%s</textarea><p class="description">%s</p></td></tr>',
+			esc_html__( 'Physical address', 'fastnutrition-mealprep' ),
+			esc_textarea( $brand['address'] ),
+			esc_html__( 'One line per row. Used as your return address on labels.', 'fastnutrition-mealprep' )
+		);
+		echo '</tbody></table>';
+		submit_button( __( 'Save brand details', 'fastnutrition-mealprep' ) );
+		echo '</form>';
+		?>
+		<script>
+		jQuery(function($){
+			var frame;
+			$('#fn-brand-logo-choose').on('click', function(e){
+				e.preventDefault();
+				if (frame) { frame.open(); return; }
+				frame = wp.media({ title: 'Choose Logo', button: { text: 'Use this image' }, multiple: false, library: { type: 'image' } });
+				frame.on('select', function(){
+					var att = frame.state().get('selection').first().toJSON();
+					$('#fn_brand_logo_id').val(att.id);
+					$('#fn-brand-logo-preview').html('<img src="' + att.url + '" style="max-width:240px;max-height:120px;border:1px solid #ddd;padding:4px;background:#fff" />');
+					$('#fn-brand-logo-remove').prop('disabled', false);
+				});
+				frame.open();
+			});
+			$('#fn-brand-logo-remove').on('click', function(e){
+				e.preventDefault();
+				$('#fn_brand_logo_id').val('0');
+				$('#fn-brand-logo-preview').html('');
+				$(this).prop('disabled', true);
+			});
+		});
+		</script>
+		<?php
+
 		echo '<h2>' . esc_html__( 'Macro calculator page', 'fastnutrition-mealprep' ) . '</h2>';
 		if ( $calc_page_id && get_post( $calc_page_id ) ) {
 			echo '<p>' . esc_html__( 'Page already created:', 'fastnutrition-mealprep' ) . ' <a href="' . esc_url( get_permalink( $calc_page_id ) ) . '" target="_blank">' . esc_html( get_the_title( $calc_page_id ) ) . '</a></p>';
@@ -271,5 +355,25 @@ final class SettingsPage {
 
 	public static function minimal_styling(): bool {
 		return '1' === (string) get_option( self::OPTION_MINIMAL_STYLING, '0' );
+	}
+
+	/**
+	 * Brand info used on labels and other branded surfaces.
+	 *
+	 * @return array{logo_id:int,logo_url:string,logo_path:string,web:string,email:string,phone:string,address:string}
+	 */
+	public static function brand_info(): array {
+		$logo_id   = (int) get_option( self::OPTION_BRAND_LOGO_ID, 0 );
+		$logo_url  = $logo_id ? (string) wp_get_attachment_image_url( $logo_id, 'full' ) : '';
+		$logo_path = $logo_id ? (string) get_attached_file( $logo_id ) : '';
+		return [
+			'logo_id'   => $logo_id,
+			'logo_url'  => $logo_url,
+			'logo_path' => $logo_path && is_readable( $logo_path ) ? $logo_path : '',
+			'web'       => (string) get_option( self::OPTION_BRAND_WEB, '' ),
+			'email'     => (string) get_option( self::OPTION_BRAND_EMAIL, '' ),
+			'phone'     => (string) get_option( self::OPTION_BRAND_PHONE, '' ),
+			'address'   => (string) get_option( self::OPTION_BRAND_ADDRESS, '' ),
+		];
 	}
 }

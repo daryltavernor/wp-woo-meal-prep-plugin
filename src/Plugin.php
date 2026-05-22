@@ -7,6 +7,7 @@ use FastNutrition\MealPrep\Account\Favourites;
 use FastNutrition\MealPrep\Admin\BlockedDatesAdmin;
 use FastNutrition\MealPrep\Admin\BundleAdmin;
 use FastNutrition\MealPrep\Admin\ConflictsNotice;
+use FastNutrition\MealPrep\Admin\LabelsAdmin;
 use FastNutrition\MealPrep\Admin\MenuRegistry;
 use FastNutrition\MealPrep\Admin\PrepDashboard;
 use FastNutrition\MealPrep\Admin\PrepSheet;
@@ -83,6 +84,7 @@ final class Plugin {
 		( new BlockedDatesAdmin() )->register();
 		( new BundleAdmin() )->register();
 		( new ConflictsNotice() )->register();
+		( new LabelsAdmin() )->register();
 
 		( new Favourites() )->register();
 		( new RestController() )->register();

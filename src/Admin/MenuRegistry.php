@@ -52,6 +52,9 @@ final class MenuRegistry {
 		add_submenu_page( self::SLUG, __( 'Collection Profiles', 'fastnutrition-mealprep' ), __( 'Collection Profiles', 'fastnutrition-mealprep' ), 'manage_woocommerce', 'fn-collection-profiles', [ ProfileAdmin::class, 'render_collection_static' ] );
 		add_submenu_page( self::SLUG, __( 'Blocked Dates', 'fastnutrition-mealprep' ), __( 'Blocked Dates', 'fastnutrition-mealprep' ), 'manage_woocommerce', 'fn-blocked-dates', [ BlockedDatesAdmin::class, 'render_static' ] );
 
+		// Label printing.
+		add_submenu_page( self::SLUG, __( 'Print Labels', 'fastnutrition-mealprep' ), __( 'Print Labels', 'fastnutrition-mealprep' ), 'manage_woocommerce', 'fn-print-labels', [ LabelsAdmin::class, 'render_static' ] );
+
 		// Settings.
 		add_submenu_page( self::SLUG, __( 'Checkout & General Settings', 'fastnutrition-mealprep' ), __( 'Settings', 'fastnutrition-mealprep' ), 'manage_woocommerce', 'fn-settings', [ SettingsPage::class, 'render_static' ] );
 	}
