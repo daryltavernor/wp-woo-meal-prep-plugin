@@ -150,23 +150,27 @@ function renderNotes( ext ) {
 		const needed    = Number( u.needed || 0 );
 		const nextQty   = Number( u.next_qty || 0 );
 		const nextPrice = Number( u.next_price || 0 );
-		const perExtra  = Number( u.per_extra || 0 );
+		const savings   = Number( u.total_savings || 0 );
 		if ( needed <= 0 ) {
 			return;
 		}
-		notes.push(
-			makeNote(
-				'fn-cart-note-upsell',
-				sprintf(
-					/* translators: 1: meals to add, 2: tier qty, 3: tier price, 4: per-extra cost */
-					__( 'Add %1$d more to unlock %2$d for %3$s — only %4$s per extra meal.', 'fastnutrition-mealprep' ),
-					needed,
-					nextQty,
-					formatMoney( nextPrice, ext ),
-					formatMoney( perExtra, ext )
-				)
+		const text = savings > 0.0001
+			? sprintf(
+				/* translators: 1: meals to add, 2: tier qty, 3: tier price, 4: amount saved */
+				__( 'Add %1$d more to unlock %2$d for %3$s — save %4$s.', 'fastnutrition-mealprep' ),
+				needed,
+				nextQty,
+				formatMoney( nextPrice, ext ),
+				formatMoney( savings, ext )
 			)
-		);
+			: sprintf(
+				/* translators: 1: meals to add, 2: tier qty, 3: tier price */
+				__( 'Add %1$d more to unlock %2$d for %3$s.', 'fastnutrition-mealprep' ),
+				needed,
+				nextQty,
+				formatMoney( nextPrice, ext )
+			);
+		notes.push( makeNote( 'fn-cart-note-upsell', text ) );
 	} );
 
 	if ( ! notes.length ) {

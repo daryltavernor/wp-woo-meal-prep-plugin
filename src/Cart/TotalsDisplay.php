@@ -127,7 +127,11 @@ final class TotalsDisplay {
 			$next_qty      = (int) $next['qty'];
 			$next_price    = (float) $next['price'];
 			$extras_needed = max( 0, $next_qty - $qty );
-			$per_extra     = $extras_needed > 0 ? max( 0.0, ( $next_price - $current_total ) / $extras_needed ) : 0.0;
+			// "Save vs regular price" = what they'd pay at catalog rate for the
+			// FULL next-tier qty minus the bundle price. Always positive and
+			// frames the deal as a saving, not an added cost.
+			$catalog_at_next_qty = $next_qty * $catalog_price;
+			$total_savings       = max( 0.0, $catalog_at_next_qty - $next_price );
 
 			$upsells[] = [
 				'product_id'    => $pid,
@@ -137,7 +141,7 @@ final class TotalsDisplay {
 				'next_qty'      => $next_qty,
 				'next_price'    => $next_price,
 				'current_total' => $current_total,
-				'per_extra'     => $per_extra,
+				'total_savings' => $total_savings,
 			];
 		}
 
@@ -168,19 +172,30 @@ final class TotalsDisplay {
 			<?php
 		}
 		foreach ( self::compute_upsells() as $u ) {
+			$savings = (float) ( $u['total_savings'] ?? 0 );
 			?>
 			<tr class="fn-cart-row fn-cart-upsell">
 				<th colspan="2">
 					<span class="fn-note-icon" aria-hidden="true">+</span>
 					<?php
-					printf(
-						/* translators: 1: count needed, 2: next tier qty, 3: next tier price, 4: per-extra cost */
-						esc_html__( 'Add %1$d more to unlock %2$d for %3$s — only %4$s per extra meal.', 'fastnutrition-mealprep' ),
-						(int) $u['needed'],
-						(int) $u['next_qty'],
-						wp_kses_post( wc_price( (float) $u['next_price'] ) ),
-						wp_kses_post( wc_price( (float) $u['per_extra'] ) )
-					);
+					if ( $savings > 0.0001 ) {
+						printf(
+							/* translators: 1: meals to add, 2: next tier qty, 3: next tier price, 4: amount saved */
+							esc_html__( 'Add %1$d more to unlock %2$d for %3$s — save %4$s.', 'fastnutrition-mealprep' ),
+							(int) $u['needed'],
+							(int) $u['next_qty'],
+							wp_kses_post( wc_price( (float) $u['next_price'] ) ),
+							wp_kses_post( wc_price( $savings ) )
+						);
+					} else {
+						printf(
+							/* translators: 1: meals to add, 2: next tier qty, 3: next tier price */
+							esc_html__( 'Add %1$d more to unlock %2$d for %3$s.', 'fastnutrition-mealprep' ),
+							(int) $u['needed'],
+							(int) $u['next_qty'],
+							wp_kses_post( wc_price( (float) $u['next_price'] ) )
+						);
+					}
 					?>
 				</th>
 			</tr>
