@@ -85,22 +85,6 @@ function makeWrapper() {
 	return wrapper;
 }
 
-function hideShippingInCart() {
-	// Only act inside the Cart block (not the Checkout block).
-	const cartBlock = document.querySelector( '.wp-block-woocommerce-cart' );
-	if ( ! cartBlock ) {
-		return;
-	}
-	cartBlock.querySelectorAll( '.wc-block-components-totals-shipping' ).forEach( ( el ) => {
-		const parentWrapper = el.closest( '.wc-block-components-totals-wrapper' );
-		if ( parentWrapper && parentWrapper.children.length === 1 && parentWrapper.contains( el ) ) {
-			parentWrapper.style.display = 'none';
-		} else {
-			el.style.display = 'none';
-		}
-	} );
-}
-
 function isOnCartPage() {
 	return !! document.querySelector( '.wp-block-woocommerce-cart' );
 }
@@ -189,8 +173,6 @@ function renderNotes( ext ) {
 }
 
 function render() {
-	hideShippingInCart();
-
 	const ext = getExtensions();
 	if ( ! ext ) {
 		return;
@@ -237,7 +219,18 @@ function render() {
 	} );
 }
 
-let lastSig = '';
+let lastSig    = '';
+let pendingRaf = null;
+
+function scheduleRender() {
+	if ( null !== pendingRaf ) {
+		return;
+	}
+	pendingRaf = window.requestAnimationFrame( () => {
+		pendingRaf = null;
+		render();
+	} );
+}
 
 function init() {
 	const dataApi = window?.wp?.data;
@@ -257,24 +250,13 @@ function init() {
 			const sig = `${ ext.bundleSavings }|${ ext.addonTotal }|${ surchargeSig }|${ upsellSig }`;
 			if ( sig !== lastSig ) {
 				lastSig = sig;
-				render();
-			} else if ( ! document.querySelector( '.fn-totals-wrapper' ) && ! document.querySelector( '.fn-cart-notes-wrapper' ) ) {
-				render();
+				scheduleRender();
 			}
 		} );
 	}
 
-	// Watch the DOM in case WC re-renders the totals area.
-	const observer = new MutationObserver( () => {
-		if ( ! document.querySelector( '.fn-totals-wrapper' ) ) {
-			render();
-		}
-		// And re-hide shipping if it gets re-rendered.
-		hideShippingInCart();
-	} );
-	observer.observe( document.body, { childList: true, subtree: true } );
-
-	render();
+	// Initial render after the cart block has had a chance to hydrate.
+	scheduleRender();
 }
 
 if ( document.readyState === 'loading' ) {

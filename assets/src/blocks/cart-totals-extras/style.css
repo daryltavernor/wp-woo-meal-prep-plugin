@@ -1,9 +1,14 @@
 /* ---------- Hide shipping on the CART page only ---------- */
 
 /* Block cart — the real selector WC uses. Scoped to .wp-block-woocommerce-cart
-   so the checkout block (which uses the same totals classes) is unaffected. */
+   so the checkout block (which uses the same totals classes) is unaffected.
+   !important because WC's own button/totals stylesheet may otherwise win. */
 .wp-block-woocommerce-cart .wc-block-components-totals-shipping {
-	display: none;
+	display: none !important;
+}
+/* Collapse the wrapper if shipping is its only child so we don't leave a gap. */
+.wp-block-woocommerce-cart .wc-block-components-totals-wrapper:has( > .wc-block-components-totals-shipping:only-child ) {
+	display: none !important;
 }
 
 /* Classic shortcode cart fallback (in case anyone still uses it). */
