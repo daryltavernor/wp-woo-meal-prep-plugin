@@ -243,7 +243,10 @@ function apply( root ) {
 		STEPS.forEach( ( step ) => {
 			const show = step.key === active;
 			step.selectors.forEach( ( sel ) => {
-				fields.querySelectorAll( sel ).forEach( ( el ) => {
+				// Query from `checkout`, not `fields`: WC renders the
+				// express payment block above the fields column, so a
+				// fields-scoped query would miss it.
+				checkout.querySelectorAll( sel ).forEach( ( el ) => {
 					el.style.display = show ? '' : 'none';
 				} );
 			} );
@@ -331,7 +334,7 @@ function apply( root ) {
 	} );
 
 	const observer = new MutationObserver( () => render() );
-	observer.observe( fields, { childList: true, subtree: true } );
+	observer.observe( checkout, { childList: true, subtree: true } );
 
 	render();
 	return true;
