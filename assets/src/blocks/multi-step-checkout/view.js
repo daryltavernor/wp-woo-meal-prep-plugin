@@ -239,6 +239,10 @@ function apply( root ) {
 
 	let active = 'address';
 	const render = () => {
+		// Mirror the active step on the checkout root so CSS can target
+		// elements the JS selector loop doesn't reach (e.g. Stripe-rendered
+		// express checkout that has no `wp-block-...` wrapper class).
+		checkout.dataset.fnStep = active;
 		nav.querySelectorAll( 'li' ).forEach( ( li ) => li.classList.toggle( 'is-active', li.dataset.step === active ) );
 		STEPS.forEach( ( step ) => {
 			const show = step.key === active;

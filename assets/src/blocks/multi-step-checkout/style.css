@@ -146,6 +146,20 @@ body .wc-block-components-checkout-place-order-button > * {
 	display: none !important;
 }
 
+/* ---------- Hide Express Checkout (Apple/Google Pay/Link) on non-payment steps ----------
+   Stripe renders express checkout via the WC Blocks Payment Method API.
+   Depending on version, the rendered class can be the block wrapper
+   (`.wp-block-woocommerce-checkout-express-payment-block`) or the inner
+   component (`.wc-block-components-express-payment--checkout`) without
+   the block wrapper, or both. Hide every variant when the multi-step UI
+   isn't on the payment step. The `data-fn-step` attribute is set by
+   view.js on every render. */
+.wp-block-woocommerce-checkout:not([data-fn-step="payment"]) .wp-block-woocommerce-checkout-express-payment-block,
+.wp-block-woocommerce-checkout:not([data-fn-step="payment"]) .wc-block-components-express-payment,
+.wp-block-woocommerce-checkout:not([data-fn-step="payment"]) .wc-block-components-express-payment-continue-rule {
+	display: none !important;
+}
+
 /* ---------- Slot picker ---------- */
 .fn-slot-picker-mount {
 	margin: 1rem 0;
