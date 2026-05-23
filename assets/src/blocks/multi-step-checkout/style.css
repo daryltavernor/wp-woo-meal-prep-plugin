@@ -23,6 +23,23 @@
 	color: #000;
 }
 
+/* Narrower screens: long labels like "Delivery or collection" wrap to
+   2–3 lines and the pill radius (999px) turns each item into a near-
+   circle. Reduce radius + padding + text size so wrapped pills render
+   as proper rounded rectangles. */
+@media ( max-width: 640px ) {
+	.fn-steps-nav {
+		gap: 0.35rem;
+		margin-bottom: 1rem;
+	}
+	.fn-steps-nav li {
+		padding: 0.45rem 0.5rem;
+		border-radius: 10px;
+		font-size: 0.72em;
+		line-height: 1.2;
+	}
+}
+
 /* ---------- Back / Next ---------- */
 .fn-step-actions {
 	margin-top: 1.5rem;

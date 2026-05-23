@@ -238,7 +238,20 @@ function apply( root ) {
 	fields.appendChild( actions );
 
 	let active = 'address';
+	// Hoist the Stripe Express Checkout component to the top of the fields
+	// column so on the payment step it sits above the card form, not below
+	// it. Idempotent: only moves when not already first, so the
+	// MutationObserver below doesn't loop.
+	const hoistExpress = () => {
+		const express = fields.querySelector(
+			'.wp-block-woocommerce-checkout-express-payment-block, .wc-block-components-express-payment'
+		);
+		if ( express && fields.firstChild !== express ) {
+			fields.insertBefore( express, fields.firstChild );
+		}
+	};
 	const render = () => {
+		hoistExpress();
 		// Mirror the active step on the checkout root so CSS can target
 		// elements the JS selector loop doesn't reach (e.g. Stripe-rendered
 		// express checkout that has no `wp-block-...` wrapper class).
