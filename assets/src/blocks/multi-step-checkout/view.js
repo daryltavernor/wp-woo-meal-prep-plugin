@@ -13,7 +13,6 @@ const STEPS = [
 		key: 'address',
 		label: __( 'Your details', 'fastnutrition-mealprep' ),
 		selectors: [
-			'.wp-block-woocommerce-checkout-express-payment-block',
 			'.wp-block-woocommerce-checkout-contact-information-block',
 			'.wp-block-woocommerce-checkout-shipping-address-block',
 			'.wp-block-woocommerce-checkout-billing-address-block',
@@ -28,6 +27,7 @@ const STEPS = [
 		key: 'payment',
 		label: __( 'Payment', 'fastnutrition-mealprep' ),
 		selectors: [
+			'.wp-block-woocommerce-checkout-express-payment-block',
 			'.wp-block-woocommerce-checkout-payment-block',
 			'.wp-block-woocommerce-checkout-additional-information-block',
 			'.wp-block-woocommerce-checkout-order-note-block',

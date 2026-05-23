@@ -11,6 +11,19 @@
 	display: none !important;
 }
 
+/* ---------- Hide Apple/Google Pay express checkout on the CART page ----------
+   We surface Apple/Google Pay only on the final checkout step (inline with the
+   Stripe Card method), after the customer has chosen a delivery or collection
+   slot. The cart-page express variant would bypass the slot picker entirely. */
+.wp-block-woocommerce-cart .wp-block-woocommerce-cart-express-payment-block,
+.wp-block-woocommerce-cart .wc-block-cart-express-payment-block,
+.wp-block-woocommerce-cart .wc-block-components-express-payment,
+body.woocommerce-cart #wc-stripe-payment-request-wrapper,
+body.woocommerce-cart .wc-stripe-payment-request-wrapper,
+body.woocommerce-cart #wc-stripe-payment-request-button-separator {
+	display: none !important;
+}
+
 /* Classic shortcode cart fallback (in case anyone still uses it). */
 body.woocommerce-cart .cart_totals tr.shipping,
 body.woocommerce-cart .cart_totals .woocommerce-shipping-totals,
