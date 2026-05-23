@@ -3,6 +3,7 @@ declare( strict_types=1 );
 
 namespace FastNutrition\MealPrep\Admin;
 
+use FastNutrition\MealPrep\Cart\Surcharge;
 use FastNutrition\MealPrep\Install\IngredientSeeder;
 
 final class SettingsPage {
@@ -81,6 +82,12 @@ final class SettingsPage {
 				sprintf( 'Seeded %d ingredients (existing entries skipped).', $count ),
 				30
 			);
+		} elseif ( 'save_surcharge' === $action ) {
+			update_option( Surcharge::OPTION_ENABLED, ! empty( $_POST['fn_surcharge_enabled'] ) ? '1' : '0' );
+			update_option( Surcharge::OPTION_THRESHOLD, isset( $_POST['fn_surcharge_threshold'] ) ? (float) wp_unslash( (string) $_POST['fn_surcharge_threshold'] ) : 23 );
+			update_option( Surcharge::OPTION_AMOUNT, isset( $_POST['fn_surcharge_amount'] ) ? (float) wp_unslash( (string) $_POST['fn_surcharge_amount'] ) : 8 );
+			update_option( Surcharge::OPTION_LABEL, isset( $_POST['fn_surcharge_label'] ) ? sanitize_text_field( wp_unslash( (string) $_POST['fn_surcharge_label'] ) ) : 'Basket surcharge' );
+			set_transient( 'fn_settings_notice', __( 'Surcharge settings saved.', 'fastnutrition-mealprep' ), 30 );
 		} elseif ( 'save_brand' === $action ) {
 			update_option( self::OPTION_BRAND_LOGO_ID, isset( $_POST['fn_brand_logo_id'] ) ? (int) $_POST['fn_brand_logo_id'] : 0 );
 			update_option( self::OPTION_BRAND_WEB, isset( $_POST['fn_brand_web'] ) ? esc_url_raw( wp_unslash( (string) $_POST['fn_brand_web'] ) ) : '' );
@@ -202,6 +209,48 @@ final class SettingsPage {
 		submit_button( __( 'Save update settings', 'fastnutrition-mealprep' ) );
 		echo '</form>';
 		submit_button();
+		echo '</form>';
+
+		// Basket surcharge — encourage minimum-spend behaviour.
+		$s_enabled   = Surcharge::enabled();
+		$s_threshold = Surcharge::threshold();
+		$s_amount    = Surcharge::amount();
+		$s_label     = Surcharge::label();
+		echo '<h2>' . esc_html__( 'Basket surcharge', 'fastnutrition-mealprep' ) . '</h2>';
+		echo '<p class="description">' . esc_html__( 'Adds a flat fee to the cart and checkout if the subtotal is below the threshold. The cart page shows a friendly note inviting the customer to spend more so they can skip the fee.', 'fastnutrition-mealprep' ) . '</p>';
+		echo '<form method="post">';
+		wp_nonce_field( 'fn_save_settings', 'fn_settings_nonce' );
+		echo '<input type="hidden" name="fn_action" value="save_surcharge" />';
+		echo '<table class="form-table"><tbody>';
+		printf(
+			'<tr><th>%s</th><td><label><input type="checkbox" name="fn_surcharge_enabled" value="1" %s /> %s</label></td></tr>',
+			esc_html__( 'Enable surcharge', 'fastnutrition-mealprep' ),
+			checked( $s_enabled, true, false ),
+			esc_html__( 'Apply when subtotal is below the threshold', 'fastnutrition-mealprep' )
+		);
+		$currency = function_exists( 'get_woocommerce_currency_symbol' ) ? get_woocommerce_currency_symbol() : '£';
+		printf(
+			'<tr><th><label for="fn_surcharge_threshold">%s</label></th><td>%s <input type="number" id="fn_surcharge_threshold" name="fn_surcharge_threshold" value="%s" step="0.01" min="0" class="small-text" /> <p class="description">%s</p></td></tr>',
+			esc_html__( 'Threshold', 'fastnutrition-mealprep' ),
+			esc_html( $currency ),
+			esc_attr( (string) $s_threshold ),
+			esc_html__( 'Surcharge is added when the cart subtotal (before fees and shipping) is under this amount.', 'fastnutrition-mealprep' )
+		);
+		printf(
+			'<tr><th><label for="fn_surcharge_amount">%s</label></th><td>%s <input type="number" id="fn_surcharge_amount" name="fn_surcharge_amount" value="%s" step="0.01" min="0" class="small-text" /></td></tr>',
+			esc_html__( 'Surcharge amount', 'fastnutrition-mealprep' ),
+			esc_html( $currency ),
+			esc_attr( (string) $s_amount )
+		);
+		printf(
+			'<tr><th><label for="fn_surcharge_label">%s</label></th><td><input type="text" id="fn_surcharge_label" name="fn_surcharge_label" value="%s" class="regular-text" placeholder="%s" /><p class="description">%s</p></td></tr>',
+			esc_html__( 'Label shown in cart totals', 'fastnutrition-mealprep' ),
+			esc_attr( $s_label ),
+			esc_attr__( 'Basket surcharge', 'fastnutrition-mealprep' ),
+			esc_html__( 'The label customers see on the totals row.', 'fastnutrition-mealprep' )
+		);
+		echo '</tbody></table>';
+		submit_button( __( 'Save surcharge settings', 'fastnutrition-mealprep' ) );
 		echo '</form>';
 
 		// Brand info (used on printed labels + emails).

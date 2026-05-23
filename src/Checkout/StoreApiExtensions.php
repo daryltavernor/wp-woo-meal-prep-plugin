@@ -6,6 +6,7 @@ namespace FastNutrition\MealPrep\Checkout;
 use Automattic\WooCommerce\StoreApi\StoreApi;
 use Automattic\WooCommerce\StoreApi\Schemas\ExtendSchema;
 use FastNutrition\MealPrep\Cart\Selections;
+use FastNutrition\MealPrep\Cart\Surcharge;
 use FastNutrition\MealPrep\Cart\TotalsDisplay;
 use FastNutrition\MealPrep\Delivery\BlockedDates;
 use FastNutrition\MealPrep\Delivery\Profile;
@@ -80,12 +81,16 @@ final class StoreApiExtensions {
 			}
 		}
 
-		$summary = TotalsDisplay::compute_summary();
+		$summary   = TotalsDisplay::compute_summary();
+		$upsells   = TotalsDisplay::compute_upsells();
+		$surcharge = Surcharge::status();
 
 		return [
 			'macros'         => $totals,
 			'addon_total'    => $summary['addon_total'],
 			'bundle_savings' => $summary['bundle_savings'],
+			'upsells'        => $upsells,
+			'surcharge'      => $surcharge,
 		];
 	}
 
@@ -106,6 +111,18 @@ final class StoreApiExtensions {
 			'bundle_savings' => [
 				'description' => __( 'Total saved due to bundle pricing tiers.', 'fastnutrition-mealprep' ),
 				'type'        => 'number',
+				'context'     => [ 'view' ],
+				'readonly'    => true,
+			],
+			'upsells'        => [
+				'description' => __( 'Per-product hints showing how many more meals to add to reach the next bundle tier.', 'fastnutrition-mealprep' ),
+				'type'        => 'array',
+				'context'     => [ 'view' ],
+				'readonly'    => true,
+			],
+			'surcharge'      => [
+				'description' => __( 'Status of the basket surcharge: enabled, threshold, amount, and whether it currently applies.', 'fastnutrition-mealprep' ),
+				'type'        => 'object',
 				'context'     => [ 'view' ],
 				'readonly'    => true,
 			],

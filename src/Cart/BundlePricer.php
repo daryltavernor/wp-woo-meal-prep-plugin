@@ -34,7 +34,7 @@ final class BundlePricer {
 				$total_qty += (int) $item['quantity'];
 			}
 
-			$result = $this->calculate( $total_qty, $bundles );
+			$result = self::calculate( $total_qty, $bundles );
 			if ( ! $result['applied'] ) {
 				// Below the lowest threshold — clear any prior override and leave AddOnPricer's price alone.
 				foreach ( $items as $key => $item ) {
@@ -73,11 +73,14 @@ final class BundlePricer {
 	 *   the customer always sees a clean number.
 	 * - Below the lowest threshold no bundle applies (catalog rate kept).
 	 *
+	 * Public + static so the upsell logic in TotalsDisplay can reuse it
+	 * without duplicating the math.
+	 *
 	 * @param int   $qty     Total cart qty for the product.
 	 * @param array $bundles Array of [ 'qty' => int, 'price' => float ] tiers.
 	 * @return array{applied: bool, tier?: array, threshold_qty?: int, bundle_price?: float, extra_qty?: int, per_meal_rate?: float, total?: float, effective_unit?: float}
 	 */
-	private function calculate( int $qty, array $bundles ): array {
+	public static function calculate( int $qty, array $bundles ): array {
 		$applicable_tier = null;
 		foreach ( $bundles as $tier ) {
 			$tier_qty   = (int) ( $tier['qty'] ?? 0 );

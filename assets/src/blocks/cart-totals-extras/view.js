@@ -1,5 +1,5 @@
 import './style.css';
-import { __ } from '@wordpress/i18n';
+import { __, sprintf } from '@wordpress/i18n';
 
 const CART_STORE = 'wc/store/cart';
 const NS = 'fastnutrition-mealprep';
@@ -21,6 +21,8 @@ function getExtensions() {
 	return {
 		addonTotal:     Number( ext.addon_total || 0 ),
 		bundleSavings:  Number( ext.bundle_savings || 0 ),
+		upsells:        Array.isArray( ext.upsells ) ? ext.upsells : [],
+		surcharge:      ext.surcharge && typeof ext.surcharge === 'object' ? ext.surcharge : null,
 		currencySymbol: cart?.totals?.currency_symbol || '£',
 		currencyMinor:  Number( cart?.totals?.currency_minor_unit ?? 2 ),
 		currencyDec:    cart?.totals?.currency_decimal_separator || '.',
@@ -99,6 +101,89 @@ function hideShippingInCart() {
 	} );
 }
 
+function isOnCartPage() {
+	return !! document.querySelector( '.wp-block-woocommerce-cart' );
+}
+
+function makeNote( extraClass, text ) {
+	const row = document.createElement( 'div' );
+	row.className = `fn-cart-note ${ extraClass }`;
+	row.textContent = text;
+	return row;
+}
+
+function renderNotes( ext ) {
+	if ( ! isOnCartPage() ) {
+		return;
+	}
+	const cartBlock = document.querySelector( '.wp-block-woocommerce-cart' );
+	if ( ! cartBlock ) {
+		return;
+	}
+	const summaryBlock = cartBlock.querySelector( '.wp-block-woocommerce-cart-order-summary-block' );
+	const anchor       = summaryBlock?.querySelector( '.wp-block-woocommerce-cart-order-summary-coupon-form-block' )
+		|| summaryBlock?.firstElementChild
+		|| null;
+	const container    = summaryBlock || cartBlock;
+
+	container.querySelectorAll( ':scope > .fn-cart-notes-wrapper' ).forEach( ( el ) => el.remove() );
+
+	const notes = [];
+	if ( ext.surcharge && ext.surcharge.applies ) {
+		const remaining = Number( ext.surcharge.remaining || 0 );
+		const amount    = Number( ext.surcharge.amount || 0 );
+		const label     = String( ext.surcharge.label || 'basket surcharge' ).toLowerCase();
+		notes.push(
+			makeNote(
+				'fn-cart-note-surcharge',
+				sprintf(
+					/* translators: 1: remaining amount, 2: surcharge amount, 3: surcharge label */
+					__( 'Spend %1$s more to skip the %2$s %3$s.', 'fastnutrition-mealprep' ),
+					formatMoney( remaining, ext ),
+					formatMoney( amount, ext ),
+					label
+				)
+			)
+		);
+	}
+	( ext.upsells || [] ).forEach( ( u ) => {
+		const needed    = Number( u.needed || 0 );
+		const nextQty   = Number( u.next_qty || 0 );
+		const nextPrice = Number( u.next_price || 0 );
+		const perExtra  = Number( u.per_extra || 0 );
+		if ( needed <= 0 ) {
+			return;
+		}
+		notes.push(
+			makeNote(
+				'fn-cart-note-upsell',
+				sprintf(
+					/* translators: 1: meals to add, 2: tier qty, 3: tier price, 4: per-extra cost */
+					__( 'Add %1$d more to unlock %2$d for %3$s — only %4$s per extra meal.', 'fastnutrition-mealprep' ),
+					needed,
+					nextQty,
+					formatMoney( nextPrice, ext ),
+					formatMoney( perExtra, ext )
+				)
+			)
+		);
+	} );
+
+	if ( ! notes.length ) {
+		return;
+	}
+
+	const wrapper = document.createElement( 'div' );
+	wrapper.className = 'fn-cart-notes-wrapper';
+	notes.forEach( ( n ) => wrapper.appendChild( n ) );
+
+	if ( anchor && anchor.parentElement === container ) {
+		container.insertBefore( wrapper, anchor );
+	} else {
+		container.insertBefore( wrapper, container.firstChild );
+	}
+}
+
 function render() {
 	hideShippingInCart();
 
@@ -106,6 +191,8 @@ function render() {
 	if ( ! ext ) {
 		return;
 	}
+
+	renderNotes( ext );
 
 	const showSavings = ext.bundleSavings > 0.0001;
 	const showAddons  = ext.addonTotal > 0.0001;
@@ -154,11 +241,20 @@ function init() {
 	if ( dataApi && typeof dataApi.subscribe === 'function' ) {
 		dataApi.subscribe( () => {
 			const ext = getExtensions();
-			const sig = ext ? `${ ext.bundleSavings }|${ ext.addonTotal }` : '';
+			if ( ! ext ) {
+				return;
+			}
+			const surchargeSig = ext.surcharge
+				? `${ ext.surcharge.applies ? 1 : 0 }|${ ext.surcharge.remaining }|${ ext.surcharge.amount }`
+				: '';
+			const upsellSig = ( ext.upsells || [] )
+				.map( ( u ) => `${ u.product_id }:${ u.needed }:${ u.next_qty }` )
+				.join( ',' );
+			const sig = `${ ext.bundleSavings }|${ ext.addonTotal }|${ surchargeSig }|${ upsellSig }`;
 			if ( sig !== lastSig ) {
 				lastSig = sig;
 				render();
-			} else if ( ! document.querySelector( '.fn-totals-wrapper' ) ) {
+			} else if ( ! document.querySelector( '.fn-totals-wrapper' ) && ! document.querySelector( '.fn-cart-notes-wrapper' ) ) {
 				render();
 			}
 		} );

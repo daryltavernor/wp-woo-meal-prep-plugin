@@ -72,7 +72,125 @@ final class TotalsDisplay {
 		];
 	}
 
+	/**
+	 * Suggestions to upsell the cart to the next bundle tier on a per-product
+	 * basis. Each entry tells the customer how many more of a specific product
+	 * they need to add to unlock the next bundle, and what each extra meal
+	 * effectively costs (which is much less than the catalog rate they'd
+	 * otherwise pay).
+	 *
+	 * @return array<int,array{product_id:int,product_name:string,current_qty:int,needed:int,next_qty:int,next_price:float,current_total:float,per_extra:float}>
+	 */
+	public static function compute_upsells(): array {
+		$upsells = [];
+		if ( ! function_exists( 'WC' ) || ! WC() || ! WC()->cart ) {
+			return $upsells;
+		}
+
+		$by_product = [];
+		foreach ( WC()->cart->get_cart() as $item ) {
+			$pid = (int) $item['product_id'];
+			$by_product[ $pid ] = ( $by_product[ $pid ] ?? 0 ) + (int) ( $item['quantity'] ?? 0 );
+		}
+
+		foreach ( $by_product as $pid => $qty ) {
+			$bundles = \FastNutrition\MealPrep\Products\BundleMeta::get_bundles( $pid );
+			if ( empty( $bundles ) ) {
+				continue;
+			}
+			usort(
+				$bundles,
+				static fn( $a, $b ) => (int) ( $a['qty'] ?? 0 ) <=> (int) ( $b['qty'] ?? 0 )
+			);
+
+			$next = null;
+			foreach ( $bundles as $tier ) {
+				$tier_qty = (int) ( $tier['qty'] ?? 0 );
+				if ( $tier_qty > $qty ) {
+					$next = $tier;
+					break;
+				}
+			}
+			if ( null === $next ) {
+				continue;
+			}
+
+			$catalog       = function_exists( 'wc_get_product' ) ? wc_get_product( $pid ) : null;
+			$catalog_price = $catalog ? (float) $catalog->get_price( 'edit' ) : 0.0;
+			$product_name  = $catalog ? (string) $catalog->get_name() : '';
+
+			$current_calc  = \FastNutrition\MealPrep\Cart\BundlePricer::calculate( $qty, $bundles );
+			$current_total = ! empty( $current_calc['applied'] )
+				? (float) $current_calc['total']
+				: $qty * $catalog_price;
+
+			$next_qty      = (int) $next['qty'];
+			$next_price    = (float) $next['price'];
+			$extras_needed = max( 0, $next_qty - $qty );
+			$per_extra     = $extras_needed > 0 ? max( 0.0, ( $next_price - $current_total ) / $extras_needed ) : 0.0;
+
+			$upsells[] = [
+				'product_id'    => $pid,
+				'product_name'  => $product_name,
+				'current_qty'   => $qty,
+				'needed'        => $extras_needed,
+				'next_qty'      => $next_qty,
+				'next_price'    => $next_price,
+				'current_total' => $current_total,
+				'per_extra'     => $per_extra,
+			];
+		}
+
+		return $upsells;
+	}
+
+	private function render_classic_upsell_and_surcharge_rows(): void {
+		if ( ! is_cart() ) {
+			return;
+		}
+		$surcharge = Surcharge::status();
+		if ( ! empty( $surcharge['applies'] ) ) {
+			?>
+			<tr class="fn-cart-row fn-cart-surcharge-note">
+				<th colspan="2">
+					<span class="fn-note-icon" aria-hidden="true">!</span>
+					<?php
+					printf(
+						/* translators: 1: remaining amount, 2: surcharge amount, 3: surcharge label */
+						esc_html__( 'Spend %1$s more to skip the %2$s %3$s.', 'fastnutrition-mealprep' ),
+						wp_kses_post( wc_price( (float) $surcharge['remaining'] ) ),
+						wp_kses_post( wc_price( (float) $surcharge['amount'] ) ),
+						esc_html( strtolower( (string) $surcharge['label'] ) )
+					);
+					?>
+				</th>
+			</tr>
+			<?php
+		}
+		foreach ( self::compute_upsells() as $u ) {
+			?>
+			<tr class="fn-cart-row fn-cart-upsell">
+				<th colspan="2">
+					<span class="fn-note-icon" aria-hidden="true">+</span>
+					<?php
+					printf(
+						/* translators: 1: count needed, 2: next tier qty, 3: next tier price, 4: per-extra cost */
+						esc_html__( 'Add %1$d more to unlock %2$d for %3$s — only %4$s per extra meal.', 'fastnutrition-mealprep' ),
+						(int) $u['needed'],
+						(int) $u['next_qty'],
+						wp_kses_post( wc_price( (float) $u['next_price'] ) ),
+						wp_kses_post( wc_price( (float) $u['per_extra'] ) )
+					);
+					?>
+				</th>
+			</tr>
+			<?php
+		}
+	}
+
 	public function render_classic_cart_rows(): void {
+		$this->render_classic_upsell_and_surcharge_rows();
+
 		$data = self::compute_summary();
 		if ( $data['bundle_savings'] > 0.0001 ) {
 			?>
