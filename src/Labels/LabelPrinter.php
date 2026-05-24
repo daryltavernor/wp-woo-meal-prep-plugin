@@ -3,20 +3,21 @@ declare( strict_types=1 );
 
 namespace FastNutrition\MealPrep\Labels;
 
+use FastNutrition\MealPrep\Admin\PrepDashboard;
 use FastNutrition\MealPrep\Admin\SettingsPage;
 use FastNutrition\MealPrep\Cart\Selections;
 use FastNutrition\MealPrep\Macros\Calculator;
 
 /**
- * Generates a print-ready PDF of 4x4-inch labels for a thermal printer.
+ * Generates a print-ready PDF of 100x100 mm labels for a thermal printer.
  *
  * For each matched order:
  *   1. ONE summary label  — customer name, address, contact, total meal count, fulfilment slot, brand contact.
  *   2. N meal labels      — one per individual meal (qty), with meal description, macros, add-ons,
  *                           fulfilment slot, and brand contact.
  *
- * Page size is 4x4 in (288x288 pt). Each label is its own page so the
- * thermal printer cuts/dispenses between them automatically.
+ * Page size is 100x100 mm (~283.46 pt square). Each label is its own page so
+ * the thermal printer cuts/dispenses between them automatically.
  */
 final class LabelPrinter {
 
@@ -48,8 +49,8 @@ final class LabelPrinter {
 			]
 		);
 		$dompdf->loadHtml( $html );
-		// 4 in x 4 in = 288 pt x 288 pt (1 in = 72 pt).
-		$dompdf->setPaper( [ 0, 0, 288, 288 ], 'portrait' );
+		// 100 mm x 100 mm = 283.46 pt x 283.46 pt (1 pt = 1/72 in, 1 in = 25.4 mm).
+		$dompdf->setPaper( [ 0, 0, 283.46, 283.46 ], 'portrait' );
 		$dompdf->render();
 		$prefix   = self::MODE_SUMMARY === $mode ? 'summary-labels' : 'labels';
 		$filename = $prefix . '-' . gmdate( 'Y-m-d-His' ) . '.pdf';
@@ -75,7 +76,7 @@ final class LabelPrinter {
 	     rounded-corner cut so no content lands in the trimmed zone.
 	   - Inverted blocks (white text on solid black) are drawn as solid ink and
 	     print cleanly. Used sparingly for triage cues (UNPAID, meal count). */
-	@page { size: 4in 4in; margin: 0; }
+	@page { size: 100mm 100mm; margin: 0; }
 	html, body { margin: 0; padding: 0; }
 	body { font-family: DejaVu Sans, sans-serif; color: #000; }
 	/* Page-break strategy: each .label is exactly page-sized. Instead of
@@ -83,8 +84,8 @@ final class LabelPrinter {
 	   label fills the page exactly), put the break BEFORE each label after
 	   the first. No trailing break, no blank pages between labels. */
 	.label {
-		width: 4in;
-		height: 4in;
+		width: 100mm;
+		height: 100mm;
 		box-sizing: border-box;
 		padding: 5mm;
 		position: relative;
@@ -297,7 +298,10 @@ final class LabelPrinter {
 			// Fall back to the cart-attached selection key for older items.
 			$selection = $item->get_meta( Selections::CART_KEY, true );
 		}
-		$desc   = $item->get_name();
+		$desc   = is_array( $selection ) ? PrepDashboard::describe_selection( $selection ) : '';
+		if ( '' === $desc ) {
+			$desc = $item->get_name();
+		}
 		$macros = is_array( $selection ) ? Calculator::macros_for_selection( (int) $item->get_product_id(), $selection ) : Calculator::EMPTY;
 		$addons = is_array( $selection ) && ! empty( $selection['addons'] ) ? array_filter( array_map( static fn( $a ) => (string) ( $a['label'] ?? '' ), (array) $selection['addons'] ) ) : [];
 		$ff     = $order->get_meta( '_fn_fulfilment' );
