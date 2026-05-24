@@ -158,6 +158,8 @@ final class LabelPrinter {
 		font-weight: bold;
 		margin-bottom: 1.5mm;
 		line-height: 1.2;
+		word-wrap: break-word;
+		overflow-wrap: break-word;
 	}
 	.lbl-name-id { margin-right: 2mm; }
 	.lbl-desc {
