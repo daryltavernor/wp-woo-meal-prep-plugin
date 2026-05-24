@@ -47,11 +47,14 @@ final class LabelPrinter {
 	 *                                      50-meal order doesn't print 50 test
 	 *                                      labels.
 	 */
-	public static function stream( array $order_ids, string $mode = self::MODE_FULL, int $limit_meals_per_order = 0 ): void {
+	public static function stream( array $order_ids, string $mode = self::MODE_FULL, int $limit_meals_per_order = 0, bool $is_test = false ): void {
 		if ( ! class_exists( \Dompdf\Dompdf::class ) ) {
 			wp_die( esc_html__( 'Dompdf is not installed. Run composer install in the plugin directory.', 'fastnutrition-mealprep' ) );
 		}
-		$html   = self::build_html( $order_ids, $mode, $limit_meals_per_order );
+		if ( ! defined( 'DONOTCACHEPAGE' ) ) {
+			define( 'DONOTCACHEPAGE', true );
+		}
+		$html   = self::build_html( $order_ids, $mode, $limit_meals_per_order, $is_test );
 		$dompdf = new \Dompdf\Dompdf(
 			[
 				'isRemoteEnabled'      => true,
@@ -85,15 +88,85 @@ final class LabelPrinter {
 		// cache and any "open recent PDF" reuse in the viewer.
 		$filename = $prefix . '-' . gmdate( 'Y-m-d-His' ) . '-' . wp_generate_password( 6, false ) . '.pdf';
 
+		// Test prints force a download so the mobile PDF viewer (notorious
+		// for caching by URL) can never serve a stale file — each download
+		// has a unique filename and the OS treats it as a new document.
+		$disposition = $is_test ? 'attachment' : 'inline';
+
 		nocache_headers();
 		header( 'Content-Type: application/pdf' );
 		header( 'Content-Length: ' . strlen( $pdf ) );
-		header( 'Content-Disposition: inline; filename="' . $filename . '"' );
+		header( 'Content-Disposition: ' . $disposition . '; filename="' . $filename . '"' );
 		echo $pdf;
 		exit;
 	}
 
-	private static function build_html( array $order_ids, string $mode = self::MODE_FULL, int $limit_meals_per_order = 0 ): string {
+	/**
+	 * Renders the label HTML directly to the browser (no PDF rasterisation).
+	 *
+	 * Use this for design iteration. Same CSS as the PDF, but the response
+	 * is normal HTML, so it bypasses every PDF viewer cache and lets you
+	 * inspect the layout in browser DevTools. Refresh the tab to see the
+	 * latest design after a code change.
+	 */
+	public static function stream_html( array $order_ids, string $mode = self::MODE_FULL, int $limit_meals_per_order = 0 ): void {
+		if ( ! defined( 'DONOTCACHEPAGE' ) ) {
+			define( 'DONOTCACHEPAGE', true );
+		}
+		$html = self::build_html( $order_ids, $mode, $limit_meals_per_order, true );
+
+		// Inject a screen-mode stylesheet so each .label looks like a real
+		// label card on a grey background. Print-mode CSS is untouched —
+		// the @page rules already in <style> handle the PDF case.
+		$screen_css = <<<'CSS'
+<style>
+@media screen {
+	html { background: #ddd; padding: 24px; margin: 0; font-family: -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif; }
+	body { background: transparent; margin: 0; padding: 0; }
+	.preview-banner {
+		max-width: 100mm;
+		margin: 0 auto 16px;
+		padding: 10px 14px;
+		background: #fff8e5;
+		border: 1px dashed #dba617;
+		color: #333;
+		font-size: 13px;
+		line-height: 1.45;
+	}
+	.preview-banner strong { color: #000; }
+	.preview-banner code { background: #fff; padding: 1px 5px; border-radius: 3px; font-size: 12px; }
+	.label {
+		background: #fff;
+		margin: 0 auto 16px;
+		box-shadow: 0 2px 12px rgba(0,0,0,0.25);
+		border: 1px dashed #999;
+	}
+}
+@media print {
+	.preview-banner { display: none; }
+}
+</style>
+CSS;
+
+		$banner_msg  = sprintf(
+			/* translators: 1: plugin version, 2: render timestamp */
+			esc_html__( 'Rendered from plugin %1$s at %2$s. Refresh this tab (⌘R / Ctrl+R) to re-render with the latest code.', 'fastnutrition-mealprep' ),
+			'<code>v' . esc_html( defined( 'FN_MEALPREP_VERSION' ) ? FN_MEALPREP_VERSION : '?' ) . '</code>',
+			'<code>' . esc_html( wp_date( 'H:i:s' ) ) . '</code>'
+		);
+		$banner = '<div class="preview-banner"><strong>' . esc_html__( 'Label preview', 'fastnutrition-mealprep' ) . '</strong> — ' . $banner_msg . '</div>';
+
+		$html = str_replace( '</head>', $screen_css . '</head>', $html );
+		$html = preg_replace( '/<body([^>]*)>/', '<body$1>' . $banner, $html, 1 );
+
+		nocache_headers();
+		header( 'Content-Type: text/html; charset=UTF-8' );
+		header( 'X-Robots-Tag: noindex' );
+		echo $html;
+		exit;
+	}
+
+	private static function build_html( array $order_ids, string $mode = self::MODE_FULL, int $limit_meals_per_order = 0, bool $is_test = false ): string {
 		$brand                  = SettingsPage::brand_info();
 		$brand['logo_data_uri'] = self::logo_data_uri( $brand );
 		ob_start();
@@ -291,6 +364,20 @@ final class LabelPrinter {
 	}
 	.lbl-foot-address { font-weight: bold; margin-bottom: 0.5mm; }
 	.lbl-foot-line { line-height: 1.3; }
+	/* Visible on test/preview renders only. Eats ~3mm of vertical space
+	   so summary content needs ~67mm instead of 70mm. */
+	.lbl-teststamp {
+		width: 90mm;
+		font-size: 6pt;
+		text-align: center;
+		color: #000;
+		background: #ffc;
+		padding: 0.4mm 0;
+		margin-bottom: 1mm;
+		border: 1px dashed #000;
+		box-sizing: border-box;
+		letter-spacing: 0.3mm;
+	}
 	.muted { color: #000; font-style: italic; }
 </style>
 </head>
@@ -303,7 +390,7 @@ final class LabelPrinter {
 				continue;
 			}
 			if ( self::MODE_MEAL !== $mode ) {
-				self::render_summary_label( $order, $brand );
+				self::render_summary_label( $order, $brand, $is_test );
 				$has_labels = true;
 			}
 			if ( self::MODE_SUMMARY === $mode ) {
@@ -313,7 +400,7 @@ final class LabelPrinter {
 			foreach ( $order->get_items() as $item ) {
 				$qty = (int) $item->get_quantity();
 				for ( $i = 1; $i <= $qty; $i++ ) {
-					self::render_meal_label( $order, $item, $i, $qty, $brand );
+					self::render_meal_label( $order, $item, $i, $qty, $brand, $is_test );
 					$has_labels = true;
 					$meals_rendered++;
 					if ( $limit_meals_per_order > 0 && $meals_rendered >= $limit_meals_per_order ) {
@@ -332,7 +419,7 @@ final class LabelPrinter {
 		return (string) ob_get_clean();
 	}
 
-	private static function render_summary_label( \WC_Order $order, array $brand ): void {
+	private static function render_summary_label( \WC_Order $order, array $brand, bool $is_test = false ): void {
 		$ff           = $order->get_meta( '_fn_fulfilment' );
 		$total_meals  = 0;
 		foreach ( $order->get_items() as $item ) {
@@ -345,6 +432,7 @@ final class LabelPrinter {
 		?>
 		<div class="label summary">
 			<div class="label-body">
+				<?php self::render_test_stamp( $is_test ); ?>
 				<?php self::render_head( $brand, null ); ?>
 				<div class="lbl-name">
 					<span class="lbl-name-id">#<?php echo (int) $order->get_id(); ?></span>
@@ -389,7 +477,7 @@ final class LabelPrinter {
 		<?php
 	}
 
-	private static function render_meal_label( \WC_Order $order, \WC_Order_Item_Product $item, int $idx, int $total, array $brand ): void {
+	private static function render_meal_label( \WC_Order $order, \WC_Order_Item_Product $item, int $idx, int $total, array $brand, bool $is_test = false ): void {
 		$selection = $item->get_meta( '_fn_selection', true );
 		if ( ! is_array( $selection ) ) {
 			// Fall back to the cart-attached selection key for older items.
@@ -405,6 +493,7 @@ final class LabelPrinter {
 		?>
 		<div class="label meal">
 			<div class="label-body">
+				<?php self::render_test_stamp( $is_test ); ?>
 				<?php self::render_head( $brand, $idx . '/' . $total ); ?>
 				<div class="lbl-name">
 					<span class="lbl-name-id">#<?php echo (int) $order->get_id(); ?></span>
@@ -428,6 +517,23 @@ final class LabelPrinter {
 				<div class="lbl-fulfilment"><?php echo esc_html( self::format_fulfilment( $ff ) ); ?></div>
 			</div>
 			<?php self::render_foot( $brand ); ?>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Tiny banner shown only on test prints / HTML previews. Carries the
+	 * plugin version + render timestamp so the user can verify with their
+	 * own eyes whether the response is fresh (vs. served from a cache).
+	 */
+	private static function render_test_stamp( bool $is_test ): void {
+		if ( ! $is_test ) {
+			return;
+		}
+		$version = defined( 'FN_MEALPREP_VERSION' ) ? FN_MEALPREP_VERSION : '?';
+		?>
+		<div class="lbl-teststamp">
+			TEST · v<?php echo esc_html( $version ); ?> · <?php echo esc_html( wp_date( 'H:i:s' ) ); ?>
 		</div>
 		<?php
 	}

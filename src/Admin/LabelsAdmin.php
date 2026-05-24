@@ -9,6 +9,7 @@ final class LabelsAdmin {
 
 	public function register(): void {
 		add_action( 'admin_init', [ $this, 'maybe_handle_pdf' ] );
+		add_action( 'admin_init', [ $this, 'maybe_handle_preview' ] );
 	}
 
 	public static function render_static(): void {
@@ -39,6 +40,43 @@ final class LabelsAdmin {
 		// stream() exits.
 	}
 
+	/**
+	 * Renders the label HTML directly to the browser (no PDF). Cache-busted
+	 * via the URL itself + nocache headers. Use this to iterate on label
+	 * design without fighting PDF viewer caches: change CSS, hit refresh,
+	 * see new design.
+	 *
+	 * URL: /wp-admin/admin.php?page=fn-print-labels&action=preview&order=X&mode=Y
+	 */
+	public function maybe_handle_preview(): void {
+		if ( ! isset( $_GET['page'], $_GET['action'] ) ) {
+			return;
+		}
+		if ( 'fn-print-labels' !== $_GET['page'] || 'preview' !== $_GET['action'] ) {
+			return;
+		}
+		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			return;
+		}
+		check_admin_referer( 'fn_preview_labels' );
+
+		$order_id = isset( $_GET['order'] ) ? (int) $_GET['order'] : 0;
+		$mode_in  = isset( $_GET['mode'] ) ? sanitize_key( (string) $_GET['mode'] ) : 'full';
+		$mode_map = [
+			'full'    => LabelPrinter::MODE_FULL,
+			'summary' => LabelPrinter::MODE_SUMMARY,
+			'meal'    => LabelPrinter::MODE_MEAL,
+		];
+		$mode = $mode_map[ $mode_in ] ?? LabelPrinter::MODE_FULL;
+
+		if ( ! $order_id || ! wc_get_order( $order_id ) ) {
+			wp_die( esc_html__( 'No such order.', 'fastnutrition-mealprep' ) );
+		}
+
+		LabelPrinter::stream_html( [ $order_id ], $mode, 1 );
+		// stream_html() exits.
+	}
+
 	public function render(): void {
 		if ( ! current_user_can( 'manage_woocommerce' ) ) {
 			wp_die( esc_html__( 'You do not have permission to access this page.', 'fastnutrition-mealprep' ) );
@@ -63,11 +101,41 @@ final class LabelsAdmin {
 
 		echo '<div style="background:#f0f6fc;border-left:4px solid #2271b1;padding:10px 14px;margin:14px 0;max-width:900px">';
 		echo '<p style="margin:0 0 6px"><strong>' . esc_html__( 'What this page does', 'fastnutrition-mealprep' ) . '</strong><br>';
-		echo esc_html__( 'Generates a PDF of 4×4 inch thermal labels for every order whose fulfilment date (delivery or collection) falls inside the selected window. Each order produces one summary label (customer, address, contact, total meal count, slot) plus one label per individual meal (description, macros, add-ons, slot).', 'fastnutrition-mealprep' );
+		echo esc_html__( 'Generates a PDF of 100×100 mm thermal labels for every order whose fulfilment date (delivery or collection) falls inside the selected window. Each order produces one summary label (customer, address, contact, total meal count, slot) plus one label per individual meal (description, macros, add-ons, slot).', 'fastnutrition-mealprep' );
 		echo '</p>';
 		echo '<p style="margin:0"><strong>' . esc_html__( 'Branding', 'fastnutrition-mealprep' ) . '</strong> — ';
 		echo esc_html__( 'Logo, phone, email, web and return address come from Meal Prep → Settings → Branding.', 'fastnutrition-mealprep' );
 		echo '</p></div>';
+
+		// Test preview form — opens a live HTML render in a new tab so the
+		// user can iterate on label design without fighting PDF caches.
+		$preview_order = isset( $_GET['preview_order'] ) ? (int) $_GET['preview_order'] : 0;
+		$preview_mode  = isset( $_GET['preview_mode'] ) ? sanitize_key( (string) $_GET['preview_mode'] ) : 'full';
+		echo '<div style="background:#fff8e5;border-left:4px solid #dba617;padding:10px 14px;margin:14px 0;max-width:900px">';
+		echo '<p style="margin:0 0 8px"><strong>' . esc_html__( 'Test preview (no cache)', 'fastnutrition-mealprep' ) . '</strong> — ';
+		echo esc_html__( 'Renders one order as live HTML in a new tab. Hit refresh in that tab to see the latest design after a code change — no PDF cache to fight.', 'fastnutrition-mealprep' );
+		echo '</p>';
+		echo '<form method="get" target="_blank" action="' . esc_url( admin_url( 'admin.php' ) ) . '" style="display:flex;gap:8px;align-items:end;flex-wrap:wrap">';
+		echo '<input type="hidden" name="page" value="fn-print-labels" />';
+		echo '<input type="hidden" name="action" value="preview" />';
+		wp_nonce_field( 'fn_preview_labels' );
+		printf(
+			'<label>%s<br><input type="number" name="order" value="%s" min="1" required style="width:120px" /></label>',
+			esc_html__( 'Order #', 'fastnutrition-mealprep' ),
+			esc_attr( (string) ( $preview_order ?: '' ) )
+		);
+		echo '<label>' . esc_html__( 'Show', 'fastnutrition-mealprep' ) . '<br><select name="mode">';
+		foreach ( [
+			'full'    => __( 'Summary + 1 meal label', 'fastnutrition-mealprep' ),
+			'summary' => __( 'Summary only', 'fastnutrition-mealprep' ),
+			'meal'    => __( '1 meal label only', 'fastnutrition-mealprep' ),
+		] as $val => $label ) {
+			printf( '<option value="%s" %s>%s</option>', esc_attr( $val ), selected( $preview_mode, $val, false ), esc_html( $label ) );
+		}
+		echo '</select></label>';
+		echo '<button type="submit" class="button button-secondary">' . esc_html__( 'Open preview ↗', 'fastnutrition-mealprep' ) . '</button>';
+		echo '</form>';
+		echo '</div>';
 
 		echo '<form method="get" style="margin:1em 0;">';
 		echo '<input type="hidden" name="page" value="fn-print-labels" />';

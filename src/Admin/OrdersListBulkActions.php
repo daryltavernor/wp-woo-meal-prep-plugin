@@ -90,7 +90,7 @@ final class OrdersListBulkActions {
 		// Test prints cap meals at 1 per order; real prints render every meal.
 		$meal_limit = $is_test ? 1 : 0;
 
-		LabelPrinter::stream( $order_ids, $mode, $meal_limit );
+		LabelPrinter::stream( $order_ids, $mode, $meal_limit, $is_test );
 		// stream() exits.
 		return $redirect_to;
 	}
