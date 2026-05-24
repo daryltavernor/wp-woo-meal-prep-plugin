@@ -120,94 +120,134 @@ final class LabelPrinter {
 	   the first. No trailing break, no blank pages between labels.
 	   Bottom padding reserves ~22 mm for the brand foot (address +
 	   3 lines of contact). */
+	/* Layout uses position-based content boxes with EXPLICIT widths
+	   in mm — NOT padding + box-sizing arithmetic. Dompdf was not
+	   constraining children to the padding-edge of .label, so meal
+	   descriptions rendered past the 95mm right edge and the summary
+	   content overflowed onto a second page. Explicit widths give
+	   Dompdf nothing to get wrong. */
 	.label {
 		width: 100mm;
 		height: 100mm;
-		box-sizing: border-box;
-		padding: 5mm 5mm 27mm 5mm;
 		position: relative;
 		overflow: hidden;
 	}
 	.label + .label { page-break-before: always; }
+	/* 90 x 70 mm body box, leaving 25 mm at the bottom for the foot. */
+	.label-body {
+		position: absolute;
+		top: 5mm;
+		left: 5mm;
+		width: 90mm;
+		height: 70mm;
+		overflow: hidden;
+	}
 	/* Head holds the logo on the left. The counter ("1/10") sits on the
 	   right for meal labels and is empty on the summary. Order # has
 	   moved out of the head — it now sits inline with the customer
 	   name to save horizontal space. */
 	.lbl-head {
-		width: 100%;
+		width: 90mm;
 		border-collapse: collapse;
 		border-bottom: 1px solid #000;
-		margin: 0 0 2mm;
+		margin: 0 0 1.5mm;
 	}
 	.lbl-head td {
-		padding: 0 0 2mm;
+		padding: 0 0 1.5mm;
 		vertical-align: middle;
 	}
 	.lbl-head-logo img {
-		max-width: 55mm;
-		max-height: 14mm;
+		max-width: 60mm;
+		max-height: 12mm;
 	}
 	.lbl-head-counter {
 		text-align: right;
 		font-size: 10pt;
 		font-weight: bold;
-		width: 22mm;
+		width: 20mm;
 	}
 	.lbl-name {
-		font-size: 12pt;
+		width: 90mm;
+		font-size: 11pt;
 		font-weight: bold;
-		margin-bottom: 1.5mm;
+		margin-bottom: 1mm;
 		line-height: 1.2;
 		word-wrap: break-word;
 		overflow-wrap: break-word;
 	}
 	.lbl-name-id { margin-right: 2mm; }
 	.lbl-desc {
-		font-size: 12pt;
+		width: 90mm;
+		font-size: 11pt;
 		font-weight: bold;
 		line-height: 1.2;
-		margin-bottom: 1.5mm;
+		margin-bottom: 1mm;
 		word-wrap: break-word;
 		overflow-wrap: break-word;
 	}
-	.lbl-addons { font-size: 8pt; font-style: italic; color: #000; margin-bottom: 2mm; }
+	.lbl-addons {
+		width: 90mm;
+		font-size: 8pt;
+		font-style: italic;
+		color: #000;
+		margin-bottom: 1mm;
+		word-wrap: break-word;
+	}
 	.lbl-macros {
+		width: 90mm;
 		font-size: 9pt;
 		border: 1px solid #000;
-		padding: 1.5mm 2mm;
-		margin-bottom: 2mm;
+		padding: 1mm 1.5mm;
+		margin-bottom: 1mm;
+		box-sizing: border-box;
 	}
 	.lbl-macros span { display: inline-block; margin-right: 2.5mm; }
 	.lbl-macros strong { font-weight: bold; }
-	.lbl-address { font-size: 9pt; line-height: 1.35; margin-bottom: 2mm; }
-	.lbl-customer-contact { font-size: 8pt; color: #000; margin-bottom: 2mm; }
+	.lbl-address {
+		width: 90mm;
+		font-size: 9pt;
+		line-height: 1.3;
+		margin-bottom: 1mm;
+		word-wrap: break-word;
+	}
+	.lbl-customer-contact {
+		width: 90mm;
+		font-size: 8pt;
+		color: #000;
+		margin-bottom: 1mm;
+		word-wrap: break-word;
+	}
 	.lbl-count {
+		width: 90mm;
 		text-align: center;
-		font-size: 22pt;
+		font-size: 16pt;
 		font-weight: bold;
 		letter-spacing: 0.5mm;
-		padding: 2mm 0;
-		margin: 1mm 0 2mm;
+		padding: 1mm 0;
+		margin: 0 0 1mm;
 		border-top: 1px solid #000;
 		border-bottom: 1px solid #000;
+		box-sizing: border-box;
 	}
 	.lbl-fulfilment {
+		width: 90mm;
 		font-size: 9pt;
 		font-weight: bold;
 		text-transform: uppercase;
 		letter-spacing: 0.2mm;
-		margin-bottom: 2mm;
+		margin-bottom: 0;
 	}
 	/* Payment status — asymmetric on purpose.
 	   PAID = quiet thin-ruled line. UNPAID = full-width inverted bar
 	   so a packer can never miss an unpaid order. */
 	.lbl-payment {
+		width: 90mm;
 		text-align: center;
-		margin-bottom: 2mm;
+		margin-bottom: 1mm;
 	}
 	.lbl-payment--paid {
 		font-size: 9pt;
-		padding: 1mm 0;
+		padding: 0.5mm 0;
 		border-top: 1px solid #000;
 		border-bottom: 1px solid #000;
 	}
@@ -221,33 +261,36 @@ final class LabelPrinter {
 	.lbl-payment--unpaid {
 		background: #000;
 		color: #fff;
-		padding: 1.5mm 0;
+		padding: 1mm 0;
 	}
 	.lbl-payment--unpaid .lbl-payment-badge {
 		display: block;
-		font-size: 14pt;
+		font-size: 12pt;
 		font-weight: bold;
 		letter-spacing: 1mm;
 	}
 	.lbl-payment--unpaid .lbl-payment-method {
 		display: block;
-		font-size: 8pt;
-		margin-top: 0.5mm;
+		font-size: 7pt;
+		margin-top: 0.3mm;
 	}
+	/* Foot is anchored to the bottom 5 mm with EXPLICIT 90 mm width, so it
+	   shares the same horizontal box as the body and cannot drift past the
+	   page edge or get stranded on a different page. */
 	.lbl-foot {
 		position: absolute;
 		bottom: 5mm;
 		left: 5mm;
-		right: 5mm;
+		width: 90mm;
 		font-size: 8pt;
-		line-height: 1.35;
+		line-height: 1.3;
 		color: #000;
 		border-top: 1px solid #000;
-		padding-top: 1.5mm;
+		padding-top: 1mm;
 		text-align: center;
 	}
-	.lbl-foot-address { font-weight: bold; margin-bottom: 0.8mm; }
-	.lbl-foot-line { line-height: 1.35; }
+	.lbl-foot-address { font-weight: bold; margin-bottom: 0.5mm; }
+	.lbl-foot-line { line-height: 1.3; }
 	.muted { color: #000; font-style: italic; }
 </style>
 </head>
@@ -301,44 +344,46 @@ final class LabelPrinter {
 		$is_collection = is_array( $ff ) && 'collection' === ( $ff['type'] ?? '' );
 		?>
 		<div class="label summary">
-			<?php self::render_head( $brand, null ); ?>
-			<div class="lbl-name">
-				<span class="lbl-name-id">#<?php echo (int) $order->get_id(); ?></span>
-				<?php echo esc_html( $order->get_formatted_billing_full_name() ); ?>
-			</div>
-			<div class="lbl-address"><?php echo $is_collection ? '<em class="muted">' . esc_html__( 'Collection — no delivery address', 'fastnutrition-mealprep' ) . '</em>' : wp_kses_post( $address ); ?></div>
-			<div class="lbl-customer-contact">
-				<?php if ( $order->get_billing_phone() ) : ?>
-					<strong><?php esc_html_e( 'Tel:', 'fastnutrition-mealprep' ); ?></strong> <?php echo esc_html( $order->get_billing_phone() ); ?>
-				<?php endif; ?>
-				<?php if ( $order->get_billing_email() ) : ?>
-					<?php if ( $order->get_billing_phone() ) : ?> &nbsp; <?php endif; ?>
-					<strong><?php esc_html_e( 'Email:', 'fastnutrition-mealprep' ); ?></strong> <?php echo esc_html( $order->get_billing_email() ); ?>
-				<?php endif; ?>
-			</div>
-			<?php
-			$payment_status = self::payment_status( $order );
-			$is_paid        = 'paid' === $payment_status['state'];
-			$payment_title  = $payment_status['title'];
-			?>
-			<div class="lbl-payment lbl-payment--<?php echo $is_paid ? 'paid' : 'unpaid'; ?>">
-				<span class="lbl-payment-badge"><?php echo $is_paid ? esc_html__( 'PAID', 'fastnutrition-mealprep' ) : esc_html__( 'UNPAID', 'fastnutrition-mealprep' ); ?></span>
-				<?php if ( '' !== $payment_title ) : ?>
-					<span class="lbl-payment-method">
-						<?php
-						/* translators: %s: human-readable payment method name (e.g. "Credit Card (Stripe)") */
-						printf( esc_html__( 'via %s', 'fastnutrition-mealprep' ), esc_html( $payment_title ) );
-						?>
-					</span>
-				<?php endif; ?>
-			</div>
-			<div class="lbl-count">
+			<div class="label-body">
+				<?php self::render_head( $brand, null ); ?>
+				<div class="lbl-name">
+					<span class="lbl-name-id">#<?php echo (int) $order->get_id(); ?></span>
+					<?php echo esc_html( $order->get_formatted_billing_full_name() ); ?>
+				</div>
+				<div class="lbl-address"><?php echo $is_collection ? '<em class="muted">' . esc_html__( 'Collection — no delivery address', 'fastnutrition-mealprep' ) . '</em>' : wp_kses_post( $address ); ?></div>
+				<div class="lbl-customer-contact">
+					<?php if ( $order->get_billing_phone() ) : ?>
+						<strong><?php esc_html_e( 'Tel:', 'fastnutrition-mealprep' ); ?></strong> <?php echo esc_html( $order->get_billing_phone() ); ?>
+					<?php endif; ?>
+					<?php if ( $order->get_billing_email() ) : ?>
+						<?php if ( $order->get_billing_phone() ) : ?> &nbsp; <?php endif; ?>
+						<strong><?php esc_html_e( 'Email:', 'fastnutrition-mealprep' ); ?></strong> <?php echo esc_html( $order->get_billing_email() ); ?>
+					<?php endif; ?>
+				</div>
 				<?php
-				/* translators: %d: total meal count */
-				printf( esc_html( _n( '%d MEAL', '%d MEALS', $total_meals, 'fastnutrition-mealprep' ) ), (int) $total_meals );
+				$payment_status = self::payment_status( $order );
+				$is_paid        = 'paid' === $payment_status['state'];
+				$payment_title  = $payment_status['title'];
 				?>
+				<div class="lbl-payment lbl-payment--<?php echo $is_paid ? 'paid' : 'unpaid'; ?>">
+					<span class="lbl-payment-badge"><?php echo $is_paid ? esc_html__( 'PAID', 'fastnutrition-mealprep' ) : esc_html__( 'UNPAID', 'fastnutrition-mealprep' ); ?></span>
+					<?php if ( '' !== $payment_title ) : ?>
+						<span class="lbl-payment-method">
+							<?php
+							/* translators: %s: human-readable payment method name (e.g. "Credit Card (Stripe)") */
+							printf( esc_html__( 'via %s', 'fastnutrition-mealprep' ), esc_html( $payment_title ) );
+							?>
+						</span>
+					<?php endif; ?>
+				</div>
+				<div class="lbl-count">
+					<?php
+					/* translators: %d: total meal count */
+					printf( esc_html( _n( '%d MEAL', '%d MEALS', $total_meals, 'fastnutrition-mealprep' ) ), (int) $total_meals );
+					?>
+				</div>
+				<div class="lbl-fulfilment"><?php echo esc_html( self::format_fulfilment( $ff ) ); ?></div>
 			</div>
-			<div class="lbl-fulfilment"><?php echo esc_html( self::format_fulfilment( $ff ) ); ?></div>
 			<?php self::render_foot( $brand ); ?>
 		</div>
 		<?php
@@ -359,27 +404,29 @@ final class LabelPrinter {
 		$ff     = $order->get_meta( '_fn_fulfilment' );
 		?>
 		<div class="label meal">
-			<?php self::render_head( $brand, $idx . '/' . $total ); ?>
-			<div class="lbl-name">
-				<span class="lbl-name-id">#<?php echo (int) $order->get_id(); ?></span>
-				<?php echo esc_html( $order->get_formatted_billing_full_name() ); ?>
-			</div>
-			<div class="lbl-desc"><?php echo esc_html( $desc ); ?></div>
-			<?php if ( ! empty( $addons ) ) : ?>
-				<div class="lbl-addons">+ <?php echo esc_html( implode( ', ', $addons ) ); ?></div>
-			<?php endif; ?>
-			<div class="lbl-macros">
-				<span><strong>K</strong> <?php echo (int) round( (float) $macros['kcal'] ); ?></span>
-				<span><strong>P</strong> <?php echo (int) round( (float) $macros['protein_g'] ); ?>g</span>
-				<span><strong>C</strong> <?php echo (int) round( (float) $macros['carbs_g'] ); ?>g</span>
-				<span><strong>F</strong> <?php echo (int) round( (float) $macros['fat_g'] ); ?>g</span>
-			</div>
-			<?php if ( $order->get_billing_phone() ) : ?>
-				<div class="lbl-customer-contact">
-					<strong><?php esc_html_e( 'Tel:', 'fastnutrition-mealprep' ); ?></strong> <?php echo esc_html( $order->get_billing_phone() ); ?>
+			<div class="label-body">
+				<?php self::render_head( $brand, $idx . '/' . $total ); ?>
+				<div class="lbl-name">
+					<span class="lbl-name-id">#<?php echo (int) $order->get_id(); ?></span>
+					<?php echo esc_html( $order->get_formatted_billing_full_name() ); ?>
 				</div>
-			<?php endif; ?>
-			<div class="lbl-fulfilment"><?php echo esc_html( self::format_fulfilment( $ff ) ); ?></div>
+				<div class="lbl-desc"><?php echo esc_html( $desc ); ?></div>
+				<?php if ( ! empty( $addons ) ) : ?>
+					<div class="lbl-addons">+ <?php echo esc_html( implode( ', ', $addons ) ); ?></div>
+				<?php endif; ?>
+				<div class="lbl-macros">
+					<span><strong>K</strong> <?php echo (int) round( (float) $macros['kcal'] ); ?></span>
+					<span><strong>P</strong> <?php echo (int) round( (float) $macros['protein_g'] ); ?>g</span>
+					<span><strong>C</strong> <?php echo (int) round( (float) $macros['carbs_g'] ); ?>g</span>
+					<span><strong>F</strong> <?php echo (int) round( (float) $macros['fat_g'] ); ?>g</span>
+				</div>
+				<?php if ( $order->get_billing_phone() ) : ?>
+					<div class="lbl-customer-contact">
+						<strong><?php esc_html_e( 'Tel:', 'fastnutrition-mealprep' ); ?></strong> <?php echo esc_html( $order->get_billing_phone() ); ?>
+					</div>
+				<?php endif; ?>
+				<div class="lbl-fulfilment"><?php echo esc_html( self::format_fulfilment( $ff ) ); ?></div>
+			</div>
 			<?php self::render_foot( $brand ); ?>
 		</div>
 		<?php
