@@ -23,6 +23,8 @@ final class LabelPrinter {
 
 	public const MODE_FULL    = 'full';
 	public const MODE_SUMMARY = 'summary';
+	/** Meal labels only — skips the summary page. Useful for testing the meal design in isolation. */
+	public const MODE_MEAL    = 'meal';
 
 	/** Physical label stock — 100 mm square direct-thermal. */
 	private const LABEL_SIDE_MM = 100.0;
@@ -33,14 +35,23 @@ final class LabelPrinter {
 	/**
 	 * Stream a labels PDF to the browser and exit.
 	 *
-	 * @param int[]  $order_ids Order IDs to render.
-	 * @param string $mode      MODE_FULL (one summary + one per meal) or MODE_SUMMARY (summary only).
+	 * Always sends no-cache headers so the browser never re-displays a stale
+	 * PDF from a previous click — when iterating on label design the URL is
+	 * often identical and would otherwise hit the disk cache.
+	 *
+	 * @param int[]  $order_ids             Order IDs to render.
+	 * @param string $mode                  MODE_FULL | MODE_SUMMARY | MODE_MEAL.
+	 * @param int    $limit_meals_per_order If > 0, render at most this many
+	 *                                      meal labels per order. Used by the
+	 *                                      "test print" bulk actions so a
+	 *                                      50-meal order doesn't print 50 test
+	 *                                      labels.
 	 */
-	public static function stream( array $order_ids, string $mode = self::MODE_FULL ): void {
+	public static function stream( array $order_ids, string $mode = self::MODE_FULL, int $limit_meals_per_order = 0 ): void {
 		if ( ! class_exists( \Dompdf\Dompdf::class ) ) {
 			wp_die( esc_html__( 'Dompdf is not installed. Run composer install in the plugin directory.', 'fastnutrition-mealprep' ) );
 		}
-		$html   = self::build_html( $order_ids, $mode );
+		$html   = self::build_html( $order_ids, $mode, $limit_meals_per_order );
 		$dompdf = new \Dompdf\Dompdf(
 			[
 				'isRemoteEnabled'      => true,
@@ -63,13 +74,26 @@ final class LabelPrinter {
 		$side_pt = self::LABEL_SIDE_MM * 72 / 25.4;
 		$dompdf->setPaper( [ 0, 0, $side_pt, $side_pt ], 'portrait' );
 		$dompdf->render();
-		$prefix   = self::MODE_SUMMARY === $mode ? 'summary-labels' : 'labels';
-		$filename = $prefix . '-' . gmdate( 'Y-m-d-His' ) . '.pdf';
-		$dompdf->stream( $filename, [ 'Attachment' => false ] );
+
+		$pdf      = (string) $dompdf->output();
+		$prefix   = match ( $mode ) {
+			self::MODE_SUMMARY => 'summary-labels',
+			self::MODE_MEAL    => 'meal-labels',
+			default            => 'labels',
+		};
+		// Unique filename + nocache_headers() together defeat both the URL
+		// cache and any "open recent PDF" reuse in the viewer.
+		$filename = $prefix . '-' . gmdate( 'Y-m-d-His' ) . '-' . wp_generate_password( 6, false ) . '.pdf';
+
+		nocache_headers();
+		header( 'Content-Type: application/pdf' );
+		header( 'Content-Length: ' . strlen( $pdf ) );
+		header( 'Content-Disposition: inline; filename="' . $filename . '"' );
+		echo $pdf;
 		exit;
 	}
 
-	private static function build_html( array $order_ids, string $mode = self::MODE_FULL ): string {
+	private static function build_html( array $order_ids, string $mode = self::MODE_FULL, int $limit_meals_per_order = 0 ): string {
 		$brand                  = SettingsPage::brand_info();
 		$brand['logo_data_uri'] = self::logo_data_uri( $brand );
 		ob_start();
@@ -233,15 +257,23 @@ final class LabelPrinter {
 			if ( ! $order ) {
 				continue;
 			}
-			self::render_summary_label( $order, $brand );
-			$has_labels = true;
+			if ( self::MODE_MEAL !== $mode ) {
+				self::render_summary_label( $order, $brand );
+				$has_labels = true;
+			}
 			if ( self::MODE_SUMMARY === $mode ) {
 				continue;
 			}
+			$meals_rendered = 0;
 			foreach ( $order->get_items() as $item ) {
 				$qty = (int) $item->get_quantity();
 				for ( $i = 1; $i <= $qty; $i++ ) {
 					self::render_meal_label( $order, $item, $i, $qty, $brand );
+					$has_labels = true;
+					$meals_rendered++;
+					if ( $limit_meals_per_order > 0 && $meals_rendered >= $limit_meals_per_order ) {
+						break 2;
+					}
 				}
 			}
 		}
