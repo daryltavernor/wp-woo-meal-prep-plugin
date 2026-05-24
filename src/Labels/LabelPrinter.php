@@ -397,14 +397,21 @@ CSS;
 			if ( self::MODE_SUMMARY === $mode ) {
 				continue;
 			}
-			$meals_rendered = 0;
+			// Counter shows position across ALL meals in the order
+			// ("3/15"), not the position within a single product line.
+			// Calculate total first, then increment a running counter.
+			$total_meals = 0;
+			foreach ( $order->get_items() as $item ) {
+				$total_meals += (int) $item->get_quantity();
+			}
+			$meal_num = 0;
 			foreach ( $order->get_items() as $item ) {
 				$qty = (int) $item->get_quantity();
 				for ( $i = 1; $i <= $qty; $i++ ) {
-					self::render_meal_label( $order, $item, $i, $qty, $brand, $is_test );
+					$meal_num++;
+					self::render_meal_label( $order, $item, $meal_num, $total_meals, $brand, $is_test );
 					$has_labels = true;
-					$meals_rendered++;
-					if ( $limit_meals_per_order > 0 && $meals_rendered >= $limit_meals_per_order ) {
+					if ( $limit_meals_per_order > 0 && $meal_num >= $limit_meals_per_order ) {
 						break 2;
 					}
 				}
