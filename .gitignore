@@ -5,3 +5,7 @@ node_modules/
 .vscode/
 .phpunit.result.cache
 .phpunit.cache/
+
+# Dompdf generates these font-metric caches on first PDF render; they
+# differ across PHP / Dompdf versions and shouldn't be tracked.
+vendor/dompdf/dompdf/lib/fonts/*.ufm.json
