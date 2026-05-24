@@ -9,6 +9,7 @@ use FastNutrition\MealPrep\Admin\BundleAdmin;
 use FastNutrition\MealPrep\Admin\ConflictsNotice;
 use FastNutrition\MealPrep\Admin\LabelsAdmin;
 use FastNutrition\MealPrep\Admin\MenuRegistry;
+use FastNutrition\MealPrep\Admin\OrdersListBulkActions;
 use FastNutrition\MealPrep\Admin\PrepDashboard;
 use FastNutrition\MealPrep\Admin\PrepSheet;
 use FastNutrition\MealPrep\Admin\ProfileAdmin;
@@ -87,6 +88,7 @@ final class Plugin {
 		( new BundleAdmin() )->register();
 		( new ConflictsNotice() )->register();
 		( new LabelsAdmin() )->register();
+		( new OrdersListBulkActions() )->register();
 
 		( new Favourites() )->register();
 		( new RestController() )->register();

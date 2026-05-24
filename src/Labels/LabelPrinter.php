@@ -21,11 +21,20 @@ use FastNutrition\MealPrep\Macros\Calculator;
  */
 final class LabelPrinter {
 
-	public static function stream( array $order_ids ): void {
+	public const MODE_FULL    = 'full';
+	public const MODE_SUMMARY = 'summary';
+
+	/**
+	 * Stream a labels PDF to the browser and exit.
+	 *
+	 * @param int[]  $order_ids Order IDs to render.
+	 * @param string $mode      MODE_FULL (one summary + one per meal) or MODE_SUMMARY (summary only).
+	 */
+	public static function stream( array $order_ids, string $mode = self::MODE_FULL ): void {
 		if ( ! class_exists( \Dompdf\Dompdf::class ) ) {
 			wp_die( esc_html__( 'Dompdf is not installed. Run composer install in the plugin directory.', 'fastnutrition-mealprep' ) );
 		}
-		$html   = self::build_html( $order_ids );
+		$html   = self::build_html( $order_ids, $mode );
 		$dompdf = new \Dompdf\Dompdf(
 			[
 				'isRemoteEnabled'      => true,
@@ -38,12 +47,13 @@ final class LabelPrinter {
 		// 4 in x 4 in = 288 pt x 288 pt (1 in = 72 pt).
 		$dompdf->setPaper( [ 0, 0, 288, 288 ], 'portrait' );
 		$dompdf->render();
-		$filename = 'labels-' . gmdate( 'Y-m-d-His' ) . '.pdf';
+		$prefix   = self::MODE_SUMMARY === $mode ? 'summary-labels' : 'labels';
+		$filename = $prefix . '-' . gmdate( 'Y-m-d-His' ) . '.pdf';
 		$dompdf->stream( $filename, [ 'Attachment' => false ] );
 		exit;
 	}
 
-	private static function build_html( array $order_ids ): string {
+	private static function build_html( array $order_ids, string $mode = self::MODE_FULL ): string {
 		$brand = SettingsPage::brand_info();
 		ob_start();
 		?>
@@ -120,6 +130,26 @@ final class LabelPrinter {
 		letter-spacing: 0.2mm;
 		margin-bottom: 2mm;
 	}
+	.lbl-payment {
+		text-align: center;
+		margin-bottom: 2mm;
+	}
+	.lbl-payment-badge {
+		display: inline-block;
+		padding: 0.6mm 4mm;
+		font-size: 10pt;
+		font-weight: bold;
+		letter-spacing: 0.6mm;
+		border-radius: 1.5mm;
+		color: #fff;
+	}
+	.lbl-payment--paid   .lbl-payment-badge { background: #1b7a3a; }
+	.lbl-payment--unpaid .lbl-payment-badge { background: #b32a2a; }
+	.lbl-payment-method {
+		font-size: 8pt;
+		color: #333;
+		margin-top: 1mm;
+	}
 	.lbl-foot {
 		position: absolute;
 		bottom: 4mm;
@@ -145,6 +175,9 @@ final class LabelPrinter {
 			}
 			self::render_summary_label( $order, $brand );
 			$has_labels = true;
+			if ( self::MODE_SUMMARY === $mode ) {
+				continue;
+			}
 			foreach ( $order->get_items() as $item ) {
 				$qty = (int) $item->get_quantity();
 				for ( $i = 1; $i <= $qty; $i++ ) {
@@ -184,6 +217,21 @@ final class LabelPrinter {
 				<?php if ( $order->get_billing_email() ) : ?>
 					<?php if ( $order->get_billing_phone() ) : ?> &nbsp; <?php endif; ?>
 					<strong><?php esc_html_e( 'Email:', 'fastnutrition-mealprep' ); ?></strong> <?php echo esc_html( $order->get_billing_email() ); ?>
+				<?php endif; ?>
+			</div>
+			<?php
+			$is_paid       = $order->is_paid();
+			$payment_title = trim( (string) $order->get_payment_method_title() );
+			?>
+			<div class="lbl-payment lbl-payment--<?php echo $is_paid ? 'paid' : 'unpaid'; ?>">
+				<div class="lbl-payment-badge"><?php echo $is_paid ? esc_html__( 'PAID', 'fastnutrition-mealprep' ) : esc_html__( 'UNPAID', 'fastnutrition-mealprep' ); ?></div>
+				<?php if ( '' !== $payment_title ) : ?>
+					<div class="lbl-payment-method">
+						<?php
+						/* translators: %s: human-readable payment method name (e.g. "Credit Card (Stripe)") */
+						printf( esc_html__( 'via %s', 'fastnutrition-mealprep' ), esc_html( $payment_title ) );
+						?>
+					</div>
 				<?php endif; ?>
 			</div>
 			<div class="lbl-count">
