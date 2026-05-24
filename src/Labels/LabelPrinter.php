@@ -63,6 +63,13 @@ final class LabelPrinter {
 <meta charset="utf-8">
 <title>Labels</title>
 <style>
+	/* Thermal-printer design notes:
+	   - Monochrome only (no greys). Every colour is #000 on #fff or inverted.
+	     Mid-tone greys dither badly on direct-thermal heads.
+	   - 5mm safety margin on all sides — exceeds the 3mm bleed required by the
+	     rounded-corner cut so no content lands in the trimmed zone.
+	   - Inverted blocks (white text on solid black) are drawn as solid ink and
+	     print cleanly. Used sparingly for triage cues (UNPAID, meal count). */
 	@page { size: 4in 4in; margin: 0; }
 	html, body { margin: 0; padding: 0; }
 	body { font-family: DejaVu Sans, sans-serif; color: #000; }
@@ -70,7 +77,7 @@ final class LabelPrinter {
 		width: 4in;
 		height: 4in;
 		box-sizing: border-box;
-		padding: 4mm;
+		padding: 5mm;
 		page-break-after: always;
 		position: relative;
 		overflow: hidden;
@@ -97,22 +104,21 @@ final class LabelPrinter {
 		display: block;
 		font-size: 7pt;
 		font-weight: normal;
-		color: #555;
+		color: #000;
 	}
 	.lbl-name { font-size: 11pt; font-weight: bold; margin-bottom: 1mm; }
 	.lbl-desc { font-size: 12pt; font-weight: bold; line-height: 1.2; margin-bottom: 1.5mm; }
-	.lbl-addons { font-size: 8pt; font-style: italic; color: #333; margin-bottom: 2mm; }
+	.lbl-addons { font-size: 8pt; font-style: italic; color: #000; margin-bottom: 2mm; }
 	.lbl-macros {
 		font-size: 9pt;
-		background: #f0f0f0;
+		border: 1px solid #000;
 		padding: 1.5mm 2mm;
-		border-radius: 1.5mm;
 		margin-bottom: 2mm;
 	}
 	.lbl-macros span { display: inline-block; margin-right: 2.5mm; }
 	.lbl-macros strong { font-weight: bold; }
 	.lbl-address { font-size: 9pt; line-height: 1.35; margin-bottom: 2mm; }
-	.lbl-customer-contact { font-size: 8pt; color: #333; margin-bottom: 2mm; }
+	.lbl-customer-contact { font-size: 8pt; color: #000; margin-bottom: 2mm; }
 	.lbl-count {
 		text-align: center;
 		font-size: 22pt;
@@ -130,39 +136,55 @@ final class LabelPrinter {
 		letter-spacing: 0.2mm;
 		margin-bottom: 2mm;
 	}
+	/* Payment status — asymmetric on purpose.
+	   PAID = quiet thin-ruled line. UNPAID = full-width inverted bar
+	   so a packer can never miss an unpaid order. */
 	.lbl-payment {
 		text-align: center;
 		margin-bottom: 2mm;
 	}
-	.lbl-payment-badge {
-		display: inline-block;
-		padding: 0.6mm 4mm;
-		font-size: 10pt;
-		font-weight: bold;
-		letter-spacing: 0.6mm;
-		border-radius: 1.5mm;
-		color: #fff;
+	.lbl-payment--paid {
+		font-size: 9pt;
+		padding: 1mm 0;
+		border-top: 1px solid #000;
+		border-bottom: 1px solid #000;
 	}
-	.lbl-payment--paid   .lbl-payment-badge { background: #1b7a3a; }
-	.lbl-payment--unpaid .lbl-payment-badge { background: #b32a2a; }
-	.lbl-payment-method {
+	.lbl-payment--paid .lbl-payment-badge {
+		font-weight: bold;
+		letter-spacing: 0.5mm;
+	}
+	.lbl-payment--paid .lbl-payment-method {
+		margin-left: 2mm;
+	}
+	.lbl-payment--unpaid {
+		background: #000;
+		color: #fff;
+		padding: 1.5mm 0;
+	}
+	.lbl-payment--unpaid .lbl-payment-badge {
+		display: block;
+		font-size: 14pt;
+		font-weight: bold;
+		letter-spacing: 1mm;
+	}
+	.lbl-payment--unpaid .lbl-payment-method {
+		display: block;
 		font-size: 8pt;
-		color: #333;
-		margin-top: 1mm;
+		margin-top: 0.5mm;
 	}
 	.lbl-foot {
 		position: absolute;
-		bottom: 4mm;
-		left: 4mm;
-		right: 4mm;
+		bottom: 5mm;
+		left: 5mm;
+		right: 5mm;
 		font-size: 7pt;
 		line-height: 1.35;
-		color: #444;
-		border-top: 1px dashed #999;
+		color: #000;
+		border-top: 1px solid #000;
 		padding-top: 1.5mm;
 	}
 	.lbl-foot strong { color: #000; }
-	.muted { color: #555; }
+	.muted { color: #000; font-style: italic; }
 </style>
 </head>
 <body>
@@ -224,14 +246,14 @@ final class LabelPrinter {
 			$payment_title = trim( (string) $order->get_payment_method_title() );
 			?>
 			<div class="lbl-payment lbl-payment--<?php echo $is_paid ? 'paid' : 'unpaid'; ?>">
-				<div class="lbl-payment-badge"><?php echo $is_paid ? esc_html__( 'PAID', 'fastnutrition-mealprep' ) : esc_html__( 'UNPAID', 'fastnutrition-mealprep' ); ?></div>
+				<span class="lbl-payment-badge"><?php echo $is_paid ? esc_html__( 'PAID', 'fastnutrition-mealprep' ) : esc_html__( 'UNPAID', 'fastnutrition-mealprep' ); ?></span>
 				<?php if ( '' !== $payment_title ) : ?>
-					<div class="lbl-payment-method">
+					<span class="lbl-payment-method">
 						<?php
 						/* translators: %s: human-readable payment method name (e.g. "Credit Card (Stripe)") */
 						printf( esc_html__( 'via %s', 'fastnutrition-mealprep' ), esc_html( $payment_title ) );
 						?>
-					</div>
+					</span>
 				<?php endif; ?>
 			</div>
 			<div class="lbl-count">
