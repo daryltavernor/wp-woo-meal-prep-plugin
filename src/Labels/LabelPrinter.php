@@ -93,18 +93,22 @@ final class LabelPrinter {
 	/* Page-break strategy: each .label is exactly page-sized. Instead of
 	   page-break-after (which Dompdf turns into an extra blank page when the
 	   label fills the page exactly), put the break BEFORE each label after
-	   the first. No trailing break, no blank pages between labels. */
+	   the first. No trailing break, no blank pages between labels.
+	   Bottom padding reserves ~22 mm for the brand foot (address +
+	   3 lines of contact). */
 	.label {
 		width: 100mm;
 		height: 100mm;
 		box-sizing: border-box;
-		padding: 5mm;
+		padding: 5mm 5mm 27mm 5mm;
 		position: relative;
 		overflow: hidden;
 	}
 	.label + .label { page-break-before: always; }
-	/* Head as a 2-column table — eliminates float-overflow which was both
-	   visually wonky and contributed to phantom page breaks. */
+	/* Head holds the logo on the left. The counter ("1/10") sits on the
+	   right for meal labels and is empty on the summary. Order # has
+	   moved out of the head — it now sits inline with the customer
+	   name to save horizontal space. */
 	.lbl-head {
 		width: 100%;
 		border-collapse: collapse;
@@ -115,23 +119,23 @@ final class LabelPrinter {
 		padding: 0 0 2mm;
 		vertical-align: middle;
 	}
-	.lbl-head-logo { width: 45mm; }
 	.lbl-head-logo img {
-		max-width: 42mm;
+		max-width: 55mm;
 		max-height: 14mm;
 	}
-	.lbl-head-id {
+	.lbl-head-counter {
 		text-align: right;
+		font-size: 10pt;
+		font-weight: bold;
+		width: 22mm;
+	}
+	.lbl-name {
 		font-size: 12pt;
 		font-weight: bold;
-		line-height: 1.15;
+		margin-bottom: 1.5mm;
+		line-height: 1.2;
 	}
-	.lbl-head-id .lbl-counter {
-		display: block;
-		font-size: 8pt;
-		font-weight: normal;
-	}
-	.lbl-name { font-size: 11pt; font-weight: bold; margin-bottom: 1mm; }
+	.lbl-name-id { margin-right: 2mm; }
 	.lbl-desc {
 		font-size: 12pt;
 		font-weight: bold;
@@ -209,15 +213,15 @@ final class LabelPrinter {
 		bottom: 5mm;
 		left: 5mm;
 		right: 5mm;
-		font-size: 7pt;
+		font-size: 8pt;
 		line-height: 1.35;
 		color: #000;
 		border-top: 1px solid #000;
 		padding-top: 1.5mm;
 		text-align: center;
 	}
-	.lbl-foot-address { font-weight: bold; }
-	.lbl-foot-contact { margin-top: 0.5mm; }
+	.lbl-foot-address { font-weight: bold; margin-bottom: 0.8mm; }
+	.lbl-foot-line { line-height: 1.35; }
 	.muted { color: #000; font-style: italic; }
 </style>
 </head>
@@ -263,8 +267,11 @@ final class LabelPrinter {
 		$is_collection = is_array( $ff ) && 'collection' === ( $ff['type'] ?? '' );
 		?>
 		<div class="label summary">
-			<?php self::render_head( $order, $brand, null ); ?>
-			<div class="lbl-name"><?php echo esc_html( $order->get_formatted_billing_full_name() ); ?></div>
+			<?php self::render_head( $brand, null ); ?>
+			<div class="lbl-name">
+				<span class="lbl-name-id">#<?php echo (int) $order->get_id(); ?></span>
+				<?php echo esc_html( $order->get_formatted_billing_full_name() ); ?>
+			</div>
 			<div class="lbl-address"><?php echo $is_collection ? '<em class="muted">' . esc_html__( 'Collection — no delivery address', 'fastnutrition-mealprep' ) . '</em>' : wp_kses_post( $address ); ?></div>
 			<div class="lbl-customer-contact">
 				<?php if ( $order->get_billing_phone() ) : ?>
@@ -318,8 +325,11 @@ final class LabelPrinter {
 		$ff     = $order->get_meta( '_fn_fulfilment' );
 		?>
 		<div class="label meal">
-			<?php self::render_head( $order, $brand, $idx . '/' . $total ); ?>
-			<div class="lbl-name"><?php echo esc_html( $order->get_formatted_billing_full_name() ); ?></div>
+			<?php self::render_head( $brand, $idx . '/' . $total ); ?>
+			<div class="lbl-name">
+				<span class="lbl-name-id">#<?php echo (int) $order->get_id(); ?></span>
+				<?php echo esc_html( $order->get_formatted_billing_full_name() ); ?>
+			</div>
 			<div class="lbl-desc"><?php echo esc_html( $desc ); ?></div>
 			<?php if ( ! empty( $addons ) ) : ?>
 				<div class="lbl-addons">+ <?php echo esc_html( implode( ', ', $addons ) ); ?></div>
@@ -341,7 +351,7 @@ final class LabelPrinter {
 		<?php
 	}
 
-	private static function render_head( \WC_Order $order, array $brand, ?string $counter ): void {
+	private static function render_head( array $brand, ?string $counter ): void {
 		$logo_src = (string) ( $brand['logo_data_uri'] ?? '' );
 		?>
 		<table class="lbl-head">
@@ -351,25 +361,18 @@ final class LabelPrinter {
 						<img src="<?php echo esc_attr( $logo_src ); ?>" alt="" />
 					<?php endif; ?>
 				</td>
-				<td class="lbl-head-id">
-					#<?php echo (int) $order->get_id(); ?>
-					<?php if ( null !== $counter ) : ?>
-						<span class="lbl-counter"><?php echo esc_html( $counter ); ?></span>
-					<?php endif; ?>
-				</td>
+				<td class="lbl-head-counter"><?php echo null !== $counter ? esc_html( $counter ) : ''; ?></td>
 			</tr>
 		</table>
 		<?php
 	}
 
 	private static function render_foot( array $brand ): void {
-		$contact = array_filter( [
-			$brand['web'],
-			$brand['email'],
-			$brand['phone'],
-		] );
+		$web     = trim( (string) ( $brand['web'] ?? '' ) );
+		$email   = trim( (string) ( $brand['email'] ?? '' ) );
+		$phone   = trim( (string) ( $brand['phone'] ?? '' ) );
 		$address = trim( (string) ( $brand['address'] ?? '' ) );
-		if ( empty( $contact ) && '' === $address ) {
+		if ( '' === $web && '' === $email && '' === $phone && '' === $address ) {
 			return;
 		}
 		?>
@@ -377,8 +380,14 @@ final class LabelPrinter {
 			<?php if ( '' !== $address ) : ?>
 				<div class="lbl-foot-address"><?php echo nl2br( esc_html( $address ) ); ?></div>
 			<?php endif; ?>
-			<?php if ( ! empty( $contact ) ) : ?>
-				<div class="lbl-foot-contact"><?php echo esc_html( implode( ' · ', $contact ) ); ?></div>
+			<?php if ( '' !== $web ) : ?>
+				<div class="lbl-foot-line"><?php echo esc_html( $web ); ?></div>
+			<?php endif; ?>
+			<?php if ( '' !== $email ) : ?>
+				<div class="lbl-foot-line"><?php echo esc_html( $email ); ?></div>
+			<?php endif; ?>
+			<?php if ( '' !== $phone ) : ?>
+				<div class="lbl-foot-line"><?php echo esc_html( $phone ); ?></div>
 			<?php endif; ?>
 		</div>
 		<?php
