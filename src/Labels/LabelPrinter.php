@@ -24,6 +24,12 @@ final class LabelPrinter {
 	public const MODE_FULL    = 'full';
 	public const MODE_SUMMARY = 'summary';
 
+	/** Physical label stock — 100 mm square direct-thermal. */
+	private const LABEL_SIDE_MM = 100.0;
+
+	/** Print head resolution. 203 dpi = 8 dots per mm; a 100 mm side is 800 dots. */
+	private const PRINTER_DPI = 203;
+
 	/**
 	 * Stream a labels PDF to the browser and exit.
 	 *
@@ -41,6 +47,10 @@ final class LabelPrinter {
 				'isPhpEnabled'         => false,
 				'defaultMediaType'     => 'print',
 				'isHtml5ParserEnabled' => true,
+				// Match the print head so embedded images (the brand logo) are
+				// sampled at the device resolution rather than Dompdf's 96 dpi
+				// screen default. Without this the logo prints soft.
+				'dpi'                  => self::PRINTER_DPI,
 				// Allow Dompdf to read local files from the WP install (e.g. the
 				// uploaded brand logo in wp-content/uploads). Without this,
 				// Dompdf's default chroot is the vendor dir and the logo silently
@@ -49,8 +59,9 @@ final class LabelPrinter {
 			]
 		);
 		$dompdf->loadHtml( $html );
-		// 100 mm x 100 mm = 283.46 pt x 283.46 pt (1 pt = 1/72 in, 1 in = 25.4 mm).
-		$dompdf->setPaper( [ 0, 0, 283.46, 283.46 ], 'portrait' );
+		// Convert the mm side to points (1 pt = 1/72 in, 1 in = 25.4 mm).
+		$side_pt = self::LABEL_SIDE_MM * 72 / 25.4;
+		$dompdf->setPaper( [ 0, 0, $side_pt, $side_pt ], 'portrait' );
 		$dompdf->render();
 		$prefix   = self::MODE_SUMMARY === $mode ? 'summary-labels' : 'labels';
 		$filename = $prefix . '-' . gmdate( 'Y-m-d-His' ) . '.pdf';
