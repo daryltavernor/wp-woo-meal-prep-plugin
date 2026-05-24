@@ -3,7 +3,7 @@
  * Plugin Name: Fast Nutrition — Meal Prep
  * Plugin URI:  https://www.fastnutrition.co.uk
  * Description: Full meal-prep ordering system for WooCommerce: meal builder, macros, bundles, add-ons, delivery/collection profiles, multi-step Blocks checkout, and kitchen prep management.
- * Version:     1.7.16
+ * Version:     1.7.17
  * Requires at least: 6.6
  * Requires PHP: 8.1
  * WC requires at least: 9.4
@@ -24,7 +24,7 @@ defined( 'ABSPATH' ) || exit;
 define( 'FN_MEALPREP_FILE', __FILE__ );
 define( 'FN_MEALPREP_DIR', plugin_dir_path( __FILE__ ) );
 define( 'FN_MEALPREP_URL', plugin_dir_url( __FILE__ ) );
-define( 'FN_MEALPREP_VERSION', '1.7.16' );
+define( 'FN_MEALPREP_VERSION', '1.7.17' );
 
 $fn_autoload = FN_MEALPREP_DIR . 'vendor/autoload.php';
 if ( ! is_readable( $fn_autoload ) ) {

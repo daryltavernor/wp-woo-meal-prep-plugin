@@ -269,12 +269,13 @@ CSS;
 	.lbl-macros {
 		width: 90mm;
 		font-size: 9pt;
+		line-height: 1.3;
 		border: 1px solid #000;
 		padding: 1mm 1.5mm;
 		margin-bottom: 1mm;
 		box-sizing: border-box;
+		word-wrap: break-word;
 	}
-	.lbl-macros span { display: inline-block; margin-right: 2.5mm; }
 	.lbl-macros strong { font-weight: bold; }
 	.lbl-address {
 		width: 90mm;
@@ -504,10 +505,11 @@ CSS;
 					<div class="lbl-addons">+ <?php echo esc_html( implode( ', ', $addons ) ); ?></div>
 				<?php endif; ?>
 				<div class="lbl-macros">
-					<span><strong>K</strong> <?php echo (int) round( (float) $macros['kcal'] ); ?></span>
-					<span><strong>P</strong> <?php echo (int) round( (float) $macros['protein_g'] ); ?>g</span>
-					<span><strong>C</strong> <?php echo (int) round( (float) $macros['carbs_g'] ); ?>g</span>
-					<span><strong>F</strong> <?php echo (int) round( (float) $macros['fat_g'] ); ?>g</span>
+					<strong>Macros:</strong>
+					<?php echo (int) round( (float) $macros['kcal'] ); ?> Kcals,
+					<?php echo (int) round( (float) $macros['protein_g'] ); ?>g Protein,
+					<?php echo (int) round( (float) $macros['carbs_g'] ); ?>g Carbs,
+					<?php echo (int) round( (float) $macros['fat_g'] ); ?>g Fat
 				</div>
 				<?php if ( $order->get_billing_phone() ) : ?>
 					<div class="lbl-customer-contact">
