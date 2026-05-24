@@ -311,6 +311,18 @@ CSS;
 		letter-spacing: 0.2mm;
 		margin-bottom: 0;
 	}
+	/* Storage + reheat hint on meal labels — sits in the space between
+	   the fulfilment line and the brand foot. Italic + slightly smaller
+	   so it reads as guidance, not instruction. */
+	.lbl-storage {
+		width: 90mm;
+		font-size: 7pt;
+		font-style: italic;
+		line-height: 1.3;
+		margin-top: 1mm;
+		text-align: center;
+		word-wrap: break-word;
+	}
 	/* Payment status — asymmetric on purpose.
 	   PAID = quiet thin-ruled line. UNPAID = full-width inverted bar
 	   so a packer can never miss an unpaid order. */
@@ -524,6 +536,9 @@ CSS;
 					</div>
 				<?php endif; ?>
 				<div class="lbl-fulfilment"><?php echo esc_html( self::format_fulfilment( $ff ) ); ?></div>
+				<div class="lbl-storage">
+					<?php esc_html_e( 'Refrigerate up to 3 days or freeze for 3 months · Microwave 3½ min to reheat', 'fastnutrition-mealprep' ); ?>
+				</div>
 			</div>
 			<?php self::render_foot( $brand ); ?>
 		</div>
