@@ -3,7 +3,6 @@ declare( strict_types=1 );
 
 namespace FastNutrition\MealPrep\Labels;
 
-use FastNutrition\MealPrep\Admin\PrepDashboard;
 use FastNutrition\MealPrep\Admin\SettingsPage;
 use FastNutrition\MealPrep\Cart\Selections;
 use FastNutrition\MealPrep\Macros\Calculator;
@@ -298,10 +297,7 @@ final class LabelPrinter {
 			// Fall back to the cart-attached selection key for older items.
 			$selection = $item->get_meta( Selections::CART_KEY, true );
 		}
-		$desc   = is_array( $selection ) ? PrepDashboard::describe_selection( $selection ) : '';
-		if ( '' === $desc ) {
-			$desc = $item->get_name();
-		}
+		$desc   = $item->get_name();
 		$macros = is_array( $selection ) ? Calculator::macros_for_selection( (int) $item->get_product_id(), $selection ) : Calculator::EMPTY;
 		$addons = is_array( $selection ) && ! empty( $selection['addons'] ) ? array_filter( array_map( static fn( $a ) => (string) ( $a['label'] ?? '' ), (array) $selection['addons'] ) ) : [];
 		$ff     = $order->get_meta( '_fn_fulfilment' );
