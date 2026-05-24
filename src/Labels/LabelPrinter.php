@@ -41,6 +41,11 @@ final class LabelPrinter {
 				'isPhpEnabled'         => false,
 				'defaultMediaType'     => 'print',
 				'isHtml5ParserEnabled' => true,
+				// Allow Dompdf to read local files from the WP install (e.g. the
+				// uploaded brand logo in wp-content/uploads). Without this,
+				// Dompdf's default chroot is the vendor dir and the logo silently
+				// renders as the broken-image placeholder.
+				'chroot'               => [ ABSPATH, WP_CONTENT_DIR ],
 			]
 		);
 		$dompdf->loadHtml( $html );
@@ -54,7 +59,8 @@ final class LabelPrinter {
 	}
 
 	private static function build_html( array $order_ids, string $mode = self::MODE_FULL ): string {
-		$brand = SettingsPage::brand_info();
+		$brand                  = SettingsPage::brand_info();
+		$brand['logo_data_uri'] = self::logo_data_uri( $brand );
 		ob_start();
 		?>
 <!doctype html>
@@ -73,41 +79,56 @@ final class LabelPrinter {
 	@page { size: 4in 4in; margin: 0; }
 	html, body { margin: 0; padding: 0; }
 	body { font-family: DejaVu Sans, sans-serif; color: #000; }
+	/* Page-break strategy: each .label is exactly page-sized. Instead of
+	   page-break-after (which Dompdf turns into an extra blank page when the
+	   label fills the page exactly), put the break BEFORE each label after
+	   the first. No trailing break, no blank pages between labels. */
 	.label {
 		width: 4in;
 		height: 4in;
 		box-sizing: border-box;
 		padding: 5mm;
-		page-break-after: always;
 		position: relative;
 		overflow: hidden;
 	}
-	.label:last-child { page-break-after: auto; }
+	.label + .label { page-break-before: always; }
+	/* Head as a 2-column table — eliminates float-overflow which was both
+	   visually wonky and contributed to phantom page breaks. */
 	.lbl-head {
+		width: 100%;
+		border-collapse: collapse;
 		border-bottom: 1px solid #000;
-		padding-bottom: 2mm;
-		margin-bottom: 2mm;
+		margin: 0 0 2mm;
 	}
-	.lbl-head .lbl-logo {
-		max-width: 38mm;
-		max-height: 12mm;
+	.lbl-head td {
+		padding: 0 0 2mm;
 		vertical-align: middle;
 	}
-	.lbl-head .lbl-order {
-		float: right;
-		font-size: 11pt;
-		font-weight: bold;
-		text-align: right;
-		line-height: 1.2;
+	.lbl-head-logo { width: 45mm; }
+	.lbl-head-logo img {
+		max-width: 42mm;
+		max-height: 14mm;
 	}
-	.lbl-head .lbl-order .lbl-counter {
+	.lbl-head-id {
+		text-align: right;
+		font-size: 12pt;
+		font-weight: bold;
+		line-height: 1.15;
+	}
+	.lbl-head-id .lbl-counter {
 		display: block;
-		font-size: 7pt;
+		font-size: 8pt;
 		font-weight: normal;
-		color: #000;
 	}
 	.lbl-name { font-size: 11pt; font-weight: bold; margin-bottom: 1mm; }
-	.lbl-desc { font-size: 12pt; font-weight: bold; line-height: 1.2; margin-bottom: 1.5mm; }
+	.lbl-desc {
+		font-size: 12pt;
+		font-weight: bold;
+		line-height: 1.2;
+		margin-bottom: 1.5mm;
+		word-wrap: break-word;
+		overflow-wrap: break-word;
+	}
 	.lbl-addons { font-size: 8pt; font-style: italic; color: #000; margin-bottom: 2mm; }
 	.lbl-macros {
 		font-size: 9pt;
@@ -182,8 +203,10 @@ final class LabelPrinter {
 		color: #000;
 		border-top: 1px solid #000;
 		padding-top: 1.5mm;
+		text-align: center;
 	}
-	.lbl-foot strong { color: #000; }
+	.lbl-foot-address { font-weight: bold; }
+	.lbl-foot-contact { margin-top: 0.5mm; }
 	.muted { color: #000; font-style: italic; }
 </style>
 </head>
@@ -242,8 +265,9 @@ final class LabelPrinter {
 				<?php endif; ?>
 			</div>
 			<?php
-			$is_paid       = $order->is_paid();
-			$payment_title = trim( (string) $order->get_payment_method_title() );
+			$payment_status = self::payment_status( $order );
+			$is_paid        = 'paid' === $payment_status['state'];
+			$payment_title  = $payment_status['title'];
 			?>
 			<div class="lbl-payment lbl-payment--<?php echo $is_paid ? 'paid' : 'unpaid'; ?>">
 				<span class="lbl-payment-badge"><?php echo $is_paid ? esc_html__( 'PAID', 'fastnutrition-mealprep' ) : esc_html__( 'UNPAID', 'fastnutrition-mealprep' ); ?></span>
@@ -295,6 +319,11 @@ final class LabelPrinter {
 				<span><strong>C</strong> <?php echo (int) round( (float) $macros['carbs_g'] ); ?>g</span>
 				<span><strong>F</strong> <?php echo (int) round( (float) $macros['fat_g'] ); ?>g</span>
 			</div>
+			<?php if ( $order->get_billing_phone() ) : ?>
+				<div class="lbl-customer-contact">
+					<strong><?php esc_html_e( 'Tel:', 'fastnutrition-mealprep' ); ?></strong> <?php echo esc_html( $order->get_billing_phone() ); ?>
+				</div>
+			<?php endif; ?>
 			<div class="lbl-fulfilment"><?php echo esc_html( self::format_fulfilment( $ff ) ); ?></div>
 			<?php self::render_foot( $brand ); ?>
 		</div>
@@ -302,34 +331,98 @@ final class LabelPrinter {
 	}
 
 	private static function render_head( \WC_Order $order, array $brand, ?string $counter ): void {
+		$logo_src = (string) ( $brand['logo_data_uri'] ?? '' );
 		?>
-		<div class="lbl-head">
-			<div class="lbl-order">#<?php echo (int) $order->get_id(); ?>
-				<?php if ( null !== $counter ) : ?>
-					<span class="lbl-counter"><?php echo esc_html( $counter ); ?></span>
-				<?php endif; ?>
-			</div>
-			<?php if ( ! empty( $brand['logo_path'] ) ) : ?>
-				<img src="<?php echo esc_attr( $brand['logo_path'] ); ?>" class="lbl-logo" alt="" />
+		<table class="lbl-head">
+			<tr>
+				<td class="lbl-head-logo">
+					<?php if ( '' !== $logo_src ) : ?>
+						<img src="<?php echo esc_attr( $logo_src ); ?>" alt="" />
+					<?php endif; ?>
+				</td>
+				<td class="lbl-head-id">
+					#<?php echo (int) $order->get_id(); ?>
+					<?php if ( null !== $counter ) : ?>
+						<span class="lbl-counter"><?php echo esc_html( $counter ); ?></span>
+					<?php endif; ?>
+				</td>
+			</tr>
+		</table>
+		<?php
+	}
+
+	private static function render_foot( array $brand ): void {
+		$contact = array_filter( [
+			$brand['web'],
+			$brand['email'],
+			$brand['phone'],
+		] );
+		$address = trim( (string) ( $brand['address'] ?? '' ) );
+		if ( empty( $contact ) && '' === $address ) {
+			return;
+		}
+		?>
+		<div class="lbl-foot">
+			<?php if ( '' !== $address ) : ?>
+				<div class="lbl-foot-address"><?php echo nl2br( esc_html( $address ) ); ?></div>
+			<?php endif; ?>
+			<?php if ( ! empty( $contact ) ) : ?>
+				<div class="lbl-foot-contact"><?php echo esc_html( implode( ' · ', $contact ) ); ?></div>
 			<?php endif; ?>
 		</div>
 		<?php
 	}
 
-	private static function render_foot( array $brand ): void {
-		$bits = array_filter( [
-			$brand['web'],
-			$brand['email'],
-			$brand['phone'],
-		] );
-		if ( empty( $bits ) ) {
-			return;
+	/**
+	 * Inline the brand logo as a base64 data URI so Dompdf never has to touch
+	 * the filesystem (which can fail silently due to chroot or open_basedir).
+	 */
+	private static function logo_data_uri( array $brand ): string {
+		$path = (string) ( $brand['logo_path'] ?? '' );
+		if ( '' === $path || ! is_readable( $path ) ) {
+			return '';
 		}
-		?>
-		<div class="lbl-foot">
-			<?php echo esc_html( implode( ' · ', $bits ) ); ?>
-		</div>
-		<?php
+		$data = @file_get_contents( $path );
+		if ( false === $data ) {
+			return '';
+		}
+		$type = wp_check_filetype( $path );
+		$mime = $type['type'] ?? '';
+		// Dompdf reliably handles PNG, JPEG and GIF. SVG/WebP/AVIF are hit-or-miss.
+		if ( ! in_array( $mime, [ 'image/png', 'image/jpeg', 'image/gif' ], true ) ) {
+			return '';
+		}
+		return 'data:' . $mime . ';base64,' . base64_encode( $data );
+	}
+
+	/**
+	 * Resolve the payment state for a label. Cash-on-delivery / collection is
+	 * always "unpaid" until the courier or counter staff actually collect the
+	 * money — even though WooCommerce marks the order as "processing" and
+	 * WC_Order::is_paid() returns true.
+	 *
+	 * @return array{state:string,title:string}
+	 */
+	private static function payment_status( \WC_Order $order ): array {
+		$method_id = $order->get_payment_method();
+		$title     = trim( (string) $order->get_payment_method_title() );
+
+		/**
+		 * Payment-method slugs that should never appear as PAID on the label,
+		 * because the money is collected at fulfilment rather than upfront.
+		 * Defaults to WooCommerce's built-in COD gateway.
+		 *
+		 * @param string[] $methods
+		 */
+		$cash_methods = (array) apply_filters( 'fn_mealprep_cash_payment_methods', [ 'cod' ] );
+
+		$is_cash = in_array( $method_id, $cash_methods, true );
+		$is_paid = ! $is_cash && $order->is_paid();
+
+		return [
+			'state' => $is_paid ? 'paid' : 'unpaid',
+			'title' => $title,
+		];
 	}
 
 	private static function format_fulfilment( mixed $ff ): string {
