@@ -323,6 +323,14 @@ CSS;
 		text-align: center;
 		word-wrap: break-word;
 	}
+	.lbl-allergens {
+		width: 90mm;
+		font-size: 7pt;
+		line-height: 1.3;
+		margin-top: 0.5mm;
+		text-align: center;
+		word-wrap: break-word;
+	}
 	/* Payment status — asymmetric on purpose.
 	   PAID = quiet thin-ruled line. UNPAID = full-width inverted bar
 	   so a packer can never miss an unpaid order. */
@@ -538,6 +546,9 @@ CSS;
 				<div class="lbl-fulfilment"><?php echo esc_html( self::format_fulfilment( $ff ) ); ?></div>
 				<div class="lbl-storage">
 					<?php esc_html_e( 'Refrigerate up to 3 days or freeze for 3 months · Microwave 3½ min to reheat', 'fastnutrition-mealprep' ); ?>
+				</div>
+				<div class="lbl-allergens">
+					<?php esc_html_e( 'Allergens & prep: fastnutrition.co.uk/info/allergeninfo.pdf', 'fastnutrition-mealprep' ); ?>
 				</div>
 			</div>
 			<?php self::render_foot( $brand ); ?>
