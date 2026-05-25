@@ -153,7 +153,13 @@ final class StoreApiExtensions {
 			'end'   => isset( $payload['slot']['end'] ) ? sanitize_text_field( (string) $payload['slot']['end'] ) : '',
 		];
 
-		if ( ! $pid || ! $date || ! Profile::get( $pid ) || BlockedDates::is_blocked( $date ) ) {
+		if (
+			! $pid
+			|| ! $date
+			|| ! Profile::get( $pid )
+			|| BlockedDates::is_blocked( $date )
+			|| $date < SlotAvailability::earliest_allowed_date()
+		) {
 			WC()->session->set( 'fn_fulfilment', null );
 			return;
 		}

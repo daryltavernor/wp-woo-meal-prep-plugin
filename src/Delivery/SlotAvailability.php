@@ -4,14 +4,37 @@ declare( strict_types=1 );
 namespace FastNutrition\MealPrep\Delivery;
 
 use DateTimeImmutable;
+use FastNutrition\MealPrep\Admin\SettingsPage;
 
 final class SlotAvailability {
 
 	public const WINDOW_DAYS = 14;
-	public const LEAD_HOURS  = 24;
 
 	public function register(): void {
 		// Data class only.
+	}
+
+	/**
+	 * The earliest date a customer may pick, in WordPress local timezone,
+	 * as a 'Y-m-d' string.
+	 *
+	 * Baseline: tomorrow (one-day lead time).
+	 * If a daily cut-off is configured and the current local time is at or
+	 * past the cut-off, tomorrow is skipped — earliest becomes day-after-
+	 * tomorrow. E.g. cut-off 18:00, 18:01 on Monday → earliest is Wednesday.
+	 */
+	public static function earliest_allowed_date(): string {
+		$now    = new DateTimeImmutable( 'now', wp_timezone() );
+		$cutoff = SettingsPage::order_cutoff();
+		$offset = 1;
+		if ( '' !== $cutoff ) {
+			[ $h, $m ]    = explode( ':', $cutoff );
+			$today_cutoff = $now->setTime( (int) $h, (int) $m, 0 );
+			if ( $now >= $today_cutoff ) {
+				$offset = 2;
+			}
+		}
+		return $now->modify( "+{$offset} days" )->setTime( 0, 0 )->format( 'Y-m-d' );
 	}
 
 	/**
@@ -31,8 +54,7 @@ final class SlotAvailability {
 			return [];
 		}
 
-		$now   = new DateTimeImmutable( 'now', wp_timezone() );
-		$start = $now->modify( '+' . self::LEAD_HOURS . ' hours' )->setTime( 0, 0 );
+		$start = new DateTimeImmutable( self::earliest_allowed_date(), wp_timezone() );
 		$out   = [];
 
 		for ( $i = 0; $i <= self::WINDOW_DAYS; $i++ ) {

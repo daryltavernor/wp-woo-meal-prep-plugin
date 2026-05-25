@@ -19,6 +19,24 @@ final class SettingsPage {
 	public const OPTION_BRAND_EMAIL       = 'fn_brand_email';
 	public const OPTION_BRAND_PHONE       = 'fn_brand_phone';
 	public const OPTION_BRAND_ADDRESS     = 'fn_brand_address';
+	public const OPTION_ORDER_CUTOFF      = 'fn_order_cutoff';
+
+	/**
+	 * Daily cut-off time (HH:MM, WordPress local timezone) after which the
+	 * next day's delivery / collection slots disappear from the customer's
+	 * picker. Returns '' if cut-off is disabled.
+	 */
+	public static function order_cutoff(): string {
+		$raw = trim( (string) get_option( self::OPTION_ORDER_CUTOFF, '18:00' ) );
+		if ( '' === $raw ) {
+			return '';
+		}
+		if ( ! preg_match( '/^([01]?\d|2[0-3]):[0-5]\d$/', $raw ) ) {
+			return '18:00';
+		}
+		[ $h, $m ] = explode( ':', $raw );
+		return sprintf( '%02d:%02d', (int) $h, (int) $m );
+	}
 
 	/**
 	 * @return array<string,array{label:string,hook:string,priority:int}>
@@ -95,6 +113,14 @@ final class SettingsPage {
 			update_option( self::OPTION_BRAND_PHONE, isset( $_POST['fn_brand_phone'] ) ? sanitize_text_field( wp_unslash( (string) $_POST['fn_brand_phone'] ) ) : '' );
 			update_option( self::OPTION_BRAND_ADDRESS, isset( $_POST['fn_brand_address'] ) ? sanitize_textarea_field( wp_unslash( (string) $_POST['fn_brand_address'] ) ) : '' );
 			set_transient( 'fn_settings_notice', __( 'Brand details saved.', 'fastnutrition-mealprep' ), 30 );
+		} elseif ( 'save_cutoff' === $action ) {
+			$raw = isset( $_POST['fn_order_cutoff'] ) ? sanitize_text_field( wp_unslash( (string) $_POST['fn_order_cutoff'] ) ) : '';
+			$raw = trim( $raw );
+			if ( '' !== $raw && ! preg_match( '/^([01]?\d|2[0-3]):[0-5]\d$/', $raw ) ) {
+				$raw = '18:00';
+			}
+			update_option( self::OPTION_ORDER_CUTOFF, $raw );
+			set_transient( 'fn_settings_notice', __( 'Ordering window saved.', 'fastnutrition-mealprep' ), 30 );
 		}
 		wp_safe_redirect( admin_url( 'admin.php?page=fn-settings' ) );
 		exit;
@@ -324,6 +350,33 @@ final class SettingsPage {
 		});
 		</script>
 		<?php
+
+		// Ordering window (next-day cut-off).
+		$cutoff      = self::order_cutoff();
+		$tz_label    = wp_timezone()->getName();
+		$now_local   = wp_date( 'H:i' );
+		echo '<h2>' . esc_html__( 'Ordering window', 'fastnutrition-mealprep' ) . '</h2>';
+		echo '<p class="description">';
+		printf(
+			/* translators: 1: WP timezone identifier, 2: current local time */
+			esc_html__( 'Times use your WordPress timezone (%1$s — currently %2$s).', 'fastnutrition-mealprep' ),
+			'<strong>' . esc_html( $tz_label ) . '</strong>',
+			'<strong>' . esc_html( $now_local ) . '</strong>'
+		);
+		echo '</p>';
+		echo '<form method="post">';
+		wp_nonce_field( 'fn_save_settings', 'fn_settings_nonce' );
+		echo '<input type="hidden" name="fn_action" value="save_cutoff" />';
+		echo '<table class="form-table"><tbody>';
+		printf(
+			'<tr><th><label for="fn_order_cutoff">%s</label></th><td><input type="time" id="fn_order_cutoff" name="fn_order_cutoff" value="%s" style="max-width:140px" /><p class="description">%s</p></td></tr>',
+			esc_html__( 'Daily cut-off time', 'fastnutrition-mealprep' ),
+			esc_attr( $cutoff ),
+			esc_html__( 'After this time the NEXT day\'s delivery and collection slots disappear from the customer\'s picker. Example: set to 18:00 and a customer trying to order at 18:01 on Monday will see Wednesday as the earliest available date, not Tuesday. Leave blank to disable the cut-off (only the standard one-day lead time applies).', 'fastnutrition-mealprep' )
+		);
+		echo '</tbody></table>';
+		submit_button( __( 'Save ordering window', 'fastnutrition-mealprep' ) );
+		echo '</form>';
 
 		echo '<h2>' . esc_html__( 'Macro calculator page', 'fastnutrition-mealprep' ) . '</h2>';
 		if ( $calc_page_id && get_post( $calc_page_id ) ) {
