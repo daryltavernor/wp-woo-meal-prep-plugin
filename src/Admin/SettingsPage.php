@@ -76,17 +76,19 @@ final class SettingsPage {
 			return;
 		}
 		$action = isset( $_POST['fn_action'] ) ? sanitize_key( wp_unslash( (string) $_POST['fn_action'] ) ) : '';
-		if ( 'save' === $action ) {
+		if ( 'save_placement' === $action ) {
 			update_option( self::OPTION_MULTISTEP_ENABLED, ! empty( $_POST['fn_multistep_enabled'] ) ? 1 : 0 );
 			update_option( self::OPTION_MINIMAL_STYLING, ! empty( $_POST['fn_minimal_styling'] ) ? 1 : 0 );
 			$placement = isset( $_POST['fn_builder_placement'] ) ? sanitize_key( wp_unslash( (string) $_POST['fn_builder_placement'] ) ) : 'replace_add_to_cart';
 			update_option( self::OPTION_BUILDER_PLACEMENT, isset( self::placements()[ $placement ] ) ? $placement : 'replace_add_to_cart' );
-
+			set_transient( 'fn_settings_notice', __( 'Checkout flow & meal builder placement saved.', 'fastnutrition-mealprep' ), 30 );
+		} elseif ( 'save_updates' === $action ) {
 			$branch = isset( $_POST['fn_update_branch'] ) ? sanitize_text_field( wp_unslash( (string) $_POST['fn_update_branch'] ) ) : '';
-			update_option( self::OPTION_UPDATE_BRANCH, $branch !== '' ? $branch : 'main' );
+			update_option( self::OPTION_UPDATE_BRANCH, '' !== $branch ? $branch : 'main' );
 			if ( isset( $_POST['fn_update_token'] ) ) {
 				update_option( self::OPTION_UPDATE_TOKEN, sanitize_text_field( wp_unslash( (string) $_POST['fn_update_token'] ) ) );
 			}
+			set_transient( 'fn_settings_notice', __( 'Plugin update settings saved.', 'fastnutrition-mealprep' ), 30 );
 		} elseif ( 'convert_checkout' === $action ) {
 			$result = self::convert_checkout_page_to_blocks();
 			set_transient( 'fn_settings_notice', $result, 30 );
@@ -178,7 +180,7 @@ final class SettingsPage {
 
 		echo '<form method="post" style="margin-top:1.5em">';
 		wp_nonce_field( 'fn_save_settings', 'fn_settings_nonce' );
-		echo '<input type="hidden" name="fn_action" value="save" />';
+		echo '<input type="hidden" name="fn_action" value="save_placement" />';
 		echo '<table class="form-table"><tbody>';
 		printf(
 			'<tr><th>%s</th><td><label><input type="checkbox" name="fn_multistep_enabled" value="1" %s /> %s</label><p class="description">%s</p></td></tr>',
@@ -214,7 +216,7 @@ final class SettingsPage {
 		echo '<p>' . esc_html__( 'WordPress checks the GitHub repository for new versions in the background. When the Version header in fastnutrition-mealprep.php is bumped on the branch below and pushed, the standard WP "Update available" notice appears in Plugins and Dashboard → Updates.', 'fastnutrition-mealprep' ) . '</p>';
 		echo '<form method="post">';
 		wp_nonce_field( 'fn_save_settings', 'fn_settings_nonce' );
-		echo '<input type="hidden" name="fn_action" value="save" />';
+		echo '<input type="hidden" name="fn_action" value="save_updates" />';
 
 		echo '<table class="form-table"><tbody>';
 		printf(
