@@ -204,32 +204,62 @@ final class StoreApiExtensions {
 		if ( empty( $packages ) ) {
 			return null;
 		}
-		// Collection: prefer Local Pickup, fall back to the cheapest free rate.
-		// Delivery: prefer the first non-pickup rate.
-		$pickup_ids = [ 'local_pickup', 'pickup_location' ];
-		$candidate  = null;
+
+		// Collect every rate across every package so we can score them
+		// holistically. Most shops have one package.
+		$rates = [];
 		foreach ( $packages as $package ) {
 			foreach ( ( $package['rates'] ?? [] ) as $rate ) {
-				$method_id = $rate->get_method_id();
-				$rate_id   = $rate->get_id();
-				$cost      = (float) $rate->get_cost();
-				$is_pickup = in_array( $method_id, $pickup_ids, true );
-
-				if ( 'collection' === $type ) {
-					if ( $is_pickup ) {
-						return $rate_id;
-					}
-					if ( null === $candidate && $cost <= 0.0001 ) {
-						$candidate = $rate_id;
-					}
-				} else {
-					if ( ! $is_pickup ) {
-						return $rate_id;
-					}
-				}
+				$rates[] = $rate;
 			}
 		}
-		return $candidate;
+		if ( empty( $rates ) ) {
+			return null;
+		}
+
+		// Identify pickup-like rates by either WC's pickup method IDs OR by
+		// label text — the user's zones use a plain `flat_rate` titled
+		// "Collection" rather than the dedicated `local_pickup` method, so
+		// matching on method id alone is not enough.
+		$pickup_method_ids = [ 'local_pickup', 'pickup_location' ];
+		$is_pickup_like    = static function ( $rate ) use ( $pickup_method_ids ): bool {
+			if ( in_array( $rate->get_method_id(), $pickup_method_ids, true ) ) {
+				return true;
+			}
+			$label = strtolower( (string) $rate->get_label() );
+			return false !== strpos( $label, 'collection' )
+				|| false !== strpos( $label, 'pickup' )
+				|| false !== strpos( $label, 'pick up' )
+				|| false !== strpos( $label, 'pick-up' );
+		};
+
+		if ( 'collection' === $type ) {
+			// Collection: prefer a pickup-like rate. If none, fall back to
+			// the cheapest available rate (collection is typically free).
+			foreach ( $rates as $rate ) {
+				if ( $is_pickup_like( $rate ) ) {
+					return $rate->get_id();
+				}
+			}
+			usort( $rates, static fn( $a, $b ) => (float) $a->get_cost() <=> (float) $b->get_cost() );
+			return $rates[0]->get_id();
+		}
+
+		// Delivery: exclude pickup-like rates. Among what's left prefer a
+		// rate whose label mentions "delivery"; otherwise pick the most
+		// expensive (delivery rates usually carry the highest cost in the
+		// zone). Last resort: any non-pickup rate.
+		$delivery_candidates = array_values( array_filter( $rates, static fn( $r ) => ! $is_pickup_like( $r ) ) );
+		if ( empty( $delivery_candidates ) ) {
+			return $rates[0]->get_id();
+		}
+		foreach ( $delivery_candidates as $rate ) {
+			if ( false !== strpos( strtolower( (string) $rate->get_label() ), 'delivery' ) ) {
+				return $rate->get_id();
+			}
+		}
+		usort( $delivery_candidates, static fn( $a, $b ) => (float) $b->get_cost() <=> (float) $a->get_cost() );
+		return $delivery_candidates[0]->get_id();
 	}
 
 	public function apply_to_order( $order, $request ): void {

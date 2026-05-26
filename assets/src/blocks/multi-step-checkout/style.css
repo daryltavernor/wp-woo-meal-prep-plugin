@@ -179,6 +179,17 @@ body .wc-block-components-checkout-place-order-button > * {
 	display: none !important;
 }
 
+/* ---------- Hide order-summary shipping line until payment step ----------
+   The customer picks delivery vs collection via our slot picker on step 2,
+   not via WC's shipping picker. Until they've actually committed (which
+   only happens on the payment step) the order summary shouldn't be
+   advertising a method — and especially shouldn't show "Collection: Free"
+   while they're still deciding. */
+.wp-block-woocommerce-checkout:not([data-fn-step="payment"]) .wp-block-woocommerce-checkout-order-summary-shipping-block,
+.wp-block-woocommerce-checkout:not([data-fn-step="payment"]) .wc-block-components-totals-shipping {
+	display: none !important;
+}
+
 /* ---------- Hide Express Checkout (Apple/Google Pay/Link) on non-payment steps ----------
    Stripe renders express checkout via the WC Blocks Payment Method API.
    Depending on version, the rendered class can be the block wrapper

@@ -250,7 +250,20 @@ function apply( root ) {
 			fields.insertBefore( express, fields.firstChild );
 		}
 	};
+	// WC's React tree re-renders the fields block on focus/blur/keyboard
+	// events (especially aggressive on iOS Safari) and strips children it
+	// didn't render. Re-attach our nav + action bar each render so they
+	// always exist. Idempotent: only re-inserts when not already connected.
+	const ensureChrome = () => {
+		if ( ! nav.isConnected ) {
+			checkout.prepend( nav );
+		}
+		if ( ! actions.isConnected ) {
+			fields.appendChild( actions );
+		}
+	};
 	const render = () => {
+		ensureChrome();
 		hoistExpress();
 		// Mirror the active step on the checkout root so CSS can target
 		// elements the JS selector loop doesn't reach (e.g. Stripe-rendered
