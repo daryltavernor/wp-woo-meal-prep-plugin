@@ -40,16 +40,29 @@
 	}
 }
 
-/* ---------- Back / Next ---------- */
+/* ---------- Back / Next ----------
+   The action bar is appended as a DIRECT child of .wp-block-woocommerce-
+   checkout (not inside the fields block) so WC's React reconciliation
+   can't strip it. The checkout block is typically a 2-column grid (form
+   | order summary), so we span every grid column to keep the action bar
+   full-width below both columns. */
+.wp-block-woocommerce-checkout > .fn-step-actions,
 .fn-step-actions {
 	margin-top: 1.5rem;
 	/* Push the action bar above the iOS home indicator / safe-area so the
 	   buttons aren't tucked under the bottom system chrome on iPhone. */
 	margin-bottom: env( safe-area-inset-bottom, 0 );
-	display: flex;
+	display: flex !important;
 	justify-content: space-between;
 	align-items: stretch;
 	gap: 0.75rem;
+	width: 100%;
+	visibility: visible !important;
+	opacity: 1 !important;
+}
+.wp-block-woocommerce-checkout > .fn-step-actions {
+	/* Span every column in case the WC checkout block is a CSS grid. */
+	grid-column: 1 / -1;
 }
 .fn-step-actions button {
 	font-family: 'Kanit', system-ui, -apple-system, sans-serif;
@@ -73,9 +86,12 @@
 	appearance: none;
 	-webkit-tap-highlight-color: transparent;
 	min-height: 44px;
-	/* Don't let Flexbox shrink the button below readable width. */
-	flex: 0 1 auto;
-	min-width: 5.5rem;
+	/* Don't let Flexbox shrink the button below readable width, and don't
+	   let it stretch to fill — keep buttons content-sized at left/right. */
+	flex: 0 0 auto;
+	min-width: 6rem;
+	visibility: visible !important;
+	opacity: 1 !important;
 }
 .fn-step-actions .fn-step-back {
 	background: #fff;

@@ -235,7 +235,12 @@ function apply( root ) {
 	const actions = document.createElement( 'div' );
 	actions.className = 'fn-step-actions';
 	actions.innerHTML = `<button type="button" class="fn-step-back">${ __( 'Back', 'fastnutrition-mealprep' ) }</button> <button type="button" class="fn-step-next">${ __( 'Next', 'fastnutrition-mealprep' ) }</button>`;
-	fields.appendChild( actions );
+	// Append to the checkout root (sibling of the fields and totals blocks),
+	// not inside fields. WC's React reconciliation of the fields block on
+	// iOS Safari was stripping any manually-appended child — including this
+	// action bar. Living at the checkout-root level means React's per-block
+	// trees can't touch it.
+	checkout.appendChild( actions );
 
 	let active = 'address';
 	// Hoist the Stripe Express Checkout component to the top of the fields
@@ -250,16 +255,17 @@ function apply( root ) {
 			fields.insertBefore( express, fields.firstChild );
 		}
 	};
-	// WC's React tree re-renders the fields block on focus/blur/keyboard
-	// events (especially aggressive on iOS Safari) and strips children it
-	// didn't render. Re-attach our nav + action bar each render so they
-	// always exist. Idempotent: only re-inserts when not already connected.
+	// WC's React tree re-renders blocks on focus/blur/keyboard events
+	// (significantly more aggressive on iOS Safari) and strips children
+	// it didn't render. Re-attach our nav + action bar at the start of
+	// every render so they always exist. Idempotent: only re-inserts
+	// when not already a child of the checkout root.
 	const ensureChrome = () => {
-		if ( ! nav.isConnected ) {
+		if ( ! checkout.contains( nav ) ) {
 			checkout.prepend( nav );
 		}
-		if ( ! actions.isConnected ) {
-			fields.appendChild( actions );
+		if ( ! checkout.contains( actions ) ) {
+			checkout.appendChild( actions );
 		}
 	};
 	const render = () => {
