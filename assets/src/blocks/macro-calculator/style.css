@@ -1,65 +1,131 @@
+/* ============================================================================
+ * Macro Calculator — visual twin of the meal builder on a product page.
+ * Three pill dropdowns, a black/lime macros banner. All rules namespaced
+ * under .fn-macro-calc so nothing leaks.
+ * ========================================================================= */
+
 .fn-macro-calc {
-	font-family: 'Kanit', system-ui, sans-serif;
-	max-width: 720px;
-	margin: 0 auto;
-	padding: 1rem;
-	border: 2px solid #000;
-	border-radius: 12px;
-	background: #fff;
-}
-.fn-macro-calc h3 {
-	margin-top: 0;
+	font-family: 'Kanit', system-ui, -apple-system, 'Helvetica Neue', sans-serif;
 	color: #000;
-	text-transform: uppercase;
-	font-weight: 800;
+	max-width: 780px;
+	margin: 1.5rem auto;
+	text-align: center;
+	line-height: 1.4;
 }
-.fn-macro-calc table {
-	width: 100%;
-	border-collapse: collapse;
-}
-.fn-macro-calc th, .fn-macro-calc td {
-	padding: 0.4rem;
-	border-bottom: 1px solid #ddd;
-	text-align: left;
-}
-.fn-macro-calc select, .fn-macro-calc input[type="number"], .fn-macro-calc input[type="text"] {
-	padding: 0.4rem;
-	border: 1px solid #000;
-	border-radius: 6px;
-	width: 100%;
-}
-.fn-macro-calc .fn-macro-actions {
-	margin: 0.5rem 0;
+
+/* ---- Dropdown rows (identical pattern to .fn-meal-builder .fn-row) ------- */
+.fn-macro-calc .fn-row {
 	display: flex;
-	gap: 0.5rem;
+	align-items: center;
+	justify-content: center;
+	gap: 1.25rem;
+	margin: 0 0 1.1rem;
+	flex-wrap: wrap;
 }
-.fn-macro-calc button {
-	padding: 0.4rem 0.8rem;
-	border: 2px solid #000;
-	background: #c5e643;
+.fn-macro-calc .fn-row-label {
+	flex: 0 0 auto;
+	min-width: 180px;
+	font: 800 italic 1.1rem/1.2 'Kanit', sans-serif;
+	color: #000;
+	letter-spacing: 0.01em;
+}
+.fn-macro-calc .fn-row-control { flex: 1 1 240px; }
+.fn-macro-calc .fn-row select {
+	display: block;
+	width: 100%;
+	min-height: 52px;
+	margin: 0;
+	background-color: #f4f4f4;
+	background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='10' viewBox='0 0 14 10'><path fill='%23000' d='M7 10 0 0h14z'/></svg>");
+	background-repeat: no-repeat;
+	background-position: right 1.25rem center;
+	border: none;
 	border-radius: 999px;
+	box-shadow: none;
+	padding: 0.85rem 2.75rem 0.85rem 1.5rem;
+	font: 800 italic 1rem/1.2 'Kanit', sans-serif;
+	color: #000;
 	cursor: pointer;
-	font-weight: 700;
+	appearance: none;
+	-webkit-appearance: none;
+	-moz-appearance: none;
+	outline: none;
+	max-width: 100%;
 }
-.fn-macro-calc .fn-macro-totals {
-	margin-top: 1rem;
+.fn-macro-calc .fn-row select::-ms-expand { display: none; }
+.fn-macro-calc .fn-row select:focus { background-color: #ebebeb; }
+.fn-macro-calc .fn-row select option {
+	color: #000;
+	background: #fff;
+	font-style: normal;
+	font-weight: 500;
+}
+
+/* ---- Live macros banner (black/lime, identical to product-page) --------- */
+.fn-macro-calc-totals {
+	margin: 1.5rem auto 0;
+	max-width: 720px;
+	padding: 0.85rem 1.25rem;
 	background: #000;
 	color: #c5e643;
-	padding: 0.75rem;
-	border-radius: 8px;
-}
-.fn-macro-calc .fn-macro-custom, .fn-macro-calc .fn-macro-targets {
-	margin-top: 1rem;
-	padding: 0.75rem;
-	background: #f7f7f7;
-	border-radius: 8px;
-}
-.fn-macro-calc .fn-macro-custom label, .fn-macro-calc .fn-macro-targets label {
+	border-radius: 14px;
+	font: 800 italic 0.95rem/1.4 'Kanit', sans-serif;
+	letter-spacing: 0.02em;
 	display: flex;
-	gap: 0.5rem;
+	flex-wrap: wrap;
 	align-items: center;
-	margin: 0.25rem 0;
+	justify-content: center;
+	gap: 0.6rem 1.1rem;
+	text-align: center;
 }
-.fn-macro-calc progress {
-	width: 100%;
+.fn-macro-calc-label {
+	color: #fff;
+	font-style: normal;
+	font-weight: 800;
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	font-size: 0.78rem;
+}
+.fn-macro-calc-values {
+	display: inline-flex;
+	flex-wrap: wrap;
+	gap: 0.6rem 1.1rem;
+	justify-content: center;
+}
+.fn-macro-calc-values > span {
+	display: inline-flex;
+	align-items: baseline;
+	gap: 0.3rem;
+	color: #c5e643;
+}
+.fn-macro-calc-values .fn-n {
+	color: #fff;
+	font-weight: 800;
+	font-size: 1rem;
+}
+.fn-macro-calc-empty {
+	color: rgba( 255, 255, 255, 0.7 );
+	font-style: italic;
+	font-weight: 500;
+}
+
+/* ---- Reset button -------------------------------------------------------- */
+.fn-macro-calc-reset {
+	margin-top: 0.9rem;
+	padding: 0.5rem 1.4rem;
+	border: 2px solid #000;
+	background: #fff;
+	color: #000;
+	border-radius: 999px;
+	cursor: pointer;
+	font: 800 italic 0.85rem/1 'Kanit', sans-serif;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+}
+.fn-macro-calc-reset:hover { background: #f4f4f4; }
+
+/* ---- Mobile -------------------------------------------------------------- */
+@media (max-width: 620px) {
+	.fn-macro-calc .fn-row { gap: 0.4rem; }
+	.fn-macro-calc .fn-row-label { flex-basis: 100%; min-width: 0; text-align: center; }
 }
