@@ -43,12 +43,16 @@
 /* ---------- Back / Next ---------- */
 .fn-step-actions {
 	margin-top: 1.5rem;
+	/* Push the action bar above the iOS home indicator / safe-area so the
+	   buttons aren't tucked under the bottom system chrome on iPhone. */
+	margin-bottom: env( safe-area-inset-bottom, 0 );
 	display: flex;
 	justify-content: space-between;
+	align-items: stretch;
 	gap: 0.75rem;
 }
 .fn-step-actions button {
-	font-family: 'Kanit', sans-serif;
+	font-family: 'Kanit', system-ui, -apple-system, sans-serif;
 	font-weight: 700;
 	font-size: 0.85rem;
 	line-height: 1.6;
@@ -60,6 +64,18 @@
 	cursor: pointer;
 	transition: background 0.15s ease, color 0.15s ease;
 	display: inline-block;
+	/* iOS Safari paints <button> with native chrome (-webkit-appearance:
+	   push-button) which overrides our background and effectively makes
+	   the button invisible on iPhones. Explicit reset forces our styles
+	   to take effect. -webkit-tap-highlight-color removes the grey flash
+	   on tap. min-height meets Apple's 44pt minimum tap target. */
+	-webkit-appearance: none;
+	appearance: none;
+	-webkit-tap-highlight-color: transparent;
+	min-height: 44px;
+	/* Don't let Flexbox shrink the button below readable width. */
+	flex: 0 1 auto;
+	min-width: 5.5rem;
 }
 .fn-step-actions .fn-step-back {
 	background: #fff;
