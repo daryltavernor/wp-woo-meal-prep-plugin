@@ -27,17 +27,31 @@ final class MealProduct {
 	 *
 	 * The meal builder JS finds every element with [data-fn-macros] on the page
 	 * and updates them with kcal / protein / carbs / fat as the selection changes.
+	 *
+	 * Gated on the current product being a meal product (same gate as
+	 * [fn_meal_builder]) — otherwise the "Pick your ingredients…" placeholder
+	 * would print on every shared product-page template even when there's no
+	 * builder for the customer to interact with. Accepts an optional
+	 * product_id attribute for rendering outside the product loop.
 	 */
 	public function macros_shortcode( array|string $atts = [] ): string {
 		$atts = shortcode_atts(
 			[
-				'layout' => 'inline', // 'inline' | 'stacked'
-				'label'  => __( 'Macros', 'fastnutrition-mealprep' ),
-				'empty'  => __( 'Pick your ingredients to see macros…', 'fastnutrition-mealprep' ),
+				'layout'     => 'inline', // 'inline' | 'stacked'
+				'label'      => __( 'Macros', 'fastnutrition-mealprep' ),
+				'empty'      => __( 'Pick your ingredients to see macros…', 'fastnutrition-mealprep' ),
+				'product_id' => 0,
 			],
 			is_array( $atts ) ? $atts : [],
 			'fn_macros'
 		);
+		$product_id = (int) $atts['product_id'];
+		if ( ! $product_id && function_exists( 'is_product' ) && is_product() ) {
+			$product_id = (int) get_queried_object_id();
+		}
+		if ( ! $product_id || ! self::is_meal( $product_id ) ) {
+			return '';
+		}
 		$class = 'fn-macro-display fn-macro-' . ( $atts['layout'] === 'stacked' ? 'stacked' : 'inline' );
 		return sprintf(
 			'<div class="%1$s" data-fn-macros data-fn-macros-empty="%2$s" data-fn-macros-label="%3$s"><span class="fn-macro-empty">%2$s</span></div>',
