@@ -204,6 +204,8 @@ final class SettingsPage {
 
 		echo '</tbody></table>';
 		echo '<p class="description"><strong>' . esc_html__( 'Shortcode:', 'fastnutrition-mealprep' ) . '</strong> <code>[fn_meal_builder]</code> ' . esc_html__( 'inside a meal product description, or', 'fastnutrition-mealprep' ) . ' <code>[fn_meal_builder product_id="123"]</code> ' . esc_html__( 'anywhere on the site to render it for that specific product.', 'fastnutrition-mealprep' ) . '</p>';
+		submit_button( __( 'Save changes', 'fastnutrition-mealprep' ) );
+		echo '</form>';
 
 		// Self-updates from GitHub.
 		$branch = (string) get_option( self::OPTION_UPDATE_BRANCH, 'main' );
@@ -213,10 +215,6 @@ final class SettingsPage {
 		echo '<form method="post">';
 		wp_nonce_field( 'fn_save_settings', 'fn_settings_nonce' );
 		echo '<input type="hidden" name="fn_action" value="save" />';
-		// Re-submit the other current values so this form doesn\'t reset them.
-		echo '<input type="hidden" name="fn_multistep_enabled" value="' . ( self::multistep_enabled() ? '1' : '0' ) . '" />';
-		echo '<input type="hidden" name="fn_minimal_styling" value="' . ( self::minimal_styling() ? '1' : '0' ) . '" />';
-		echo '<input type="hidden" name="fn_builder_placement" value="' . esc_attr( self::get_placement() ) . '" />';
 
 		echo '<table class="form-table"><tbody>';
 		printf(
@@ -233,8 +231,6 @@ final class SettingsPage {
 		);
 		echo '</tbody></table>';
 		submit_button( __( 'Save update settings', 'fastnutrition-mealprep' ) );
-		echo '</form>';
-		submit_button();
 		echo '</form>';
 
 		// Basket surcharge — encourage minimum-spend behaviour.
