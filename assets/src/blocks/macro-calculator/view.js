@@ -158,7 +158,7 @@ function MacroCalculator() {
 				<>
 					<Row label={ __( 'Pick a Protein', 'fastnutrition-mealprep' ) }>
 						<select value={ slot1Value } onChange={ ( e ) => onSlot1Change( e.target.value ) }>
-							<option value="">{ __( 'Meat, Fish or Quorn', 'fastnutrition-mealprep' ) }</option>
+							<option value="">{ __( 'Meat, Quorn or Set Meal', 'fastnutrition-mealprep' ) }</option>
 							{ allowed.protein.length > 0 && (
 								<optgroup label={ __( 'Proteins', 'fastnutrition-mealprep' ) }>
 									{ allowed.protein.map( ( i ) => (
