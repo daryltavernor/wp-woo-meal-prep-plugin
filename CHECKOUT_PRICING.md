@@ -111,11 +111,24 @@ Configurable in **Meal Prep → Settings → Surcharge** via four options:
 `fn_surcharge_enabled`, `fn_surcharge_threshold`, `fn_surcharge_amount`,
 `fn_surcharge_label`. No behaviour change from previous versions.
 
-### 4. `StoreApiExtensions::filter_package_rates` — the shipping fix
+### 4. `StoreApiExtensions::gate_shipping_calc` + `filter_package_rates` — the shipping fix
 
-Hooks `woocommerce_package_rates` at priority **100** (after third-party
-shipping plugins have added their rates). Reads `WC()->session->get('fn_fulfilment')`
-and removes rates that don't match the chosen type:
+Two filters together produce deterministic shipping behaviour:
+
+**`gate_shipping_calc`** hooks `woocommerce_cart_ready_to_calc_shipping` at
+priority **100**. Returns `false` (skip shipping calculation entirely) until
+the customer has committed a fulfilment slot — i.e. until
+`WC()->session->get('fn_fulfilment')` is populated. This is what stops the
+basket page (and step 1 of checkout) from including a phantom default
+delivery rate in the total before the customer has picked anything. The
+existing `TotalsDisplay::maybe_hide_cart_shipping` couldn't do this for
+Blocks because it gates on `is_cart()`, which doesn't fire for Store API
+REST requests.
+
+**`filter_package_rates`** hooks `woocommerce_package_rates` at priority
+**100** (after third-party shipping plugins have added their rates). Reads
+`WC()->session->get('fn_fulfilment')` and removes rates that don't match
+the chosen type:
 
 * `type === 'collection'`: keep only pickup-like rates (method id
   `local_pickup` / `pickup_location`, or label contains
@@ -160,6 +173,7 @@ the order is created. No effect on totals.
 | `woocommerce_get_item_data`                       | 10       | `Selections::display_selection`           |
 | `woocommerce_before_calculate_totals`             | **10**   | `BundlePricer::apply`                     |
 | `woocommerce_cart_calculate_fees`                 | 10       | `Surcharge::maybe_add_fee`                |
+| `woocommerce_cart_ready_to_calc_shipping`         | **100**  | `StoreApiExtensions::gate_shipping_calc`  |
 | `woocommerce_package_rates`                       | **100**  | `StoreApiExtensions::filter_package_rates`|
 | `woocommerce_get_item_data`                       | 20       | `BundlePricer::render_notice`             |
 | `woocommerce_checkout_create_order_line_item`     | 10       | `OrderItemMeta::persist`                  |

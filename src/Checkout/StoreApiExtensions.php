@@ -29,6 +29,14 @@ final class StoreApiExtensions {
 		// fulfilment type. Priority 100 so it runs after third-party shipping
 		// plugins have populated their rates.
 		add_filter( 'woocommerce_package_rates', [ $this, 'filter_package_rates' ], 100, 2 );
+		// Suppress shipping calculation entirely until the customer has picked
+		// a slot (= until fn_fulfilment is in session). Without this, the
+		// Blocks cart fetches its data via the Store API and computes a
+		// default shipping rate (the first WC rate for the zone) which gets
+		// added to the displayed total before the customer has chosen
+		// anything. TotalsDisplay::maybe_hide_cart_shipping only fires on the
+		// `wp` action so it never runs against the Store API endpoint.
+		add_filter( 'woocommerce_cart_ready_to_calc_shipping', [ $this, 'gate_shipping_calc' ], 100 );
 	}
 
 	public function extend(): void {
@@ -227,10 +235,28 @@ final class StoreApiExtensions {
 	}
 
 	/**
+	 * Short-circuit WC's shipping calculation until the customer has chosen a
+	 * fulfilment slot. Returning false here makes WC_Cart::show_shipping()
+	 * return false → calculate_shipping() skips → shipping_total stays 0.
+	 *
+	 * Applies on every cart load, including the Store API cart endpoint
+	 * (which is how the Blocks basket / checkout fetches its totals).
+	 */
+	public function gate_shipping_calc( bool $ready ): bool {
+		$fulfilment = self::get_session_fulfilment();
+		if ( empty( $fulfilment['type'] ) ) {
+			return false;
+		}
+		return $ready;
+	}
+
+	/**
 	 * Narrow the package's rate list to match the customer's chosen
 	 * fulfilment type. With type=collection the Delivery rate is removed; with
 	 * type=delivery the Collection rate is removed. With no fulfilment set
-	 * (e.g. cart page before the slot picker runs) rates pass through.
+	 * (e.g. cart page before the slot picker runs) rates pass through —
+	 * gate_shipping_calc() will have suppressed the calculation entirely
+	 * before this filter runs.
 	 *
 	 * This is the single guarantee that customers cannot be charged a
 	 * delivery fee when they picked Collection.
