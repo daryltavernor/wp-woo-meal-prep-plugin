@@ -67,31 +67,16 @@ function defaultBillingSameAsShipping( checkout ) {
 	window.setTimeout( () => observer.disconnect(), 8000 );
 }
 
-function mountSlotPicker( fieldsBlock ) {
-	const existing = fieldsBlock.querySelector( '.fn-slot-picker-mount' );
+function mountSlotPicker( container ) {
+	const existing = container.querySelector( '.fn-slot-picker-mount' );
 	if ( existing ) {
 		return existing;
 	}
 	const mount = document.createElement( 'div' );
 	mount.className = 'fn-slot-picker-mount';
-	insertSlotMount( fieldsBlock, mount );
+	container.appendChild( mount );
 	createRoot( mount ).render( <SlotPicker /> );
 	return mount;
-}
-
-// Place the slot picker mount in its preferred home — after the shipping
-// method block if WC rendered one, else after the address block. Same
-// anchor list is reused by ensureChrome() to re-attach the same DOM node
-// (preserving its React state) if WC strips it during a re-render.
-function insertSlotMount( fieldsBlock, mount ) {
-	const anchor = fieldsBlock.querySelector( '.wp-block-woocommerce-checkout-shipping-method-block' )
-		|| fieldsBlock.querySelector( '.wp-block-woocommerce-checkout-shipping-address-block' )
-		|| fieldsBlock.querySelector( '.wp-block-woocommerce-checkout-billing-address-block' );
-	if ( anchor && anchor.parentElement ) {
-		anchor.parentElement.insertBefore( mount, anchor.nextSibling );
-	} else {
-		fieldsBlock.appendChild( mount );
-	}
 }
 
 const VISIBLE_LIMIT = 4;
@@ -228,7 +213,12 @@ function apply( root ) {
 		return false;
 	}
 
-	const slotMount = mountSlotPicker( fields );
+	// Slot picker mount lives at the checkout root, same level as nav and
+	// the action bar — WC's React reconciliation of the inner fields block
+	// kept stripping it on iOS Safari. On step 2 it's the only visible
+	// element anyway (every other section is display:none from the step
+	// logic), so the DOM position doesn't affect what the customer sees.
+	const slotMount = mountSlotPicker( checkout );
 	defaultBillingSameAsShipping( checkout );
 	checkout.dataset.fnMultistep = 'applied';
 
@@ -269,18 +259,24 @@ function apply( root ) {
 	// (significantly more aggressive on iOS Safari) and strips children
 	// it didn't render. Re-attach our nav + action bar + slot picker mount
 	// at the start of every render. Idempotent: only re-inserts when the
-	// node has actually been detached from its expected parent.
+	// node has actually been detached from the checkout root.
 	const ensureChrome = () => {
 		if ( ! checkout.contains( nav ) ) {
 			checkout.prepend( nav );
 		}
+		// Insert slot mount BEFORE the action bar so the visual order is
+		// nav -> [WC blocks] -> slot picker -> action bar. Falls back to
+		// append if the action bar isn't itself attached yet (ordering of
+		// repairs in this same render call).
+		if ( slotMount && ! checkout.contains( slotMount ) ) {
+			if ( checkout.contains( actions ) ) {
+				checkout.insertBefore( slotMount, actions );
+			} else {
+				checkout.appendChild( slotMount );
+			}
+		}
 		if ( ! checkout.contains( actions ) ) {
 			checkout.appendChild( actions );
-		}
-		// Same DOM node is re-inserted so React's mounted root + state on
-		// the slot picker survive the round-trip.
-		if ( slotMount && ! fields.contains( slotMount ) ) {
-			insertSlotMount( fields, slotMount );
 		}
 	};
 	const render = () => {
