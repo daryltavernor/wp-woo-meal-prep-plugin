@@ -68,11 +68,22 @@ function defaultBillingSameAsShipping( checkout ) {
 }
 
 function mountSlotPicker( fieldsBlock ) {
-	if ( fieldsBlock.querySelector( '.fn-slot-picker-mount' ) ) {
-		return;
+	const existing = fieldsBlock.querySelector( '.fn-slot-picker-mount' );
+	if ( existing ) {
+		return existing;
 	}
 	const mount = document.createElement( 'div' );
 	mount.className = 'fn-slot-picker-mount';
+	insertSlotMount( fieldsBlock, mount );
+	createRoot( mount ).render( <SlotPicker /> );
+	return mount;
+}
+
+// Place the slot picker mount in its preferred home — after the shipping
+// method block if WC rendered one, else after the address block. Same
+// anchor list is reused by ensureChrome() to re-attach the same DOM node
+// (preserving its React state) if WC strips it during a re-render.
+function insertSlotMount( fieldsBlock, mount ) {
 	const anchor = fieldsBlock.querySelector( '.wp-block-woocommerce-checkout-shipping-method-block' )
 		|| fieldsBlock.querySelector( '.wp-block-woocommerce-checkout-shipping-address-block' )
 		|| fieldsBlock.querySelector( '.wp-block-woocommerce-checkout-billing-address-block' );
@@ -81,7 +92,6 @@ function mountSlotPicker( fieldsBlock ) {
 	} else {
 		fieldsBlock.appendChild( mount );
 	}
-	createRoot( mount ).render( <SlotPicker /> );
 }
 
 const VISIBLE_LIMIT = 4;
@@ -218,7 +228,7 @@ function apply( root ) {
 		return false;
 	}
 
-	mountSlotPicker( fields );
+	const slotMount = mountSlotPicker( fields );
 	defaultBillingSameAsShipping( checkout );
 	checkout.dataset.fnMultistep = 'applied';
 
@@ -257,15 +267,20 @@ function apply( root ) {
 	};
 	// WC's React tree re-renders blocks on focus/blur/keyboard events
 	// (significantly more aggressive on iOS Safari) and strips children
-	// it didn't render. Re-attach our nav + action bar at the start of
-	// every render so they always exist. Idempotent: only re-inserts
-	// when not already a child of the checkout root.
+	// it didn't render. Re-attach our nav + action bar + slot picker mount
+	// at the start of every render. Idempotent: only re-inserts when the
+	// node has actually been detached from its expected parent.
 	const ensureChrome = () => {
 		if ( ! checkout.contains( nav ) ) {
 			checkout.prepend( nav );
 		}
 		if ( ! checkout.contains( actions ) ) {
 			checkout.appendChild( actions );
+		}
+		// Same DOM node is re-inserted so React's mounted root + state on
+		// the slot picker survive the round-trip.
+		if ( slotMount && ! fields.contains( slotMount ) ) {
+			insertSlotMount( fields, slotMount );
 		}
 	};
 	const render = () => {
@@ -307,14 +322,18 @@ function apply( root ) {
 				wcActionsRow.insertBefore( back, wcActionsRow.firstChild );
 			}
 			if ( actions && actions.parentElement ) {
-				actions.style.display = 'none';
+				// Inline !important so this beats the .fn-step-actions
+				// CSS rule, which uses !important to defend against
+				// theme rules that would otherwise hide the bar on
+				// steps 1-2.
+				actions.style.setProperty( 'display', 'none', 'important' );
 			}
 		} else {
 			if ( back && actions && ! actions.contains( back ) ) {
 				actions.insertBefore( back, actions.firstChild );
 			}
 			if ( actions ) {
-				actions.style.display = '';
+				actions.style.removeProperty( 'display' );
 			}
 		}
 	};
