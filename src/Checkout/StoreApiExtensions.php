@@ -25,6 +25,10 @@ final class StoreApiExtensions {
 			add_action( 'woocommerce_blocks_loaded', [ $this, 'extend' ] );
 		}
 		add_action( 'woocommerce_store_api_checkout_update_order_from_request', [ $this, 'apply_to_order' ], 10, 2 );
+		// Narrow the available shipping rates to match the customer's chosen
+		// fulfilment type. Priority 100 so it runs after third-party shipping
+		// plugins have populated their rates.
+		add_filter( 'woocommerce_package_rates', [ $this, 'filter_package_rates' ], 100, 2 );
 	}
 
 	public function extend(): void {
@@ -183,6 +187,12 @@ final class StoreApiExtensions {
 		if ( ! function_exists( 'WC' ) || ! WC() || ! WC()->session || ! WC()->shipping() ) {
 			return;
 		}
+		// Recompute packages so filter_package_rates() runs against the
+		// just-saved fulfilment session value before we look up the surviving
+		// rate id.
+		if ( WC()->cart ) {
+			WC()->cart->calculate_shipping();
+		}
 		$preferred = $this->pick_shipping_rate_id( $type );
 		if ( null === $preferred ) {
 			return;
@@ -193,73 +203,75 @@ final class StoreApiExtensions {
 		}
 		$chosen[0] = $preferred;
 		WC()->session->set( 'chosen_shipping_methods', $chosen );
+		// calculate_totals() re-runs calculate_shipping() internally, so we
+		// don't need a second explicit call here.
 		if ( WC()->cart ) {
-			WC()->cart->calculate_shipping();
 			WC()->cart->calculate_totals();
 		}
 	}
 
+	/**
+	 * After filter_package_rates() has narrowed the rate list to those that
+	 * match the customer's chosen fulfilment type, pick the first remaining
+	 * rate id from the first package. Returns null if no rate survives.
+	 */
 	private function pick_shipping_rate_id( string $type ): ?string {
+		unset( $type ); // filter has already narrowed by type; kept for callers.
 		$packages = WC()->shipping()->get_packages();
-		if ( empty( $packages ) ) {
-			return null;
-		}
-
-		// Collect every rate across every package so we can score them
-		// holistically. Most shops have one package.
-		$rates = [];
 		foreach ( $packages as $package ) {
 			foreach ( ( $package['rates'] ?? [] ) as $rate ) {
-				$rates[] = $rate;
-			}
-		}
-		if ( empty( $rates ) ) {
-			return null;
-		}
-
-		// Identify pickup-like rates by either WC's pickup method IDs OR by
-		// label text — the user's zones use a plain `flat_rate` titled
-		// "Collection" rather than the dedicated `local_pickup` method, so
-		// matching on method id alone is not enough.
-		$pickup_method_ids = [ 'local_pickup', 'pickup_location' ];
-		$is_pickup_like    = static function ( $rate ) use ( $pickup_method_ids ): bool {
-			if ( in_array( $rate->get_method_id(), $pickup_method_ids, true ) ) {
-				return true;
-			}
-			$label = strtolower( (string) $rate->get_label() );
-			return false !== strpos( $label, 'collection' )
-				|| false !== strpos( $label, 'pickup' )
-				|| false !== strpos( $label, 'pick up' )
-				|| false !== strpos( $label, 'pick-up' );
-		};
-
-		if ( 'collection' === $type ) {
-			// Collection: prefer a pickup-like rate. If none, fall back to
-			// the cheapest available rate (collection is typically free).
-			foreach ( $rates as $rate ) {
-				if ( $is_pickup_like( $rate ) ) {
-					return $rate->get_id();
-				}
-			}
-			usort( $rates, static fn( $a, $b ) => (float) $a->get_cost() <=> (float) $b->get_cost() );
-			return $rates[0]->get_id();
-		}
-
-		// Delivery: exclude pickup-like rates. Among what's left prefer a
-		// rate whose label mentions "delivery"; otherwise pick the most
-		// expensive (delivery rates usually carry the highest cost in the
-		// zone). Last resort: any non-pickup rate.
-		$delivery_candidates = array_values( array_filter( $rates, static fn( $r ) => ! $is_pickup_like( $r ) ) );
-		if ( empty( $delivery_candidates ) ) {
-			return $rates[0]->get_id();
-		}
-		foreach ( $delivery_candidates as $rate ) {
-			if ( false !== strpos( strtolower( (string) $rate->get_label() ), 'delivery' ) ) {
 				return $rate->get_id();
 			}
 		}
-		usort( $delivery_candidates, static fn( $a, $b ) => (float) $b->get_cost() <=> (float) $a->get_cost() );
-		return $delivery_candidates[0]->get_id();
+		return null;
+	}
+
+	/**
+	 * Narrow the package's rate list to match the customer's chosen
+	 * fulfilment type. With type=collection the Delivery rate is removed; with
+	 * type=delivery the Collection rate is removed. With no fulfilment set
+	 * (e.g. cart page before the slot picker runs) rates pass through.
+	 *
+	 * This is the single guarantee that customers cannot be charged a
+	 * delivery fee when they picked Collection.
+	 *
+	 * @param array<string, \WC_Shipping_Rate> $rates
+	 * @param array                            $package
+	 * @return array<string, \WC_Shipping_Rate>
+	 */
+	public function filter_package_rates( array $rates, array $package ): array {
+		unset( $package );
+		$fulfilment = self::get_session_fulfilment();
+		$type       = $fulfilment['type'] ?? '';
+		if ( 'delivery' !== $type && 'collection' !== $type ) {
+			return $rates;
+		}
+
+		$want_pickup = ( 'collection' === $type );
+		$filtered    = [];
+		foreach ( $rates as $key => $rate ) {
+			if ( self::is_pickup_like( $rate ) === $want_pickup ) {
+				$filtered[ $key ] = $rate;
+			}
+		}
+		return $filtered;
+	}
+
+	/**
+	 * Identify pickup-like rates by either WC's pickup method IDs OR by label
+	 * text — this shop's zones use a plain `flat_rate` titled "Collection"
+	 * rather than the dedicated `local_pickup` method, so matching on method
+	 * id alone is not enough.
+	 */
+	private static function is_pickup_like( \WC_Shipping_Rate $rate ): bool {
+		if ( in_array( $rate->get_method_id(), [ 'local_pickup', 'pickup_location' ], true ) ) {
+			return true;
+		}
+		$label = strtolower( (string) $rate->get_label() );
+		return false !== strpos( $label, 'collection' )
+			|| false !== strpos( $label, 'pickup' )
+			|| false !== strpos( $label, 'pick up' )
+			|| false !== strpos( $label, 'pick-up' );
 	}
 
 	public function apply_to_order( $order, $request ): void {

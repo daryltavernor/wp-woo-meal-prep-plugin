@@ -14,7 +14,6 @@ use FastNutrition\MealPrep\Admin\PrepDashboard;
 use FastNutrition\MealPrep\Admin\PrepSheet;
 use FastNutrition\MealPrep\Admin\ProfileAdmin;
 use FastNutrition\MealPrep\Admin\SettingsPage;
-use FastNutrition\MealPrep\Cart\AddOnPricer;
 use FastNutrition\MealPrep\Cart\BundlePricer;
 use FastNutrition\MealPrep\Cart\OrderItemMeta;
 use FastNutrition\MealPrep\Cart\Selections;
@@ -62,7 +61,6 @@ final class Plugin {
 
 		( new Selections() )->register();
 		( new BundlePricer() )->register();
-		( new AddOnPricer() )->register();
 		( new OrderItemMeta() )->register();
 		( new TotalsDisplay() )->register();
 		( new Surcharge() )->register();

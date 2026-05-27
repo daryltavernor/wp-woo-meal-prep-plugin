@@ -6,10 +6,30 @@ namespace FastNutrition\MealPrep\Cart;
 use FastNutrition\MealPrep\Products\BundleMeta;
 use WC_Cart;
 
+/**
+ * Owns line-price mutation for meal cart items.
+ *
+ * Pipeline invariant (read CHECKOUT_PRICING.md for the full design):
+ *
+ *   unit_price = ( bundle_applies ? bundle_effective_unit : catalog_base )
+ *              + selection_delta   // ingredient swaps + add-on prices
+ *
+ * Every value passed to set_price() is derived from canonical sources only —
+ * the catalog price (re-read via wc_get_product() per pass, NOT from the
+ * mutated $item['data']), the persisted Selections meta, and the bundle tier
+ * config. None of these inputs change as a result of calculate_totals()
+ * running, so the pipeline is idempotent: running apply() N times produces
+ * identical totals.
+ *
+ * Composition note: third-party pricing plugins that hook
+ * woocommerce_before_calculate_totals on the same item are not composed with;
+ * the unified pricer is deliberately the single owner of cart-line price
+ * mutation for meals.
+ */
 final class BundlePricer {
 
 	public function register(): void {
-		add_action( 'woocommerce_before_calculate_totals', [ $this, 'apply' ], 20 );
+		add_action( 'woocommerce_before_calculate_totals', [ $this, 'apply' ], 10 );
 		add_filter( 'woocommerce_get_item_data', [ $this, 'render_notice' ], 20, 2 );
 	}
 
@@ -18,48 +38,53 @@ final class BundlePricer {
 			return;
 		}
 
-		$groups = [];
+		$groups        = [];
+		$catalog_cache = [];
 		foreach ( $cart->get_cart() as $key => $item ) {
-			$groups[ (int) $item['product_id'] ][ $key ] = $item;
+			if ( empty( $item[ Selections::CART_KEY ] ) || empty( $item['data'] ) ) {
+				continue;
+			}
+			$pid                       = (int) $item['product_id'];
+			$groups[ $pid ][ $key ]    = $item;
+			if ( ! isset( $catalog_cache[ $pid ] ) ) {
+				$product                = function_exists( 'wc_get_product' ) ? wc_get_product( $pid ) : null;
+				$catalog_cache[ $pid ]  = $product ? (float) $product->get_price( 'edit' ) : 0.0;
+			}
 		}
 
 		foreach ( $groups as $product_id => $items ) {
-			$bundles = BundleMeta::get_bundles( $product_id );
-			if ( empty( $bundles ) ) {
-				continue;
-			}
+			$catalog_base = $catalog_cache[ $product_id ];
+			$bundles      = BundleMeta::get_bundles( $product_id );
 
 			$total_qty = 0;
 			foreach ( $items as $item ) {
 				$total_qty += (int) $item['quantity'];
 			}
 
-			$result = self::calculate( $total_qty, $bundles );
-			if ( ! $result['applied'] ) {
-				// Below the lowest threshold — clear any prior override and leave AddOnPricer's price alone.
-				foreach ( $items as $key => $item ) {
-					$cart->cart_contents[ $key ]['fn_bundle'] = null;
-				}
-				continue;
-			}
-
-			$effective_unit = $result['effective_unit'];
+			$result        = self::calculate( $total_qty, $bundles );
+			$bundle_applied = ! empty( $result['applied'] );
+			$unit_base     = $bundle_applied ? (float) $result['effective_unit'] : $catalog_base;
 
 			foreach ( $items as $key => $item ) {
 				$delta      = Selections::compute_price_delta( $product_id, $item[ Selections::CART_KEY ] ?? [] );
-				$line_price = $effective_unit + $delta;
-				$item['data']->set_price( max( 0, $line_price ) );
-				$cart->cart_contents[ $key ]['fn_bundle'] = [
-					'applied_tier'    => $result['tier'],
-					'effective_unit'  => $effective_unit,
-					'bundle_units'    => $total_qty,
-					'remainder_units' => 0,
-					'bundle_total'    => $result['total'],
-					'per_meal_rate'   => $result['per_meal_rate'],
-					'threshold_qty'   => $result['threshold_qty'],
-					'extra_qty'       => $result['extra_qty'],
-					'bundle_price'    => $result['bundle_price'],
-				];
+				$line_price = max( 0.0, $unit_base + $delta );
+				$item['data']->set_price( $line_price );
+
+				if ( $bundle_applied ) {
+					$cart->cart_contents[ $key ]['fn_bundle'] = [
+						'applied_tier'    => $result['tier'],
+						'effective_unit'  => $result['effective_unit'],
+						'bundle_units'    => $total_qty,
+						'remainder_units' => 0,
+						'bundle_total'    => $result['total'],
+						'per_meal_rate'   => $result['per_meal_rate'],
+						'threshold_qty'   => $result['threshold_qty'],
+						'extra_qty'       => $result['extra_qty'],
+						'bundle_price'    => $result['bundle_price'],
+					];
+				} else {
+					$cart->cart_contents[ $key ]['fn_bundle'] = null;
+				}
 			}
 		}
 	}
