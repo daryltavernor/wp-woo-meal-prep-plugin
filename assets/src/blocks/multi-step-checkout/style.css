@@ -64,11 +64,6 @@
 	/* Span every column in case the WC checkout block is a CSS grid. */
 	grid-column: 1 / -1;
 }
-.wp-block-woocommerce-checkout > .fn-slot-picker-mount {
-	/* Same grid-span as the action bar — the slot picker now lives at
-	   the checkout root (out of reach of WC's fields-block React tree). */
-	grid-column: 1 / -1;
-}
 .fn-step-actions button {
 	font-family: 'Kanit', system-ui, -apple-system, sans-serif;
 	font-weight: 700;

@@ -67,14 +67,25 @@ function defaultBillingSameAsShipping( checkout ) {
 	window.setTimeout( () => observer.disconnect(), 8000 );
 }
 
-function mountSlotPicker( container ) {
-	const existing = container.querySelector( '.fn-slot-picker-mount' );
-	if ( existing ) {
-		return existing;
+function mountSlotPicker( fieldsBlock ) {
+	// Only count a mount that is a DIRECT child of fields-block as
+	// canonical. Anything nested deeper (inside the React-managed form)
+	// or sitting outside fields-block is an orphan from an older plugin
+	// version's mount location and gets cleaned up below.
+	const canonical = Array.from( fieldsBlock.children ).find(
+		( el ) => el.classList && el.classList.contains( 'fn-slot-picker-mount' )
+	);
+	document.querySelectorAll( '.fn-slot-picker-mount' ).forEach( ( el ) => {
+		if ( el !== canonical ) {
+			el.remove();
+		}
+	} );
+	if ( canonical ) {
+		return canonical;
 	}
 	const mount = document.createElement( 'div' );
 	mount.className = 'fn-slot-picker-mount';
-	container.appendChild( mount );
+	fieldsBlock.appendChild( mount );
 	createRoot( mount ).render( <SlotPicker /> );
 	return mount;
 }
@@ -213,12 +224,12 @@ function apply( root ) {
 		return false;
 	}
 
-	// Slot picker mount lives at the checkout root, same level as nav and
-	// the action bar — WC's React reconciliation of the inner fields block
-	// kept stripping it on iOS Safari. On step 2 it's the only visible
-	// element anyway (every other section is display:none from the step
-	// logic), so the DOM position doesn't affect what the customer sees.
-	const slotMount = mountSlotPicker( checkout );
+	// Slot picker mount lives as a direct child of the fields block (sibling
+	// of express-payment and the form, not inside them). fields-block is
+	// the static WC wrapper — React owns what's inside it (express + form),
+	// not its sibling direct children, so the mount survives reconciliation
+	// without being stripped the way it was when nested inside the form.
+	const slotMount = mountSlotPicker( fields );
 	defaultBillingSameAsShipping( checkout );
 	checkout.dataset.fnMultistep = 'applied';
 
@@ -257,26 +268,22 @@ function apply( root ) {
 	};
 	// WC's React tree re-renders blocks on focus/blur/keyboard events
 	// (significantly more aggressive on iOS Safari) and strips children
-	// it didn't render. Re-attach our nav + action bar + slot picker mount
-	// at the start of every render. Idempotent: only re-inserts when the
-	// node has actually been detached from the checkout root.
+	// it didn't render. Re-attach our nav + action bar + slot picker
+	// mount at the start of every render. Idempotent: only re-inserts
+	// when a node has actually been detached from its expected parent.
 	const ensureChrome = () => {
 		if ( ! checkout.contains( nav ) ) {
 			checkout.prepend( nav );
 		}
-		// Insert slot mount BEFORE the action bar so the visual order is
-		// nav -> [WC blocks] -> slot picker -> action bar. Falls back to
-		// append if the action bar isn't itself attached yet (ordering of
-		// repairs in this same render call).
-		if ( slotMount && ! checkout.contains( slotMount ) ) {
-			if ( checkout.contains( actions ) ) {
-				checkout.insertBefore( slotMount, actions );
-			} else {
-				checkout.appendChild( slotMount );
-			}
-		}
 		if ( ! checkout.contains( actions ) ) {
 			checkout.appendChild( actions );
+		}
+		// Mount must be a DIRECT child of fields-block to stay outside
+		// the React-managed form. parentElement === fields is stricter
+		// than fields.contains() — the latter would accept a mount that
+		// React had moved into the form.
+		if ( slotMount && slotMount.parentElement !== fields ) {
+			fields.appendChild( slotMount );
 		}
 	};
 	const render = () => {
