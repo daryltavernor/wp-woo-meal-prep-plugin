@@ -67,12 +67,12 @@ function defaultBillingSameAsShipping( checkout ) {
 	window.setTimeout( () => observer.disconnect(), 8000 );
 }
 
-function mountSlotPicker( fieldsBlock ) {
-	// Only count a mount that is a DIRECT child of fields-block as
-	// canonical. Anything nested deeper (inside the React-managed form)
-	// or sitting outside fields-block is an orphan from an older plugin
-	// version's mount location and gets cleaned up below.
-	const canonical = Array.from( fieldsBlock.children ).find(
+function mountSlotPicker( container ) {
+	// Only a mount that is a DIRECT child of `container` is canonical.
+	// Anything else (left over from older plugin versions that mounted
+	// the slot picker inside the form or elsewhere in the page) is
+	// cleaned up so the page never ends up with duplicate slot pickers.
+	const canonical = Array.from( container.children ).find(
 		( el ) => el.classList && el.classList.contains( 'fn-slot-picker-mount' )
 	);
 	document.querySelectorAll( '.fn-slot-picker-mount' ).forEach( ( el ) => {
@@ -85,7 +85,7 @@ function mountSlotPicker( fieldsBlock ) {
 	}
 	const mount = document.createElement( 'div' );
 	mount.className = 'fn-slot-picker-mount';
-	fieldsBlock.appendChild( mount );
+	container.appendChild( mount );
 	createRoot( mount ).render( <SlotPicker /> );
 	return mount;
 }
@@ -224,12 +224,12 @@ function apply( root ) {
 		return false;
 	}
 
-	// Slot picker mount lives as a direct child of the fields block (sibling
-	// of express-payment and the form, not inside them). fields-block is
-	// the static WC wrapper — React owns what's inside it (express + form),
-	// not its sibling direct children, so the mount survives reconciliation
-	// without being stripped the way it was when nested inside the form.
-	const slotMount = mountSlotPicker( fields );
+	// Slot picker mount lives at the checkout root (same level as nav and
+	// the action bar). The inner fields block is React-managed by WC, so
+	// even direct children of it get stripped on iOS during reconciliation.
+	// Layout is fixed by CSS Grid on the checkout root + display:contents
+	// on the inner sidebar-layout — see style.css.
+	const slotMount = mountSlotPicker( checkout );
 	defaultBillingSameAsShipping( checkout );
 	checkout.dataset.fnMultistep = 'applied';
 
@@ -270,20 +270,23 @@ function apply( root ) {
 	// (significantly more aggressive on iOS Safari) and strips children
 	// it didn't render. Re-attach our nav + action bar + slot picker
 	// mount at the start of every render. Idempotent: only re-inserts
-	// when a node has actually been detached from its expected parent.
+	// when a node has actually been detached from the checkout root.
 	const ensureChrome = () => {
 		if ( ! checkout.contains( nav ) ) {
 			checkout.prepend( nav );
 		}
+		// Slot mount goes BEFORE the action bar so the grid auto-places it
+		// in the same row as fields-block / totals; the action bar then
+		// drops to its own row at the bottom.
+		if ( slotMount && slotMount.parentElement !== checkout ) {
+			if ( actions.parentElement === checkout ) {
+				checkout.insertBefore( slotMount, actions );
+			} else {
+				checkout.appendChild( slotMount );
+			}
+		}
 		if ( ! checkout.contains( actions ) ) {
 			checkout.appendChild( actions );
-		}
-		// Mount must be a DIRECT child of fields-block to stay outside
-		// the React-managed form. parentElement === fields is stricter
-		// than fields.contains() — the latter would accept a mount that
-		// React had moved into the form.
-		if ( slotMount && slotMount.parentElement !== fields ) {
-			fields.appendChild( slotMount );
 		}
 	};
 	const render = () => {

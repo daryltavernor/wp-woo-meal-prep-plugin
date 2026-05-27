@@ -64,6 +64,60 @@
 	/* Span every column in case the WC checkout block is a CSS grid. */
 	grid-column: 1 / -1;
 }
+
+/* ---------- Desktop layout for the checkout block ----------
+   The slot picker and the action bar are pinned at the checkout root
+   level (only safe place to avoid WC's React reconciliation stripping
+   them on iOS). But WC's two-column grid lives one level deeper, on
+   .wc-block-components-sidebar-layout. To get the slot picker into the
+   left column visually, we promote the checkout root to a CSS grid and
+   use `display: contents` on the inner sidebar-layout so its inner
+   sidebar (totals) + main (fields) drop into our outer grid. Slot
+   picker and fields-block share the same grid cell; on the slot step
+   we hide fields-block so the slot picker has the cell to itself. */
+@media ( min-width: 781px ) {
+	.wp-block-woocommerce-checkout {
+		display: grid;
+		grid-template-columns: minmax( 0, 1fr ) minmax( 280px, 380px );
+		column-gap: 2rem;
+		row-gap: 1rem;
+		align-items: start;
+	}
+	/* Step nav spans both columns at the top */
+	.wp-block-woocommerce-checkout > .fn-steps-nav {
+		grid-column: 1 / -1;
+		grid-row: 1;
+	}
+	/* Flatten the inner sidebar-layout so its children become direct
+	   participants of our outer grid. */
+	.wp-block-woocommerce-checkout > .wc-block-components-sidebar-layout {
+		display: contents;
+	}
+	/* Order summary on the right, aligned with the form / slot picker */
+	.wp-block-woocommerce-checkout .wc-block-components-sidebar.wp-block-woocommerce-checkout-totals-block {
+		grid-column: 2;
+		grid-row: 2;
+	}
+	/* Fields block (form) on the left */
+	.wp-block-woocommerce-checkout .wc-block-components-main.wp-block-woocommerce-checkout-fields-block {
+		grid-column: 1;
+		grid-row: 2;
+	}
+	/* Slot picker also on the left, same row as fields. Step logic hides
+	   one or the other so they never display together. */
+	.wp-block-woocommerce-checkout > .fn-slot-picker-mount {
+		grid-column: 1;
+		grid-row: 2;
+	}
+}
+
+/* On the slot step the fields-block is empty (every form section is
+   already display:none from the step logic), so hide the container too
+   — otherwise it would occupy the grid cell that the slot picker
+   should fill. Applies at every breakpoint. */
+.wp-block-woocommerce-checkout[data-fn-step="slot"] .wp-block-woocommerce-checkout-fields-block {
+	display: none !important;
+}
 .fn-step-actions button {
 	font-family: 'Kanit', system-ui, -apple-system, sans-serif;
 	font-weight: 700;
