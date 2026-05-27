@@ -37,6 +37,20 @@ final class StoreApiExtensions {
 		// anything. TotalsDisplay::maybe_hide_cart_shipping only fires on the
 		// `wp` action so it never runs against the Store API endpoint.
 		add_filter( 'woocommerce_cart_ready_to_calc_shipping', [ $this, 'gate_shipping_calc' ], 100 );
+		// On every render of the basket page, clear any leftover fulfilment +
+		// chosen-shipping-method from the session. WC sessions persist across
+		// browsing sessions for logged-in users, so without this, a customer
+		// who previously picked Delivery in a prior visit would see the £fee
+		// delivery rate calculated into the basket total even though they
+		// haven't picked anything for THIS order yet. The customer re-picks
+		// their slot in step 2 of checkout.
+		add_action( 'wp', [ $this, 'clear_stale_fulfilment_on_cart_page' ] );
+		// Same safety for cart mutations: adding or removing an item
+		// invalidates any previously-picked slot so the customer gets a
+		// fresh selection at checkout.
+		add_action( 'woocommerce_add_to_cart', [ $this, 'clear_session_fulfilment' ] );
+		add_action( 'woocommerce_cart_item_removed', [ $this, 'clear_session_fulfilment' ] );
+		add_action( 'woocommerce_cart_emptied', [ $this, 'clear_session_fulfilment' ] );
 	}
 
 	public function extend(): void {
@@ -232,6 +246,36 @@ final class StoreApiExtensions {
 			}
 		}
 		return null;
+	}
+
+	/**
+	 * Wipe fn_fulfilment + chosen_shipping_methods from the WC session on
+	 * cart page render. Runs on the `wp` action where is_cart() is reliable;
+	 * the subsequent Store API fetch the Blocks cart issues then sees an
+	 * empty fulfilment, filter_package_rates returns [], and shipping_total
+	 * stays at 0 on the basket page even for logged-in customers whose
+	 * session carries a previously-picked slot.
+	 */
+	public function clear_stale_fulfilment_on_cart_page(): void {
+		if ( ! function_exists( 'is_cart' ) || ! function_exists( 'is_checkout' ) ) {
+			return;
+		}
+		if ( ! is_cart() || is_checkout() ) {
+			return;
+		}
+		$this->clear_session_fulfilment();
+	}
+
+	/**
+	 * Clear the fulfilment + chosen-shipping-method from the WC session.
+	 * Idempotent — safe to call on any cart mutation event.
+	 */
+	public function clear_session_fulfilment(): void {
+		if ( ! function_exists( 'WC' ) || ! WC() || ! WC()->session ) {
+			return;
+		}
+		WC()->session->set( 'fn_fulfilment', null );
+		WC()->session->set( 'chosen_shipping_methods', [] );
 	}
 
 	/**
