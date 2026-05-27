@@ -254,11 +254,19 @@ final class StoreApiExtensions {
 	 * Narrow the package's rate list to match the customer's chosen
 	 * fulfilment type. With type=collection the Delivery rate is removed; with
 	 * type=delivery the Collection rate is removed. With no fulfilment set
-	 * (e.g. cart page before the slot picker runs) rates pass through —
-	 * gate_shipping_calc() will have suppressed the calculation entirely
-	 * before this filter runs.
+	 * (basket page, or step 1 of checkout before the slot picker has run) we
+	 * return an empty rate list — this prevents WC from picking a default
+	 * rate (the first one in the zone, typically the £fee Delivery) and
+	 * adding its cost to the displayed total before the customer has chosen
+	 * anything.
 	 *
-	 * This is the single guarantee that customers cannot be charged a
+	 * gate_shipping_calc() also returns false in this case, which suppresses
+	 * the front-end shipping table display in the legacy shortcode cart, but
+	 * it does not stop WC_Cart::calculate_shipping() from running — only this
+	 * empty-rate return guarantees shipping_total stays 0 across all UI paths
+	 * including the Blocks Store API cart endpoint.
+	 *
+	 * This is also the single guarantee that customers cannot be charged a
 	 * delivery fee when they picked Collection.
 	 *
 	 * @param array<string, \WC_Shipping_Rate> $rates
@@ -270,7 +278,7 @@ final class StoreApiExtensions {
 		$fulfilment = self::get_session_fulfilment();
 		$type       = $fulfilment['type'] ?? '';
 		if ( 'delivery' !== $type && 'collection' !== $type ) {
-			return $rates;
+			return [];
 		}
 
 		$want_pickup = ( 'collection' === $type );
