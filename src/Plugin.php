@@ -19,6 +19,7 @@ use FastNutrition\MealPrep\Cart\OrderItemMeta;
 use FastNutrition\MealPrep\Cart\Selections;
 use FastNutrition\MealPrep\Cart\Surcharge;
 use FastNutrition\MealPrep\Cart\TotalsDisplay;
+use FastNutrition\MealPrep\Checkout\FulfilmentDisplay;
 use FastNutrition\MealPrep\Checkout\MultiStep;
 use FastNutrition\MealPrep\Checkout\StoreApiExtensions;
 use FastNutrition\MealPrep\Delivery\BlockedDates;
@@ -76,6 +77,7 @@ final class Plugin {
 
 		( new MultiStep() )->register();
 		( new StoreApiExtensions() )->register();
+		( new FulfilmentDisplay() )->register();
 
 		( new MenuRegistry() )->register();
 		( new SettingsPage() )->register();

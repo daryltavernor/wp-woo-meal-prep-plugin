@@ -251,6 +251,24 @@ the order is created. No effect on totals.
   which also keeps the summary delivery line accurate.
 * **Version bumped to 1.8.6.**
 
+## What changed in v1.8.7
+
+* **Clear delivery/collection line on the order summary + emails.** The chosen
+  slot is persisted as the `_fn_fulfilment` order meta but was only ever read by
+  the admin label/prep tooling — nothing showed the customer or the team *what
+  they picked* in plain language. New `Checkout/FulfilmentDisplay`:
+  * adds one row to the order totals table (`woocommerce_get_order_item_totals`),
+    inserted right after the shipping line — e.g. **"Delivery: Tuesday, 3 June
+    2026 · 09:00–12:00"** (collection also shows "Collect from <location>").
+    The totals table is shared by the thank-you page, My Account → order, and
+    both the customer and admin "New order" emails, so the one row covers them
+    all consistently.
+  * renders a clear block on the admin order edit screen under the shipping
+    address (`woocommerce_admin_order_data_after_shipping_address`), including
+    the delivery round / pickup point name.
+  Display-only; no effect on totals.
+* **Version bumped to 1.8.7.**
+
 # Test cart scenarios
 
 These are the carts used to verify the v1.8.0 pricing fix. Run each in a
