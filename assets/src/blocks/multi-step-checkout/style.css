@@ -109,6 +109,28 @@
 		grid-column: 1;
 		grid-row: 2;
 	}
+	/* Defensive: WC sometimes adds extra direct children to the checkout
+	   block (a scroll-to-top marker, snackbar/notices containers, empty
+	   placeholder divs). Without explicit placement they auto-flow into
+	   grid cells and compete with the totals/fields blocks for column
+	   space — visible as the order summary collapsing on desktop. Span
+	   them full-width and force-shrink so they don't take a column cell. */
+	.wp-block-woocommerce-checkout > .with-scroll-to-top__scroll-point,
+	.wp-block-woocommerce-checkout > .wc-block-components-notices,
+	.wp-block-woocommerce-checkout > .wc-block-components-notices__snackbar {
+		grid-column: 1 / -1;
+		min-width: 0;
+	}
+	/* Defensive: ensure the order summary block can actually expand to
+	   fill its allocated grid cell width. WC's own CSS sometimes sets
+	   a percentage-based width on .wc-block-components-sidebar from
+	   their default 2-col layout, which doesn't apply when the parent
+	   is display: contents — but force-set width: 100% so the totals
+	   block always uses the minmax(280px, 380px) cell we gave it. */
+	.wp-block-woocommerce-checkout .wc-block-components-sidebar.wp-block-woocommerce-checkout-totals-block {
+		width: 100%;
+		min-width: 0;
+	}
 }
 
 /* On the slot step the fields-block is empty (every form section is
