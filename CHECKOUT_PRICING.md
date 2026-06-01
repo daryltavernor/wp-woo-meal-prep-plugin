@@ -200,6 +200,35 @@ the order is created. No effect on totals.
   label-preference, and most-expensive branches are gone.
 * **Version bumped to 1.8.0** (behaviour-changing release).
 
+## What changed in v1.8.5
+
+* **Bundle totals are now penny-exact across split lines.** `BundlePricer::apply()`
+  used to price every unit in a group at `effective_unit = total / qty`. WooCommerce
+  rounds each cart line's `unit_price × qty` to the store's currency precision
+  *independently*, so the sum of those rounded line totals drifted off the bundle
+  total whenever the meals were spread over more than one line — e.g. 15 meals at
+  £50 split across three 5-meal lines priced each unit at £3.3333…, which WC rounded
+  to £16.67 per line and summed to **£50.01**. The same maths produced **£49.95** for
+  fifteen separate single-meal lines. `apply()` now apportions the bundle total across
+  the lines in integer pence and hands the rounding remainder to the final line, so the
+  per-line totals always sum to exactly the bundle total. Add-on deltas are still added
+  per unit on top and are unaffected.
+* **Shipping rate cache is invalidated when the fulfilment changes.** WC caches a
+  package's shipping rates in the session (`shipping_for_package_*`), keyed by a hash of
+  the cart contents + destination + the `shipping` transient version — but **not** our
+  `fn_fulfilment` value. So picking a slot (or switching delivery ↔ collection) without
+  touching the cart left the hash unchanged, and `calculate_shipping()` could return the
+  *empty* rate list cached before a slot was chosen (see `filter_package_rates`,
+  v1.8.2) — skipping our filter entirely and charging **no delivery**.
+  `StoreApiExtensions::flush_shipping_cache()` now bumps the `shipping` transient version
+  on every fulfilment change (in `update_callback` and `clear_session_fulfilment`), so the
+  next `calculate_shipping()` recomputes the rates and the delivery fee reaches the total.
+* **Order summary no longer overlaps the action bar.** WC renders the order-summary
+  sidebar `position: sticky`; inside the multi-step grid it detached on scroll and slid
+  down over the Back/Next bar. The desktop stylesheet now pins the summary
+  `position: static` and gives the action bar `z-index: 2`.
+* **Version bumped to 1.8.5.**
+
 # Test cart scenarios
 
 These are the carts used to verify the v1.8.0 pricing fix. Run each in a

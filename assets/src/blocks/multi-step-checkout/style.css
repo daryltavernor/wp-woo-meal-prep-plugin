@@ -131,6 +131,20 @@
 		width: 100%;
 		min-width: 0;
 	}
+	/* WC makes the order summary `position: sticky` by default. Inside our
+	   grid (with the action bar living on a row below the summary) a sticky
+	   summary detaches on scroll and slides down OVER the Back/Next action
+	   bar — the reported "button overlapping the order summary". Pin the
+	   summary in normal flow so it can't overlap anything below it. */
+	.wp-block-woocommerce-checkout .wc-block-components-sidebar.wp-block-woocommerce-checkout-totals-block {
+		position: static !important;
+	}
+	/* Belt-and-braces: keep the action bar painting above the summary even if
+	   a theme reintroduces stickiness, so its buttons stay clickable. */
+	.wp-block-woocommerce-checkout > .fn-step-actions {
+		position: relative;
+		z-index: 2;
+	}
 }
 
 /* On the slot step the fields-block is empty (every form section is

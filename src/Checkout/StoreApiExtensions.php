@@ -187,6 +187,7 @@ final class StoreApiExtensions {
 			|| $date < SlotAvailability::earliest_allowed_date()
 		) {
 			WC()->session->set( 'fn_fulfilment', null );
+			self::flush_shipping_cache();
 			return;
 		}
 		WC()->session->set(
@@ -198,6 +199,10 @@ final class StoreApiExtensions {
 				'slot'       => $slot,
 			]
 		);
+		// The fulfilment type drives filter_package_rates(); invalidate WC's
+		// per-package rate cache so the next calculate_shipping() recomputes
+		// the rates for this new type instead of serving stale ones.
+		self::flush_shipping_cache();
 
 		// Auto-select the matching WC shipping method so the order carries a
 		// correct shipping line. We hide WC's native picker on the checkout
@@ -276,6 +281,29 @@ final class StoreApiExtensions {
 		}
 		WC()->session->set( 'fn_fulfilment', null );
 		WC()->session->set( 'chosen_shipping_methods', [] );
+		self::flush_shipping_cache();
+	}
+
+	/**
+	 * Invalidate WooCommerce's cached per-package shipping rates.
+	 *
+	 * WC caches the rates returned for a package in the session under
+	 * `shipping_for_package_{index}`, keyed by a hash that includes the cart
+	 * contents, the destination, and the 'shipping' transient version — but
+	 * NOT our `fn_fulfilment` session value. So when the customer picks a slot
+	 * (or switches delivery ↔ collection) without changing the cart contents
+	 * or address, the package hash is unchanged and calculate_shipping() can
+	 * return the previously-cached rate list, skipping filter_package_rates()
+	 * entirely. If that cached list was the empty one produced before a slot
+	 * was chosen, the delivery rate never reaches the total and no shipping is
+	 * charged. Bumping the 'shipping' transient version changes the hash, so
+	 * the next calculate_shipping() recomputes and our filter runs against the
+	 * current fulfilment type.
+	 */
+	private static function flush_shipping_cache(): void {
+		if ( class_exists( '\WC_Cache_Helper' ) ) {
+			\WC_Cache_Helper::get_transient_version( 'shipping', true );
+		}
 	}
 
 	/**
