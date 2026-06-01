@@ -285,14 +285,15 @@ body .wc-block-components-checkout-place-order-button > * {
 	display: none !important;
 }
 
-/* ---------- Hide order-summary shipping line until payment step ----------
-   The customer picks delivery vs collection via our slot picker on step 2,
-   not via WC's shipping picker. Until they've actually committed (which
-   only happens on the payment step) the order summary shouldn't be
-   advertising a method — and especially shouldn't show "Collection: Free"
-   while they're still deciding. */
-.wp-block-woocommerce-checkout:not([data-fn-step="payment"]) .wp-block-woocommerce-checkout-order-summary-shipping-block,
-.wp-block-woocommerce-checkout:not([data-fn-step="payment"]) .wc-block-components-totals-shipping {
+/* ---------- Order-summary shipping line: hidden until a slot is chosen ----------
+   The customer picks delivery vs collection via our slot picker, not via WC's
+   shipping picker. While they're still deciding there's nothing meaningful to
+   show (and we don't want "Collection: Free" advertised mid-decision), so the
+   line stays hidden. The moment they select a slot, view.js sets
+   data-fn-fulfilled="1" on the checkout root and the line appears — on whatever
+   step they're on — showing the chosen method and its cost. */
+.wp-block-woocommerce-checkout:not([data-fn-fulfilled="1"]) .wp-block-woocommerce-checkout-order-summary-shipping-block,
+.wp-block-woocommerce-checkout:not([data-fn-fulfilled="1"]) .wc-block-components-totals-shipping {
 	display: none !important;
 }
 

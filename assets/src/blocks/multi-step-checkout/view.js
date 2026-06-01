@@ -73,7 +73,8 @@ function mountSlotPicker( container ) {
 	// the slot picker inside the form or elsewhere in the page) is
 	// cleaned up so the page never ends up with duplicate slot pickers.
 	const canonical = Array.from( container.children ).find(
-		( el ) => el.classList && el.classList.contains( 'fn-slot-picker-mount' )
+		( el ) =>
+			el.classList && el.classList.contains( 'fn-slot-picker-mount' )
 	);
 	document.querySelectorAll( '.fn-slot-picker-mount' ).forEach( ( el ) => {
 		if ( el !== canonical ) {
@@ -102,7 +103,9 @@ function SlotPicker() {
 
 	useEffect( () => {
 		const readPostcode = () => {
-			const input = document.querySelector( 'input[autocomplete="shipping postal-code"], input[autocomplete="billing postal-code"], input[id*="postcode"]' );
+			const input = document.querySelector(
+				'input[autocomplete="shipping postal-code"], input[autocomplete="billing postal-code"], input[id*="postcode"]'
+			);
 			if ( input ) {
 				setPostcode( input.value );
 			}
@@ -118,15 +121,34 @@ function SlotPicker() {
 			return;
 		}
 		setLoading( true );
-		apiFetch( { path: `fastnutrition/v1/slots?postcode=${ encodeURIComponent( postcode ) }&method=${ method }` } )
+		apiFetch( {
+			path: `fastnutrition/v1/slots?postcode=${ encodeURIComponent(
+				postcode
+			) }&method=${ method }`,
+		} )
 			.then( ( r ) => setOptions( r.options || [] ) )
 			.finally( () => setLoading( false ) );
 	}, [ postcode, method ] );
 
-	// Collapse the list whenever the underlying options change.
+	// Collapse the list — and clear any prior pick — whenever the method or
+	// postcode changes: the available slots differ, so a previous selection is
+	// no longer valid. Clearing it also removes the order-summary delivery line
+	// (gated on data-fn-fulfilled) until the customer picks again.
 	useEffect( () => {
 		setShowAll( false );
+		setSelected( null );
 	}, [ method, postcode ] );
+
+	// Mirror "a slot has been chosen" onto the checkout root so CSS can reveal
+	// the order-summary shipping line ONLY after the customer has actually
+	// picked delivery/collection. Before that there is nothing meaningful to
+	// show; after it, the line appears with the method + cost.
+	useEffect( () => {
+		const root = document.querySelector( '.wp-block-woocommerce-checkout' );
+		if ( root ) {
+			root.dataset.fnFulfilled = selected ? '1' : '0';
+		}
+	}, [ selected ] );
 
 	useEffect( () => {
 		if ( ! selected ) {
@@ -148,48 +170,110 @@ function SlotPicker() {
 
 	return (
 		<div className="fn-slot-picker">
-			<h3 className="fn-slot-heading">{ __( 'Choose your delivery or collection', 'fastnutrition-mealprep' ) }</h3>
-			<p className="fn-slot-help">{ __( 'Delivery availability is based on your postcode above. Collection is open to everyone.', 'fastnutrition-mealprep' ) }</p>
+			<h3 className="fn-slot-heading">
+				{ __(
+					'Choose your delivery or collection',
+					'fastnutrition-mealprep'
+				) }
+			</h3>
+			<p className="fn-slot-help">
+				{ __(
+					'Delivery availability is based on your postcode above. Collection is open to everyone.',
+					'fastnutrition-mealprep'
+				) }
+			</p>
 			<div className="fn-slot-tabs">
-				<button type="button" className={ method === 'delivery' ? 'is-active' : '' } onClick={ () => setMethod( 'delivery' ) }>
+				<button
+					type="button"
+					className={ method === 'delivery' ? 'is-active' : '' }
+					onClick={ () => setMethod( 'delivery' ) }
+				>
 					{ __( 'Delivery', 'fastnutrition-mealprep' ) }
 				</button>
-				<button type="button" className={ method === 'collection' ? 'is-active' : '' } onClick={ () => setMethod( 'collection' ) }>
+				<button
+					type="button"
+					className={ method === 'collection' ? 'is-active' : '' }
+					onClick={ () => setMethod( 'collection' ) }
+				>
 					{ __( 'Collection', 'fastnutrition-mealprep' ) }
 				</button>
 			</div>
-			{ loading && <p>{ __( 'Checking availability…', 'fastnutrition-mealprep' ) }</p> }
+			{ loading && (
+				<p>
+					{ __( 'Checking availability…', 'fastnutrition-mealprep' ) }
+				</p>
+			) }
 			{ ! loading && options.length === 0 && postcode && (
-				<p className="fn-slot-empty">{ __( 'No slots available for this postcode. Try collection, or pick a different address.', 'fastnutrition-mealprep' ) }</p>
+				<p className="fn-slot-empty">
+					{ __(
+						'No slots available for this postcode. Try collection, or pick a different address.',
+						'fastnutrition-mealprep'
+					) }
+				</p>
 			) }
 			{ ! loading && ! postcode && (
-				<p className="fn-slot-empty">{ __( 'Enter your postcode above and availability will appear here.', 'fastnutrition-mealprep' ) }</p>
+				<p className="fn-slot-empty">
+					{ __(
+						'Enter your postcode above and availability will appear here.',
+						'fastnutrition-mealprep'
+					) }
+				</p>
 			) }
 			{ ! loading && ! selected && options.length > 0 && (
-				<p className="fn-slot-hint">{ __( 'Pick a date and time below to continue.', 'fastnutrition-mealprep' ) }</p>
+				<p className="fn-slot-hint">
+					{ __(
+						'Pick a date and time below to continue.',
+						'fastnutrition-mealprep'
+					) }
+				</p>
 			) }
 			<div className="fn-slot-dates">
-				{ ( showAll ? options : options.slice( 0, VISIBLE_LIMIT ) ).map( ( day ) => (
-					<div key={ `${ day.date }-${ day.profile_id }` } className="fn-slot-day">
-						<h4>{ day.day_label } <small>({ day.profile_name })</small></h4>
-						<div className="fn-slot-rows">
-							{ day.slots.map( ( slot ) => {
-								const isActive = selected && selected.date === day.date && selected.slot.start === slot.start && selected.profile_id === day.profile_id;
-								return (
-									<button
-										key={ `${ slot.start }-${ slot.end }` }
-										type="button"
-										className={ isActive ? 'is-active' : '' }
-										onClick={ () => setSelected( { date: day.date, profile_id: day.profile_id, slot } ) }
-									>
-										{ slot.start }–{ slot.end }
-										{ slot.remaining !== null && <small> ({ slot.remaining })</small> }
-									</button>
-								);
-							} ) }
+				{ ( showAll ? options : options.slice( 0, VISIBLE_LIMIT ) ).map(
+					( day ) => (
+						<div
+							key={ `${ day.date }-${ day.profile_id }` }
+							className="fn-slot-day"
+						>
+							<h4>
+								{ day.day_label }{ ' ' }
+								<small>({ day.profile_name })</small>
+							</h4>
+							<div className="fn-slot-rows">
+								{ day.slots.map( ( slot ) => {
+									const isActive =
+										selected &&
+										selected.date === day.date &&
+										selected.slot.start === slot.start &&
+										selected.profile_id === day.profile_id;
+									return (
+										<button
+											key={ `${ slot.start }-${ slot.end }` }
+											type="button"
+											className={
+												isActive ? 'is-active' : ''
+											}
+											onClick={ () =>
+												setSelected( {
+													date: day.date,
+													profile_id: day.profile_id,
+													slot,
+												} )
+											}
+										>
+											{ slot.start }–{ slot.end }
+											{ slot.remaining !== null && (
+												<small>
+													{ ' ' }
+													({ slot.remaining })
+												</small>
+											) }
+										</button>
+									);
+								} ) }
+							</div>
 						</div>
-					</div>
-				) ) }
+					)
+				) }
 			</div>
 			{ options.length > VISIBLE_LIMIT && (
 				<button
@@ -200,11 +284,10 @@ function SlotPicker() {
 					{ showAll
 						? __( 'Show fewer', 'fastnutrition-mealprep' )
 						: sprintf(
-							/* translators: %d: number of additional dates */
-							__( 'Show %d more', 'fastnutrition-mealprep' ),
-							options.length - VISIBLE_LIMIT
-						)
-					}
+								/* translators: %d: number of additional dates */
+								__( 'Show %d more', 'fastnutrition-mealprep' ),
+								options.length - VISIBLE_LIMIT
+						  ) }
 				</button>
 			) }
 		</div>
@@ -219,7 +302,9 @@ function apply( root ) {
 	if ( checkout.dataset.fnMultistep === 'applied' ) {
 		return true;
 	}
-	const fields = checkout.querySelector( '.wp-block-woocommerce-checkout-fields-block' );
+	const fields = checkout.querySelector(
+		'.wp-block-woocommerce-checkout-fields-block'
+	);
 	if ( ! fields ) {
 		return false;
 	}
@@ -245,7 +330,13 @@ function apply( root ) {
 
 	const actions = document.createElement( 'div' );
 	actions.className = 'fn-step-actions';
-	actions.innerHTML = `<button type="button" class="fn-step-back">${ __( 'Back', 'fastnutrition-mealprep' ) }</button> <button type="button" class="fn-step-next">${ __( 'Next', 'fastnutrition-mealprep' ) }</button>`;
+	actions.innerHTML = `<button type="button" class="fn-step-back">${ __(
+		'Back',
+		'fastnutrition-mealprep'
+	) }</button> <button type="button" class="fn-step-next">${ __(
+		'Next',
+		'fastnutrition-mealprep'
+	) }</button>`;
 	// Append to the checkout root (sibling of the fields and totals blocks),
 	// not inside fields. WC's React reconciliation of the fields block on
 	// iOS Safari was stripping any manually-appended child — including this
@@ -296,7 +387,9 @@ function apply( root ) {
 		// elements the JS selector loop doesn't reach (e.g. Stripe-rendered
 		// express checkout that has no `wp-block-...` wrapper class).
 		checkout.dataset.fnStep = active;
-		nav.querySelectorAll( 'li' ).forEach( ( li ) => li.classList.toggle( 'is-active', li.dataset.step === active ) );
+		nav.querySelectorAll( 'li' ).forEach( ( li ) =>
+			li.classList.toggle( 'is-active', li.dataset.step === active )
+		);
 		STEPS.forEach( ( step ) => {
 			const show = step.key === active;
 			step.selectors.forEach( ( sel ) => {
@@ -321,8 +414,10 @@ function apply( root ) {
 		// On the final (payment) step, host our BACK button inside WC's
 		// actions row so it sits beside Place Order. Otherwise restore it
 		// to our own action bar at the bottom of the form.
-		const wcActionsRow = checkout.querySelector( '.wc-block-checkout__actions_row' );
-		const onLastStep   = idx === STEPS.length - 1;
+		const wcActionsRow = checkout.querySelector(
+			'.wc-block-checkout__actions_row'
+		);
+		const onLastStep = idx === STEPS.length - 1;
 		if ( onLastStep && wcActionsRow && back ) {
 			if ( ! wcActionsRow.contains( back ) ) {
 				wcActionsRow.insertBefore( back, wcActionsRow.firstChild );
@@ -344,8 +439,91 @@ function apply( root ) {
 		}
 	};
 
-	const slotIsSelected = () => !! checkout.querySelector( '.fn-slot-rows button.is-active' );
+	const slotIsSelected = () =>
+		!! checkout.querySelector( '.fn-slot-rows button.is-active' );
 	const SLOT_STEP_IDX = STEPS.findIndex( ( s ) => s.key === 'slot' );
+	const ADDRESS_STEP_IDX = STEPS.findIndex( ( s ) => s.key === 'address' );
+	const ADDRESS_SELECTORS = STEPS[ ADDRESS_STEP_IDX ].selectors;
+
+	const isVisible = ( el ) =>
+		!! (
+			el &&
+			( el.offsetWidth || el.offsetHeight || el.getClientRects().length )
+		);
+
+	// Validate the contact + address step before letting the customer advance.
+	// WC Blocks renders required inputs with `required` / aria-required="true";
+	// we check every visible, enabled required field in the step's containers,
+	// plus the phone number explicitly (merchants often leave it optional, but
+	// orders need a contact number). Returns true only when everything's valid;
+	// on failure it nudges WC to surface its inline errors and focuses the first
+	// offending field.
+	const flagInvalid = ( field, bag ) => {
+		if ( ! bag.first ) {
+			bag.first = field;
+		}
+		// Best-effort: make WC Blocks show its own inline error for the field.
+		[ 'input', 'change', 'blur', 'focusout' ].forEach( ( type ) => {
+			field.dispatchEvent( new Event( type, { bubbles: true } ) );
+		} );
+	};
+	const validateAddressStep = () => {
+		const bag = { first: null };
+
+		ADDRESS_SELECTORS.forEach( ( sel ) => {
+			checkout.querySelectorAll( sel ).forEach( ( container ) => {
+				if ( ! isVisible( container ) ) {
+					return;
+				}
+				container
+					.querySelectorAll( 'input, select, textarea' )
+					.forEach( ( field ) => {
+						if (
+							field.disabled ||
+							field.type === 'hidden' ||
+							! isVisible( field )
+						) {
+							return;
+						}
+						const required =
+							field.required ||
+							field.getAttribute( 'aria-required' ) === 'true';
+						if ( ! required ) {
+							return;
+						}
+						const value = ( field.value || '' ).trim();
+						const valid =
+							'' !== value &&
+							( typeof field.checkValidity !== 'function' ||
+								field.checkValidity() );
+						if ( ! valid ) {
+							flagInvalid( field, bag );
+						}
+					} );
+			} );
+		} );
+
+		// Phone is enforced regardless of the WC "optional" setting.
+		checkout
+			.querySelectorAll(
+				'input[type="tel"], input[autocomplete*="tel"], input[id$="-phone"], input[id*="phone" i]'
+			)
+			.forEach( ( field ) => {
+				if ( field.disabled || ! isVisible( field ) ) {
+					return;
+				}
+				if ( '' === ( field.value || '' ).trim() ) {
+					flagInvalid( field, bag );
+				}
+			} );
+
+		if ( bag.first ) {
+			bag.first.focus();
+			bag.first.scrollIntoView( { behavior: 'smooth', block: 'center' } );
+			return false;
+		}
+		return true;
+	};
 	const flashSlotRequired = () => {
 		const picker = checkout.querySelector( '.fn-slot-picker' );
 		if ( ! picker ) {
@@ -353,15 +531,24 @@ function apply( root ) {
 		}
 		picker.classList.add( 'fn-slot-required' );
 		picker.scrollIntoView( { behavior: 'smooth', block: 'center' } );
-		window.setTimeout( () => picker.classList.remove( 'fn-slot-required' ), 2400 );
+		window.setTimeout(
+			() => picker.classList.remove( 'fn-slot-required' ),
+			2400
+		);
 	};
 
 	nav.addEventListener( 'click', ( e ) => {
 		if ( e.target.tagName !== 'LI' ) {
 			return;
 		}
-		const target    = e.target.dataset.step;
+		const target = e.target.dataset.step;
 		const targetIdx = STEPS.findIndex( ( s ) => s.key === target );
+		// Block jumping past the address step with required fields empty.
+		if ( targetIdx > ADDRESS_STEP_IDX && ! validateAddressStep() ) {
+			active = 'address';
+			render();
+			return;
+		}
 		// Block jumping past the slot step without a selection.
 		if ( targetIdx > SLOT_STEP_IDX && ! slotIsSelected() ) {
 			active = 'slot';
@@ -375,6 +562,10 @@ function apply( root ) {
 	checkout.addEventListener( 'click', ( e ) => {
 		if ( e.target.classList.contains( 'fn-step-next' ) ) {
 			const idx = STEPS.findIndex( ( s ) => s.key === active );
+			// Contact + address fields (incl. phone) must be valid to advance.
+			if ( active === 'address' && ! validateAddressStep() ) {
+				return;
+			}
 			// Slot picker is mandatory: can't leave the slot step without a pick.
 			if ( active === 'slot' && ! slotIsSelected() ) {
 				flashSlotRequired();

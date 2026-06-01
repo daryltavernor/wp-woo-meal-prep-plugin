@@ -229,6 +229,28 @@ the order is created. No effect on totals.
   `position: static` and gives the action bar `z-index: 2`.
 * **Version bumped to 1.8.5.**
 
+## What changed in v1.8.6
+
+* **The "Next" button validates the contact + address step.** The multi-step UI
+  let customers click Next without filling required fields. `view.js` now runs
+  `validateAddressStep()` before advancing past step 1 (and before any nav jump
+  that skips it): it checks every visible, enabled required field
+  (`required` / `aria-required="true"`) in the contact/shipping/billing
+  containers via `checkValidity()` + non-empty value, **and enforces the phone
+  number explicitly** regardless of WC's optional setting. On failure it nudges
+  WC Blocks to show its inline errors and focuses the first offending field.
+* **The order-summary shipping line now appears once a slot is chosen** rather
+  than only on the payment step. The slot picker sets `data-fn-fulfilled="1"` on
+  the checkout root when a slot is selected (and clears it when the method or
+  postcode changes), and the CSS gate moved from `:not([data-fn-step="payment"])`
+  to `:not([data-fn-fulfilled="1"])`. While the customer is still choosing
+  delivery vs collection the line shows nothing; the moment they pick, it shows
+  the chosen method and its cost on whatever step they're on.
+* **Switching method/postcode clears the prior slot pick.** Previously the picker
+  kept a stale selection (and could re-send it for the new type); it now resets,
+  which also keeps the summary delivery line accurate.
+* **Version bumped to 1.8.6.**
+
 # Test cart scenarios
 
 These are the carts used to verify the v1.8.0 pricing fix. Run each in a
