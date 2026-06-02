@@ -351,8 +351,17 @@ body .wc-block-components-checkout-place-order-button > * {
 	gap: 0.4rem;
 	margin-bottom: 0.75rem;
 }
-.fn-slot-tabs button {
+/* Each option is a pill with its fee caption stacked underneath, so the fee
+   never crowds the pill's rounded border. */
+.fn-slot-tab {
 	flex: 1;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 0.25rem;
+}
+.fn-slot-tabs button {
+	width: 100%;
 	padding: 0.4rem 1rem;
 	border: 2px solid #000;
 	border-radius: 999px;
@@ -368,25 +377,19 @@ body .wc-block-components-checkout-place-order-button > * {
 	background: #000;
 	color: #c5e643;
 }
-/* Fee hints on the method tabs. Collection is free → bold; delivery shows the
-   zone's fee in small grey italic. text-transform/letter-spacing reset so the
-   amount isn't uppercased by the tab styling. */
-.fn-slot-tabs .fn-fee-free {
-	margin-left: 0.4em;
+/* Fee captions under each pill: collection is free (bold); delivery shows the
+   zone's fee in small grey italic. */
+.fn-slot-tab .fn-fee-free {
+	font-size: 0.82em;
 	font-weight: 800;
+	line-height: 1.2;
 }
-.fn-slot-tabs .fn-fee {
-	margin-left: 0.4em;
+.fn-slot-tab .fn-fee {
 	font-size: 0.82em;
 	font-weight: 400;
 	font-style: italic;
 	color: #777;
-	text-transform: none;
-	letter-spacing: 0;
-}
-/* Keep the active (black) tab's grey fee readable against the dark fill. */
-.fn-slot-tabs button.is-active .fn-fee {
-	color: #b9c98f;
+	line-height: 1.2;
 }
 
 /* Day groups — compact, day label small, slots wrap as pills */

@@ -191,26 +191,30 @@ function SlotPicker() {
 				) }
 			</p>
 			<div className="fn-slot-tabs">
-				<button
-					type="button"
-					className={ method === 'collection' ? 'is-active' : '' }
-					onClick={ () => setMethod( 'collection' ) }
-				>
-					{ __( 'Collection', 'fastnutrition-mealprep' ) }
-					<strong className="fn-fee-free">
+				<div className="fn-slot-tab">
+					<button
+						type="button"
+						className={ method === 'collection' ? 'is-active' : '' }
+						onClick={ () => setMethod( 'collection' ) }
+					>
+						{ __( 'Collection', 'fastnutrition-mealprep' ) }
+					</button>
+					<span className="fn-fee-free">
 						{ __( 'Free', 'fastnutrition-mealprep' ) }
-					</strong>
-				</button>
-				<button
-					type="button"
-					className={ method === 'delivery' ? 'is-active' : '' }
-					onClick={ () => setMethod( 'delivery' ) }
-				>
-					{ __( 'Delivery', 'fastnutrition-mealprep' ) }
+					</span>
+				</div>
+				<div className="fn-slot-tab">
+					<button
+						type="button"
+						className={ method === 'delivery' ? 'is-active' : '' }
+						onClick={ () => setMethod( 'delivery' ) }
+					>
+						{ __( 'Delivery', 'fastnutrition-mealprep' ) }
+					</button>
 					{ deliveryFee && (
 						<small className="fn-fee">{ deliveryFee }</small>
 					) }
-				</button>
+				</div>
 			</div>
 			{ loading && (
 				<p>

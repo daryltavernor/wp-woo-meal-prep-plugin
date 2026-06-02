@@ -296,6 +296,15 @@ the order is created. No effect on totals.
   `is_pickup_like()`).
 * **Version bumped to 1.8.9.**
 
+## What changed in v1.8.10
+
+* **Fee captions moved under the pills.** Inside the pills the fee text crowded
+  the rounded border, so each method pill now stacks its fee caption directly
+  beneath it: **Free** (bold) under Collection, the zone fee in small grey italic
+  under Delivery. Same data as v1.8.9 — only the markup/CSS changed (`.fn-slot-tab`
+  wrapper per option).
+* **Version bumped to 1.8.10.**
+
 # Test cart scenarios
 
 These are the carts used to verify the v1.8.0 pricing fix. Run each in a
