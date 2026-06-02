@@ -4,6 +4,7 @@ declare( strict_types=1 );
 namespace FastNutrition\MealPrep\Rest;
 
 use FastNutrition\MealPrep\Cart\Selections;
+use FastNutrition\MealPrep\Checkout\StoreApiExtensions;
 use FastNutrition\MealPrep\Delivery\Profile;
 use FastNutrition\MealPrep\Delivery\SlotAvailability;
 use FastNutrition\MealPrep\PostTypes\Ingredient;
@@ -180,6 +181,20 @@ final class RestController {
 		$postcode = (string) $req->get_param( 'postcode' );
 		$method   = (string) $req->get_param( 'method' );
 		$method   = in_array( $method, [ Profile::METHOD_DELIVERY, Profile::METHOD_COLLECTION ], true ) ? $method : null;
-		return [ 'options' => SlotAvailability::options( $postcode, $method ) ];
+
+		// Fees to advertise on the slot picker tabs. Collection is free;
+		// delivery is the zone's flat rate for this postcode (null if it's a
+		// formula / can't be reduced to a single figure). Pre-format the
+		// delivery amount with the store's currency so the UI just prints it.
+		$fees           = StoreApiExtensions::fees_for_postcode( $postcode );
+		$delivery_label = null;
+		if ( null !== $fees['delivery'] && (float) $fees['delivery'] > 0 ) {
+			$delivery_label = html_entity_decode( wp_strip_all_tags( wc_price( (float) $fees['delivery'] ) ) );
+		}
+
+		return [
+			'options' => SlotAvailability::options( $postcode, $method ),
+			'fees'    => [ 'delivery' => $delivery_label ],
+		];
 	}
 }

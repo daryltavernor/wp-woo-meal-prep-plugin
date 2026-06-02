@@ -281,6 +281,21 @@ the order is created. No effect on totals.
   "Items:" list is left untouched, per the merchant's choice.
 * **Version bumped to 1.8.8.**
 
+## What changed in v1.8.9
+
+* **Collection is shown first and pre-selected** in the slot picker tabs (was
+  Delivery first / delivery default).
+* **Fees advertised on the method tabs.** Collection shows **Free** in bold;
+  Delivery shows the zone's fee in small grey italic (e.g. *£6.00*). The fee is
+  resolved server-side from the WooCommerce shipping zone matching the postcode:
+  `StoreApiExtensions::fees_for_postcode()` finds the zone, takes the first
+  enabled non-pickup method whose cost is a plain number, and the `/slots` REST
+  response returns it pre-formatted via `wc_price()`. Formula-based costs that
+  can't be reduced to one figure return `null` and the UI simply omits the
+  amount. Reuses the existing pickup-detection idea (a method-level sibling of
+  `is_pickup_like()`).
+* **Version bumped to 1.8.9.**
+
 # Test cart scenarios
 
 These are the carts used to verify the v1.8.0 pricing fix. Run each in a

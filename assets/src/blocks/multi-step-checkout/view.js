@@ -94,12 +94,17 @@ function mountSlotPicker( container ) {
 const VISIBLE_LIMIT = 4;
 
 function SlotPicker() {
-	const [ method, setMethod ] = useState( 'delivery' );
+	// Collection is shown first and is the default the customer lands on.
+	const [ method, setMethod ] = useState( 'collection' );
 	const [ postcode, setPostcode ] = useState( '' );
 	const [ options, setOptions ] = useState( [] );
 	const [ selected, setSelected ] = useState( null );
 	const [ loading, setLoading ] = useState( false );
 	const [ showAll, setShowAll ] = useState( false );
+	// Fees advertised on the tabs. Collection is always free; delivery is the
+	// zone's flat rate for the entered postcode (pre-formatted string, or null
+	// when it can't be reduced to a single figure).
+	const [ deliveryFee, setDeliveryFee ] = useState( null );
 
 	useEffect( () => {
 		const readPostcode = () => {
@@ -126,7 +131,10 @@ function SlotPicker() {
 				postcode
 			) }&method=${ method }`,
 		} )
-			.then( ( r ) => setOptions( r.options || [] ) )
+			.then( ( r ) => {
+				setOptions( r.options || [] );
+				setDeliveryFee( r.fees?.delivery ?? null );
+			} )
 			.finally( () => setLoading( false ) );
 	}, [ postcode, method ] );
 
@@ -185,17 +193,23 @@ function SlotPicker() {
 			<div className="fn-slot-tabs">
 				<button
 					type="button"
-					className={ method === 'delivery' ? 'is-active' : '' }
-					onClick={ () => setMethod( 'delivery' ) }
-				>
-					{ __( 'Delivery', 'fastnutrition-mealprep' ) }
-				</button>
-				<button
-					type="button"
 					className={ method === 'collection' ? 'is-active' : '' }
 					onClick={ () => setMethod( 'collection' ) }
 				>
 					{ __( 'Collection', 'fastnutrition-mealprep' ) }
+					<strong className="fn-fee-free">
+						{ __( 'Free', 'fastnutrition-mealprep' ) }
+					</strong>
+				</button>
+				<button
+					type="button"
+					className={ method === 'delivery' ? 'is-active' : '' }
+					onClick={ () => setMethod( 'delivery' ) }
+				>
+					{ __( 'Delivery', 'fastnutrition-mealprep' ) }
+					{ deliveryFee && (
+						<small className="fn-fee">{ deliveryFee }</small>
+					) }
 				</button>
 			</div>
 			{ loading && (

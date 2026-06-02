@@ -380,6 +380,98 @@ final class StoreApiExtensions {
 			|| false !== strpos( $label, 'pick-up' );
 	}
 
+	/**
+	 * Resolve the fees to advertise on the slot picker for a postcode.
+	 *
+	 * Collection is free by policy. The delivery fee is read from the WC
+	 * shipping zone the postcode falls into: the first enabled, non-pickup
+	 * method whose cost is a plain number. Formula-based costs (e.g. per-item)
+	 * can't be shown as a single figure, so we return null and the UI simply
+	 * omits the amount rather than guessing.
+	 *
+	 * @return array{collection:float,delivery:?float}
+	 */
+	public static function fees_for_postcode( string $postcode ): array {
+		$fees = [ 'collection' => 0.0, 'delivery' => null ];
+
+		$postcode = trim( $postcode );
+		if ( '' === $postcode || ! class_exists( '\WC_Shipping_Zones' ) ) {
+			return $fees;
+		}
+
+		$country = 'GB';
+		if ( function_exists( 'wc_get_base_location' ) ) {
+			$base    = wc_get_base_location();
+			$country = (string) ( $base['country'] ?? 'GB' );
+		}
+
+		$package = [
+			'destination' => [
+				'country'   => $country,
+				'state'     => '',
+				'postcode'  => $postcode,
+				'city'      => '',
+				'address'   => '',
+				'address_2' => '',
+			],
+		];
+
+		$zone = \WC_Shipping_Zones::get_zone_matching_package( $package );
+		if ( ! $zone ) {
+			return $fees;
+		}
+
+		foreach ( $zone->get_shipping_methods( true ) as $method ) {
+			if ( self::is_pickup_like_method( $method ) ) {
+				continue;
+			}
+			$cost = self::method_flat_cost( $method );
+			if ( null !== $cost ) {
+				$fees['delivery'] = $cost;
+				break;
+			}
+		}
+
+		return $fees;
+	}
+
+	/**
+	 * Pickup detection for a WC_Shipping_Method instance (cf. is_pickup_like(),
+	 * which works on a calculated WC_Shipping_Rate).
+	 */
+	private static function is_pickup_like_method( $method ): bool {
+		$id = (string) ( $method->id ?? '' );
+		if ( in_array( $id, [ 'local_pickup', 'pickup_location' ], true ) ) {
+			return true;
+		}
+		$title = strtolower( (string) ( method_exists( $method, 'get_title' ) ? $method->get_title() : ( $method->title ?? '' ) ) );
+		return false !== strpos( $title, 'collection' )
+			|| false !== strpos( $title, 'pickup' )
+			|| false !== strpos( $title, 'pick up' )
+			|| false !== strpos( $title, 'pick-up' );
+	}
+
+	/**
+	 * The flat configured cost of a shipping method, or null when it isn't a
+	 * single plain number (e.g. a flat_rate formula).
+	 */
+	private static function method_flat_cost( $method ): ?float {
+		$cost = '';
+		if ( method_exists( $method, 'get_option' ) ) {
+			$cost = (string) $method->get_option( 'cost', '' );
+		}
+		if ( '' === $cost && isset( $method->cost ) ) {
+			$cost = (string) $method->cost;
+		}
+		$cost = trim( $cost );
+
+		if ( '' === $cost ) {
+			// free_shipping (or a pickup with no cost) is genuinely £0.
+			return 'free_shipping' === (string) ( $method->id ?? '' ) ? 0.0 : null;
+		}
+		return is_numeric( $cost ) ? (float) $cost : null;
+	}
+
 	public function apply_to_order( $order, $request ): void {
 		$fulfilment = self::get_session_fulfilment();
 		if ( ! empty( $fulfilment ) && $order ) {
