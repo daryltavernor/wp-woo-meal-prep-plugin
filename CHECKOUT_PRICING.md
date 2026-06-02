@@ -318,6 +318,20 @@ the order is created. No effect on totals.
   "New order" email. Delivery is unchanged.
 * **Version bumped to 1.8.11.**
 
+## What changed in v1.8.12
+
+* **Step 1 "Back" returns to the basket.** It was disabled on the first step;
+  it now navigates to the cart (`wc_get_cart_url()`, passed to `view.js` via the
+  `fnMultiStep` localize as `cartUrl`). Steps 2–3 Back behaviour is unchanged.
+* **Surcharge is now delivery-only.** `Surcharge::status()` gained one condition —
+  the session fulfilment type must be `delivery`. Because `status()` is the single
+  source for the fee (`maybe_add_fee`), the classic-cart nudge and the Blocks
+  nudge (`cart_data`), the surcharge and all its "spend £X more" messaging now
+  appear only once the customer has selected Delivery at checkout, and never for
+  collection / on the basket page / before a slot is picked. The fee recalculates
+  automatically when the customer toggles delivery ↔ collection.
+* **Version bumped to 1.8.12.**
+
 # Test cart scenarios
 
 These are the carts used to verify the v1.8.0 pricing fix. Run each in a

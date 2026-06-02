@@ -3,6 +3,7 @@ declare( strict_types=1 );
 
 namespace FastNutrition\MealPrep\Cart;
 
+use FastNutrition\MealPrep\Checkout\StoreApiExtensions;
 use WC_Cart;
 
 /**
@@ -70,20 +71,27 @@ final class Surcharge {
 			$subtotal = (float) WC()->cart->get_subtotal();
 		}
 
+		// The surcharge is a DELIVERY charge: it only applies once the customer
+		// has chosen a delivery slot at checkout. It never applies to collection,
+		// and not on the basket page / step 1 where no fulfilment is set yet.
+		$is_delivery = 'delivery' === ( StoreApiExtensions::get_session_fulfilment()['type'] ?? '' );
+
 		$applies = $enabled
+			&& $is_delivery
 			&& $threshold > 0
 			&& $amount > 0
 			&& $subtotal > 0
 			&& $subtotal < $threshold;
 
 		return [
-			'enabled'   => $enabled,
-			'threshold' => $threshold,
-			'amount'    => $amount,
-			'label'     => $label,
-			'subtotal'  => $subtotal,
-			'applies'   => $applies,
-			'remaining' => max( 0.0, $threshold - $subtotal ),
+			'enabled'     => $enabled,
+			'threshold'   => $threshold,
+			'amount'      => $amount,
+			'label'       => $label,
+			'subtotal'    => $subtotal,
+			'applies'     => $applies,
+			'is_delivery' => $is_delivery,
+			'remaining'   => max( 0.0, $threshold - $subtotal ),
 		];
 	}
 }

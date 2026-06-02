@@ -423,7 +423,8 @@ function apply( root ) {
 		const back = checkout.querySelector( '.fn-step-back' );
 		const next = checkout.querySelector( '.fn-step-next' );
 		if ( back ) {
-			back.disabled = idx === 0;
+			// Step 1's Back leaves checkout for the basket, so it stays enabled.
+			back.disabled = false;
 		}
 		if ( next ) {
 			next.style.display = idx === STEPS.length - 1 ? 'none' : '';
@@ -596,10 +597,16 @@ function apply( root ) {
 		}
 		if ( e.target.classList.contains( 'fn-step-back' ) ) {
 			const idx = STEPS.findIndex( ( s ) => s.key === active );
-			if ( idx > 0 ) {
-				active = STEPS[ idx - 1 ].key;
-				render();
+			if ( idx === 0 ) {
+				// First step: leave checkout and return to the basket.
+				const cartUrl = window.fnMultiStep?.cartUrl;
+				if ( cartUrl ) {
+					window.location.href = cartUrl;
+				}
+				return;
 			}
+			active = STEPS[ idx - 1 ].key;
+			render();
 		}
 	} );
 

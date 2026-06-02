@@ -60,6 +60,7 @@ final class MultiStep {
 			[
 				'restUrl' => esc_url_raw( rest_url( 'fastnutrition/v1/' ) ),
 				'nonce'   => wp_create_nonce( 'wp_rest' ),
+				'cartUrl' => function_exists( 'wc_get_cart_url' ) ? wc_get_cart_url() : home_url( '/cart/' ),
 			]
 		);
 	}
