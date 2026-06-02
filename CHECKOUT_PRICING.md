@@ -305,6 +305,19 @@ the order is created. No effect on totals.
   wrapper per option).
 * **Version bumped to 1.8.10.**
 
+## What changed in v1.8.11
+
+* **Collection now names the real pickup point, not the profile.** The slot line
+  was reading "Collect from Collections" (it appended the delivery-profile name).
+  It now says "Collect from Fast Nutrition", and the customer email + order
+  details page gain a collection block with the full address as a Google Maps
+  directions link plus an opening-times disclaimer. The business name, address,
+  map URL and notice are filterable (`fn_collection_business_name`,
+  `fn_collection_address`, `fn_collection_map_url`, `fn_collection_notice`) so
+  they can be changed without editing code. The block is skipped on the admin
+  "New order" email. Delivery is unchanged.
+* **Version bumped to 1.8.11.**
+
 # Test cart scenarios
 
 These are the carts used to verify the v1.8.0 pricing fix. Run each in a

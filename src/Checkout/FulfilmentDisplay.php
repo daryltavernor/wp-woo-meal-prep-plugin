@@ -28,6 +28,38 @@ final class FulfilmentDisplay {
 		// Admin order edit screen — also surface the slot in the line-items
 		// table, under the shipping line, where the order is actually read.
 		add_action( 'woocommerce_after_order_itemmeta', [ $this, 'render_admin_line_item' ], 10, 3 );
+		// Customer-facing collection address + directions + opening-times notice:
+		// on the order details page (thank-you / My Account) and in the customer
+		// emails. Only shown for collection orders.
+		add_action( 'woocommerce_order_details_after_order_table', [ $this, 'render_collection_location_details' ], 10, 1 );
+		add_action( 'woocommerce_email_after_order_table', [ $this, 'render_collection_location_email' ], 20, 4 );
+	}
+
+	/**
+	 * The pickup business name. Filterable so the address can be changed without
+	 * editing code (e.g. add_filter( 'fn_collection_business_name', … )).
+	 */
+	public static function collection_business(): string {
+		return (string) apply_filters( 'fn_collection_business_name', 'Fast Nutrition' );
+	}
+
+	/** The pickup street address (single line). */
+	public static function collection_address(): string {
+		return (string) apply_filters( 'fn_collection_address', '141 London Rd, Chesterton, Newcastle ST5 7JD' );
+	}
+
+	/** A Google Maps directions link to the pickup point. */
+	public static function collection_map_url(): string {
+		$default = 'https://www.google.com/maps/dir/?api=1&destination=' . rawurlencode( self::collection_business() . ', ' . self::collection_address() );
+		return (string) apply_filters( 'fn_collection_map_url', $default );
+	}
+
+	/** Opening-times disclaimer shown beneath the collection address. */
+	public static function collection_notice(): string {
+		return (string) apply_filters(
+			'fn_collection_notice',
+			__( 'Please be sure to check our opening times on the website, our Google business page and social media for any updates before collecting.', 'fastnutrition-mealprep' )
+		);
 	}
 
 	/**
@@ -64,19 +96,24 @@ final class FulfilmentDisplay {
 			}
 		}
 
-		// Customer-facing value: date + time. For collection the pickup location
-		// is essential, so append it; for delivery the round/area name is
-		// internal jargon and is left for the admin view only.
+		// Customer-facing value: date + time. For collection, name the actual
+		// pickup business (the delivery-profile name — e.g. "Collections" — is
+		// internal jargon and reads as nonsense like "Collect from Collections").
+		// For delivery the round/area name is left for the admin view only.
 		$customer_parts = array_filter( [ $date_label, $time_label ] );
 		$customer_value = implode( ' · ', $customer_parts );
-		if ( $is_collection && '' !== $profile_name ) {
-			/* translators: %s: pickup location name */
-			$collect = sprintf( __( 'Collect from %s', 'fastnutrition-mealprep' ), $profile_name );
+		if ( $is_collection ) {
+			/* translators: %s: pickup business name */
+			$collect        = sprintf( __( 'Collect from %s', 'fastnutrition-mealprep' ), self::collection_business() );
 			$customer_value = '' !== $customer_value ? $customer_value . ' · ' . $collect : $collect;
 		}
 
-		// Admin value always includes the profile (delivery round / pickup point).
-		$admin_parts = array_filter( [ $date_label, $time_label, $profile_name ] );
+		// Admin value: date + time, plus the delivery round (delivery only) or
+		// the pickup business name (collection).
+		$admin_tail  = $is_collection
+			? sprintf( __( 'Collect from %s', 'fastnutrition-mealprep' ), self::collection_business() )
+			: $profile_name;
+		$admin_parts = array_filter( [ $date_label, $time_label, $admin_tail ] );
 		$admin_value = implode( ' · ', $admin_parts );
 
 		return [
@@ -189,5 +226,74 @@ final class FulfilmentDisplay {
 		echo '<strong>' . esc_html( $data['method_label'] ) . ':</strong> ';
 		echo esc_html( '' !== $data['admin_value'] ? $data['admin_value'] : $data['method_label'] );
 		echo '</div>';
+	}
+
+	/**
+	 * Collection address + directions + opening-times notice on the order
+	 * details page (thank-you / My Account). Collection orders only.
+	 *
+	 * @param WC_Order $order
+	 */
+	public function render_collection_location_details( $order ): void {
+		if ( ! $order instanceof WC_Order || ! self::is_collection( $order ) ) {
+			return;
+		}
+		echo $this->collection_block_html(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- built from escaped parts.
+	}
+
+	/**
+	 * Same block in the customer emails. Skipped on the admin "New order"
+	 * email — the team doesn't need directions to their own unit.
+	 *
+	 * @param WC_Order $order
+	 * @param bool     $sent_to_admin
+	 * @param bool     $plain_text
+	 * @param mixed    $email
+	 */
+	public function render_collection_location_email( $order, $sent_to_admin = false, $plain_text = false, $email = null ): void {
+		unset( $email );
+		if ( ! $order instanceof WC_Order || $sent_to_admin || ! self::is_collection( $order ) ) {
+			return;
+		}
+		if ( $plain_text ) {
+			echo "\n" . esc_html( $this->collection_block_text() ) . "\n";
+			return;
+		}
+		echo $this->collection_block_html(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- built from escaped parts.
+	}
+
+	private static function is_collection( WC_Order $order ): bool {
+		$data = self::summary( $order );
+		return ! empty( $data ) && 'collection' === $data['type'];
+	}
+
+	/**
+	 * HTML collection block: business name, linked address (directions), and the
+	 * opening-times notice. Inline-styled so it survives email clients.
+	 */
+	private function collection_block_html(): string {
+		$html  = '<div style="margin:16px 0;padding:12px 14px;border:1px solid #e0e0e0;border-radius:6px">';
+		$html .= '<p style="margin:0 0 6px;font-weight:700">' . esc_html__( 'Collection', 'fastnutrition-mealprep' ) . '</p>';
+		$html .= '<p style="margin:0 0 6px">' . sprintf(
+			/* translators: 1: business name (bold), 2: linked address */
+			esc_html__( 'Collect your order from %1$s, %2$s.', 'fastnutrition-mealprep' ),
+			'<strong>' . esc_html( self::collection_business() ) . '</strong>',
+			'<a href="' . esc_url( self::collection_map_url() ) . '" style="color:#2271b1">' . esc_html( self::collection_address() ) . '</a>'
+		) . '</p>';
+		$html .= '<p style="margin:0;font-size:.9em;color:#666;font-style:italic">' . esc_html( self::collection_notice() ) . '</p>';
+		$html .= '</div>';
+		return $html;
+	}
+
+	/** Plain-text equivalent of collection_block_html() for plain-text emails. */
+	private function collection_block_text(): string {
+		return sprintf(
+			/* translators: 1: business name, 2: address, 3: map URL, 4: opening-times notice */
+			__( 'Collection: Collect your order from %1$s, %2$s (%3$s). %4$s', 'fastnutrition-mealprep' ),
+			self::collection_business(),
+			self::collection_address(),
+			self::collection_map_url(),
+			self::collection_notice()
+		);
 	}
 }
