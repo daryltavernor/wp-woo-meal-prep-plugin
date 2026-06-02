@@ -269,6 +269,18 @@ the order is created. No effect on totals.
   Display-only; no effect on totals.
 * **Version bumped to 1.8.7.**
 
+## What changed in v1.8.8
+
+* **Slot also shown in the admin order line-items table.** v1.8.7 put the
+  fulfilment block in the order *address* panel, but the team reads the order in
+  the line-items meta box, where the shipping line just repeats the product list.
+  `FulfilmentDisplay::render_admin_line_item()` now hooks
+  `woocommerce_after_order_itemmeta` and renders the slot
+  (`Delivery: Tuesday, 3 June 2026 · 09:00–12:00 · <round>`) under the shipping
+  line only — reusing the same `summary()` formatter. WooCommerce's own repeated
+  "Items:" list is left untouched, per the merchant's choice.
+* **Version bumped to 1.8.8.**
+
 # Test cart scenarios
 
 These are the carts used to verify the v1.8.0 pricing fix. Run each in a

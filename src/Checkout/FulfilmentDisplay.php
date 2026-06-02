@@ -25,6 +25,9 @@ final class FulfilmentDisplay {
 		add_filter( 'woocommerce_get_order_item_totals', [ $this, 'add_totals_row' ], 20, 3 );
 		// Admin order edit screen — a clear block under the shipping address.
 		add_action( 'woocommerce_admin_order_data_after_shipping_address', [ $this, 'render_admin_block' ], 10, 1 );
+		// Admin order edit screen — also surface the slot in the line-items
+		// table, under the shipping line, where the order is actually read.
+		add_action( 'woocommerce_after_order_itemmeta', [ $this, 'render_admin_line_item' ], 10, 3 );
 	}
 
 	/**
@@ -154,6 +157,37 @@ final class FulfilmentDisplay {
 			echo ' — ' . esc_html( $data['admin_value'] );
 		}
 		echo '</p>';
+		echo '</div>';
+	}
+
+	/**
+	 * Render the slot under the shipping line in the admin order items table.
+	 *
+	 * `woocommerce_after_order_itemmeta` fires inside every order-item row in
+	 * the admin items meta box. We only render on the shipping line so it shows
+	 * once, right under WooCommerce's package-contents list, rather than under
+	 * every product row.
+	 *
+	 * @param int                 $item_id Order item id (unused).
+	 * @param \WC_Order_Item|mixed $item   The order item being rendered.
+	 * @param mixed               $product The product (false for shipping; unused).
+	 */
+	public function render_admin_line_item( $item_id, $item, $product ): void {
+		unset( $item_id, $product );
+		if ( ! $item instanceof \WC_Order_Item_Shipping ) {
+			return;
+		}
+		$order = $item->get_order();
+		if ( ! $order instanceof WC_Order ) {
+			return;
+		}
+		$data = self::summary( $order );
+		if ( empty( $data ) ) {
+			return;
+		}
+		echo '<div class="fn-order-item-fulfilment" style="margin-top:6px;padding:6px 8px;background:#f6f7f7;border-left:3px solid #2271b1;border-radius:2px;font-size:13px;line-height:1.4">';
+		echo '<strong>' . esc_html( $data['method_label'] ) . ':</strong> ';
+		echo esc_html( '' !== $data['admin_value'] ? $data['admin_value'] : $data['method_label'] );
 		echo '</div>';
 	}
 }
