@@ -32,6 +32,7 @@ final class OrdersListBulkActions {
 	private const ACTION_TEST_SUMMARY = 'fn_print_labels_test_summary';
 	private const ACTION_TEST_MEAL    = 'fn_print_labels_test_meal';
 	private const ACTION_TEST_BOTH    = 'fn_print_labels_test_both';
+	private const ACTION_PREP_SHEET   = 'fn_prep_sheet';
 
 	public function register(): void {
 		// Classic, CPT-based orders screen.
@@ -49,6 +50,7 @@ final class OrdersListBulkActions {
 	public function add_actions( array $actions ): array {
 		$actions[ self::ACTION_FULL ]         = __( 'Print labels: summary + meal labels', 'fastnutrition-mealprep' );
 		$actions[ self::ACTION_SUMMARY ]      = __( 'Print labels: summary only', 'fastnutrition-mealprep' );
+		$actions[ self::ACTION_PREP_SHEET ]   = __( 'Generate prep sheet (selected orders)', 'fastnutrition-mealprep' );
 		$actions[ self::ACTION_TEST_BOTH ]    = __( 'Test print (no cache): summary + 1 meal', 'fastnutrition-mealprep' );
 		$actions[ self::ACTION_TEST_SUMMARY ] = __( 'Test print (no cache): summary only', 'fastnutrition-mealprep' );
 		$actions[ self::ACTION_TEST_MEAL ]    = __( 'Test print (no cache): 1 meal label only', 'fastnutrition-mealprep' );
@@ -63,7 +65,7 @@ final class OrdersListBulkActions {
 	public function handle( string $redirect_to, string $action, array $order_ids ): string {
 		$real_actions = [ self::ACTION_SUMMARY, self::ACTION_FULL ];
 		$test_actions = [ self::ACTION_TEST_SUMMARY, self::ACTION_TEST_MEAL, self::ACTION_TEST_BOTH ];
-		if ( ! in_array( $action, array_merge( $real_actions, $test_actions ), true ) ) {
+		if ( ! in_array( $action, array_merge( $real_actions, $test_actions, [ self::ACTION_PREP_SHEET ] ), true ) ) {
 			return $redirect_to;
 		}
 		if ( ! current_user_can( 'manage_woocommerce' ) ) {
@@ -72,6 +74,13 @@ final class OrdersListBulkActions {
 		$order_ids = array_values( array_filter( array_map( 'intval', $order_ids ) ) );
 		if ( empty( $order_ids ) ) {
 			return add_query_arg( 'fn_labels_result', 'empty', $redirect_to );
+		}
+
+		// Prep sheet: stream a single PDF for exactly the ticked orders.
+		if ( self::ACTION_PREP_SHEET === $action ) {
+			PrepSheet::stream_for_orders( $order_ids );
+			// stream_for_orders() exits.
+			return $redirect_to;
 		}
 
 		$is_test = in_array( $action, $test_actions, true );
