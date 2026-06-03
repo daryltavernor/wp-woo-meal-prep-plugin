@@ -311,6 +311,16 @@ CSS;
 		letter-spacing: 0.2mm;
 		margin-bottom: 0;
 	}
+	/* Food-safety "use by" notice — fulfilment date + 3 days. Mirrors the
+	   fulfilment line's prominence so it reads as a firm instruction. */
+	.lbl-use-by {
+		width: 90mm;
+		font-size: 9pt;
+		font-weight: bold;
+		text-transform: uppercase;
+		letter-spacing: 0.2mm;
+		margin-top: 0.5mm;
+	}
 	/* Storage + reheat hint on meal labels — sits in the space between
 	   the fulfilment line and the brand foot. Italic + slightly smaller
 	   so it reads as guidance, not instruction. */
@@ -383,7 +393,7 @@ CSS;
 		padding-top: 1mm;
 		text-align: center;
 	}
-	.lbl-foot-address { font-weight: bold; margin-bottom: 0.5mm; }
+	.lbl-foot-address { margin-bottom: 0.5mm; }
 	.lbl-foot-line { line-height: 1.3; }
 	/* Visible on test/preview renders only. Eats ~3mm of vertical space
 	   so summary content needs ~67mm instead of 70mm. */
@@ -538,12 +548,11 @@ CSS;
 					<?php echo (int) round( (float) $macros['carbs_g'] ); ?>g Carbs,
 					<?php echo (int) round( (float) $macros['fat_g'] ); ?>g Fat
 				</div>
-				<?php if ( $order->get_billing_phone() ) : ?>
-					<div class="lbl-customer-contact">
-						<strong><?php esc_html_e( 'Tel:', 'fastnutrition-mealprep' ); ?></strong> <?php echo esc_html( $order->get_billing_phone() ); ?>
-					</div>
-				<?php endif; ?>
 				<div class="lbl-fulfilment"><?php echo esc_html( self::format_fulfilment( $ff ) ); ?></div>
+				<?php $use_by = self::use_by_text( $ff ); ?>
+				<?php if ( '' !== $use_by ) : ?>
+					<div class="lbl-use-by"><strong><?php esc_html_e( 'USE BY:', 'fastnutrition-mealprep' ); ?></strong> <?php echo esc_html( $use_by ); ?></div>
+				<?php endif; ?>
 				<div class="lbl-storage">
 					<?php esc_html_e( 'Refrigerate up to 3 days or freeze for 3 months · Microwave 3½ min to reheat', 'fastnutrition-mealprep' ); ?>
 				</div>
@@ -679,5 +688,25 @@ CSS;
 		$pretty_date = $date ? wp_date( 'D j M', strtotime( $date ) ) : '';
 		$window = ( $start && $end ) ? ( $start . '–' . $end ) : '';
 		return trim( $type . ' · ' . trim( $pretty_date . ' ' . $window ) );
+	}
+
+	/**
+	 * "Use by" date for a meal label: the fulfilment (collection/delivery) date
+	 * plus 3 days, formatted like the fulfilment line (e.g. "WED 9 JUN").
+	 * Returns '' when there is no fulfilment date to work from.
+	 */
+	private static function use_by_text( mixed $ff ): string {
+		if ( ! is_array( $ff ) ) {
+			return '';
+		}
+		$date = (string) ( $ff['date'] ?? '' );
+		if ( '' === $date ) {
+			return '';
+		}
+		$ts = strtotime( $date . ' +3 days' );
+		if ( false === $ts ) {
+			return '';
+		}
+		return wp_date( 'D j M', $ts );
 	}
 }
