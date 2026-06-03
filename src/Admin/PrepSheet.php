@@ -3,6 +3,8 @@ declare( strict_types=1 );
 
 namespace FastNutrition\MealPrep\Admin;
 
+use FastNutrition\MealPrep\PostTypes\Ingredient;
+
 final class PrepSheet {
 
 	public function register(): void {
@@ -84,7 +86,165 @@ final class PrepSheet {
 	}
 
 	private function render_sheet( string $date, string $method, bool $for_pdf ): void {
-		$title = sprintf( __( 'Prep Sheet — %s', 'fastnutrition-mealprep' ), $date );
+		$matched = self::collect_matched_by_date( $date, $method );
+		$totals  = PrepDashboard::get_day_totals( $date );
+		/* translators: %s: prep date */
+		$title   = sprintf( __( 'Prep Sheet — %s', 'fastnutrition-mealprep' ), $date );
+		$this->render_sections( $matched, $totals, $title, $method, $for_pdf );
+	}
+
+	/**
+	 * Stream a prep-sheet PDF for an explicit set of ticked orders (bulk action).
+	 * Section-1 totals are summed from just those orders, not the date cache.
+	 * Exits.
+	 *
+	 * @param int[] $order_ids
+	 */
+	public static function stream_for_orders( array $order_ids ): void {
+		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			return;
+		}
+		if ( ! class_exists( \Dompdf\Dompdf::class ) ) {
+			wp_die( esc_html__( 'Dompdf is not installed. Run composer install.', 'fastnutrition-mealprep' ) );
+		}
+
+		$matched = self::collect_matched_by_ids( $order_ids );
+		$totals  = self::totals_from_matched( $matched );
+		$title   = sprintf(
+			/* translators: %d: number of selected orders */
+			_n( 'Prep Sheet — %d selected order', 'Prep Sheet — %d selected orders', count( $matched ), 'fastnutrition-mealprep' ),
+			count( $matched )
+		);
+
+		ob_start();
+		( new self() )->render_sections( $matched, $totals, $title, '', true );
+		$html = (string) ob_get_clean();
+
+		$dompdf = new \Dompdf\Dompdf( [ 'isRemoteEnabled' => false ] );
+		$dompdf->loadHtml( $html );
+		$dompdf->setPaper( 'A4', 'portrait' );
+		$dompdf->render();
+		$dompdf->stream( 'prep-sheet-selected.pdf', [ 'Attachment' => true ] );
+		exit;
+	}
+
+	/**
+	 * Orders whose fulfilment date matches $date (and method, if given).
+	 *
+	 * @return array<int,array{order:\WC_Order,fulfilment:array}>
+	 */
+	private static function collect_matched_by_date( string $date, string $method ): array {
+		$orders = wc_get_orders(
+			[
+				'status'   => [ 'processing', 'completed', 'on-hold' ],
+				'limit'    => -1,
+				'meta_key' => '_fn_fulfilment',
+			]
+		);
+		$matched = [];
+		foreach ( $orders as $order ) {
+			$ff = $order->get_meta( '_fn_fulfilment' );
+			if ( ! is_array( $ff ) || ( $ff['date'] ?? '' ) !== $date ) {
+				continue;
+			}
+			if ( '' !== $method && ( $ff['type'] ?? '' ) !== $method ) {
+				continue;
+			}
+			$matched[] = [ 'order' => $order, 'fulfilment' => $ff ];
+		}
+		return $matched;
+	}
+
+	/**
+	 * Build the matched list from explicit order IDs (bulk action). Orders with
+	 * no fulfilment meta are still included (shown with a blank slot).
+	 *
+	 * @param int[] $order_ids
+	 * @return array<int,array{order:\WC_Order,fulfilment:array}>
+	 */
+	private static function collect_matched_by_ids( array $order_ids ): array {
+		$matched = [];
+		foreach ( $order_ids as $oid ) {
+			$order = wc_get_order( (int) $oid );
+			if ( ! $order ) {
+				continue;
+			}
+			$ff = $order->get_meta( '_fn_fulfilment' );
+			$matched[] = [ 'order' => $order, 'fulfilment' => is_array( $ff ) ? $ff : [] ];
+		}
+		return $matched;
+	}
+
+	/**
+	 * Ingredient portion totals computed directly from the matched orders'
+	 * items — same selection parsing as OrderItemMeta::rebuild_prep_cache(), but
+	 * not tied to the date cache. Same shape as PrepDashboard::get_day_totals().
+	 *
+	 * @param array<int,array{order:\WC_Order,fulfilment:array}> $matched
+	 * @return array<int,array{ingredient_id:int,name:string,portions:int,type_slug:string}>
+	 */
+	private static function totals_from_matched( array $matched ): array {
+		$counts = [];
+		foreach ( $matched as $m ) {
+			foreach ( $m['order']->get_items() as $item ) {
+				if ( ! $item instanceof \WC_Order_Item_Product ) {
+					continue;
+				}
+				$sel = $item->get_meta( '_fn_selection', true );
+				if ( ! is_array( $sel ) ) {
+					continue;
+				}
+				$qty = (int) $item->get_quantity();
+				foreach ( self::selection_ingredient_ids( $sel ) as $ing_id ) {
+					$counts[ $ing_id ] = ( $counts[ $ing_id ] ?? 0 ) + $qty;
+				}
+			}
+		}
+		arsort( $counts );
+		$out = [];
+		foreach ( $counts as $ing_id => $portions ) {
+			$out[] = [
+				'ingredient_id' => (int) $ing_id,
+				'name'          => (string) get_the_title( (int) $ing_id ),
+				'portions'      => (int) $portions,
+				'type_slug'     => Ingredient::get_type_slug( (int) $ing_id ),
+			];
+		}
+		return $out;
+	}
+
+	/**
+	 * Ingredient post IDs referenced by a single meal selection.
+	 *
+	 * @return int[]
+	 */
+	private static function selection_ingredient_ids( array $sel ): array {
+		$ids = [];
+		if ( 'set' === ( $sel['mode'] ?? '' ) && ! empty( $sel['set_meal_id'] ) ) {
+			$ids[] = (int) $sel['set_meal_id'];
+		} elseif ( 'sweet' === ( $sel['mode'] ?? '' ) && ! empty( $sel['sweet_id'] ) ) {
+			$ids[] = (int) $sel['sweet_id'];
+		} else {
+			if ( ! empty( $sel['protein_id'] ) ) {
+				$ids[] = (int) $sel['protein_id'];
+			}
+			if ( ! empty( $sel['carb_id'] ) ) {
+				$ids[] = (int) $sel['carb_id'];
+			}
+			foreach ( (array) ( $sel['greens_ids'] ?? [] ) as $gid ) {
+				$ids[] = (int) $gid;
+			}
+		}
+		return $ids;
+	}
+
+	/**
+	 * Render the three prep-sheet sections from a prepared order set + totals.
+	 *
+	 * @param array<int,array{order:\WC_Order,fulfilment:array}>                            $matched
+	 * @param array<int,array{ingredient_id:int,name:string,portions:int,type_slug:string}> $totals
+	 */
+	private function render_sections( array $matched, array $totals, string $title, string $method, bool $for_pdf ): void {
 		if ( $for_pdf ) {
 			echo '<html><head><meta charset="utf-8"><title>' . esc_html( $title ) . '</title>';
 			self::print_styles();
@@ -94,7 +254,6 @@ final class PrepSheet {
 
 		// Section 1 — Ingredient totals.
 		echo '<section class="fn-sheet-section"><h2>' . esc_html__( 'Ingredient totals', 'fastnutrition-mealprep' ) . '</h2>';
-		$totals = PrepDashboard::get_day_totals( $date );
 		$grouped = [];
 		foreach ( $totals as $row ) {
 			$grouped[ $row['type_slug'] ][] = $row;
@@ -121,24 +280,6 @@ final class PrepSheet {
 
 		// Section 2 — Per-order pick list.
 		echo '<section class="fn-sheet-section"><h2>' . esc_html__( 'Per-order pick list', 'fastnutrition-mealprep' ) . '</h2>';
-		$orders = wc_get_orders(
-			[
-				'status'   => [ 'processing', 'completed', 'on-hold' ],
-				'limit'    => -1,
-				'meta_key' => '_fn_fulfilment',
-			]
-		);
-		$matched = [];
-		foreach ( $orders as $order ) {
-			$ff = $order->get_meta( '_fn_fulfilment' );
-			if ( ! is_array( $ff ) || ( $ff['date'] ?? '' ) !== $date ) {
-				continue;
-			}
-			if ( '' !== $method && ( $ff['type'] ?? '' ) !== $method ) {
-				continue;
-			}
-			$matched[] = [ 'order' => $order, 'fulfilment' => $ff ];
-		}
 		if ( empty( $matched ) ) {
 			echo '<p><em>' . esc_html__( 'No orders for this filter.', 'fastnutrition-mealprep' ) . '</em></p>';
 		} else {
