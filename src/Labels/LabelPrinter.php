@@ -321,23 +321,15 @@ CSS;
 		letter-spacing: 0.2mm;
 		margin-top: 0.5mm;
 	}
-	/* Storage + reheat hint on meal labels — sits in the space between
-	   the fulfilment line and the brand foot. Italic + slightly smaller
-	   so it reads as guidance, not instruction. */
-	.lbl-storage {
+	/* Combined fine print on meal labels — storage/reheat hint + allergen
+	   pointer on a single italic line, in the space between the fulfilment
+	   line and the brand foot. Italic + small so it reads as guidance. */
+	.lbl-fineprint {
 		width: 90mm;
 		font-size: 7pt;
 		font-style: italic;
 		line-height: 1.3;
 		margin-top: 1mm;
-		text-align: center;
-		word-wrap: break-word;
-	}
-	.lbl-allergens {
-		width: 90mm;
-		font-size: 7pt;
-		line-height: 1.3;
-		margin-top: 0.5mm;
 		text-align: center;
 		word-wrap: break-word;
 	}
@@ -553,11 +545,8 @@ CSS;
 				<?php if ( '' !== $use_by ) : ?>
 					<div class="lbl-use-by"><strong><?php esc_html_e( 'USE BY:', 'fastnutrition-mealprep' ); ?></strong> <?php echo esc_html( $use_by ); ?></div>
 				<?php endif; ?>
-				<div class="lbl-storage">
-					<?php esc_html_e( 'Refrigerate up to 3 days or freeze for 3 months · Microwave 3½ min to reheat', 'fastnutrition-mealprep' ); ?>
-				</div>
-				<div class="lbl-allergens">
-					<?php esc_html_e( 'Allergens & prep: fastnutrition.co.uk/info/allergeninfo.pdf', 'fastnutrition-mealprep' ); ?>
+				<div class="lbl-fineprint">
+					<?php esc_html_e( 'Refrigerate up to 3 days or freeze for 3 months · Microwave 3½ min to reheat · Allergens & prep: fastnutrition.co.uk/info/allergeninfo.pdf', 'fastnutrition-mealprep' ); ?>
 				</div>
 			</div>
 			<?php self::render_foot( $brand ); ?>
@@ -606,6 +595,15 @@ CSS;
 		if ( '' === $web && '' === $email && '' === $phone && '' === $address ) {
 			return;
 		}
+		// Email + phone share one line, each prefixed with an icon glyph that
+		// Dompdf's bundled DejaVu Sans renders reliably (✉ U+2709, ☎ U+260E).
+		$contact = [];
+		if ( '' !== $email ) {
+			$contact[] = '✉ ' . esc_html( $email );
+		}
+		if ( '' !== $phone ) {
+			$contact[] = '☎ ' . esc_html( $phone );
+		}
 		?>
 		<div class="lbl-foot">
 			<?php if ( '' !== $address ) : ?>
@@ -614,11 +612,8 @@ CSS;
 			<?php if ( '' !== $web ) : ?>
 				<div class="lbl-foot-line"><?php echo esc_html( $web ); ?></div>
 			<?php endif; ?>
-			<?php if ( '' !== $email ) : ?>
-				<div class="lbl-foot-line"><?php echo esc_html( $email ); ?></div>
-			<?php endif; ?>
-			<?php if ( '' !== $phone ) : ?>
-				<div class="lbl-foot-line"><?php echo esc_html( $phone ); ?></div>
+			<?php if ( ! empty( $contact ) ) : ?>
+				<div class="lbl-foot-line"><?php echo implode( ' &nbsp;&nbsp; ', $contact ); ?></div>
 			<?php endif; ?>
 		</div>
 		<?php
@@ -691,9 +686,10 @@ CSS;
 	}
 
 	/**
-	 * "Use by" date for a meal label: the fulfilment (collection/delivery) date
-	 * plus 3 days, formatted like the fulfilment line (e.g. "WED 9 JUN").
-	 * Returns '' when there is no fulfilment date to work from.
+	 * "Use by" date for a meal label: a 3-day shelf life where the fulfilment
+	 * (collection/delivery) day counts as day 1 — i.e. fulfilment date + 2 days.
+	 * So collect on the 1st → use by the 3rd. Formatted like the fulfilment line
+	 * (e.g. "WED 9 JUN"). Returns '' when there is no fulfilment date.
 	 */
 	private static function use_by_text( mixed $ff ): string {
 		if ( ! is_array( $ff ) ) {
@@ -703,7 +699,7 @@ CSS;
 		if ( '' === $date ) {
 			return '';
 		}
-		$ts = strtotime( $date . ' +3 days' );
+		$ts = strtotime( $date . ' +2 days' );
 		if ( false === $ts ) {
 			return '';
 		}
