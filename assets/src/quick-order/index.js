@@ -1,11 +1,11 @@
 /**
- * In-Store Quick Order — touch-first order entry for staff (iPad kiosk).
+ * Quick Order — touch-first order entry for staff, in the WordPress admin.
  *
- * Talks only to the plugin's own token-protected endpoints
- * (fastnutrition/v1/instore/*) plus the public /ingredients and /slots reads.
- * The screen is unlocked once with the store password; the per-order PIN
- * identifies the staff member. A real WooCommerce order is created server-side
- * by InStore\OrderFactory.
+ * Talks to the plugin's own capability-protected endpoints
+ * (fastnutrition/v1/instore/*) plus the /ingredients and /slots reads. Access
+ * is governed by the WordPress login + manage_woocommerce capability; the order
+ * is attributed to the signed-in user. A real WooCommerce order is created
+ * server-side by InStore\OrderFactory.
  */
 /* Labels in this kiosk form nest their own control (a valid a11y pattern); the
    strict label-has-associated-control rule is relaxed for this file. */
@@ -17,7 +17,12 @@ import './style.css';
 
 const boot = window.fnQuickOrder || {};
 const CURRENCY = boot.currency || '£';
-const ROOT_V1 = ( boot.restUrl || '' ).replace( 'instore/', '' );
+const ROOT_V1 = boot.v1Url || ( boot.restUrl || '' ).replace( 'instore/', '' );
+
+// Authenticate REST writes with the logged-in user's cookie nonce.
+if ( boot.nonce ) {
+	apiFetch.use( apiFetch.createNonceMiddleware( boot.nonce ) );
+}
 
 const money = ( n ) => `${ CURRENCY }${ Number( n || 0 ).toFixed( 2 ) }`;
 const uid = () => Math.random().toString( 36 ).slice( 2 );
@@ -63,62 +68,6 @@ function Stepper( { value, onChange, min = 1 } ) {
 			>
 				+
 			</button>
-		</div>
-	);
-}
-
-/* ---- Unlock screen ----------------------------------------------------- */
-function Unlock( { onUnlocked } ) {
-	const [ pw, setPw ] = useState( '' );
-	const [ busy, setBusy ] = useState( false );
-	const [ err, setErr ] = useState( '' );
-
-	const submit = async () => {
-		setBusy( true );
-		setErr( '' );
-		try {
-			await api( 'unlock', { method: 'POST', data: { password: pw } } );
-			onUnlocked();
-		} catch ( e ) {
-			setErr(
-				e.message || __( 'Could not unlock.', 'fastnutrition-mealprep' )
-			);
-			setBusy( false );
-		}
-	};
-
-	return (
-		<div className="fn-unlock">
-			<div className="fn-unlock__card">
-				<h1>{ __( 'Quick Order', 'fastnutrition-mealprep' ) }</h1>
-				<p>
-					{ __(
-						'Enter the store password to unlock this device.',
-						'fastnutrition-mealprep'
-					) }
-				</p>
-				<input
-					type="password"
-					value={ pw }
-					onChange={ ( e ) => setPw( e.target.value ) }
-					onKeyDown={ ( e ) => e.key === 'Enter' && submit() }
-					placeholder={ __(
-						'Store password',
-						'fastnutrition-mealprep'
-					) }
-				/>
-				{ err ? <div className="fn-error">{ err }</div> : null }
-				<button
-					type="button"
-					className="fn-primary"
-					disabled={ busy || ! pw }
-					onClick={ submit }
-				>
-					{ busy
-						? __( 'Unlocking…', 'fastnutrition-mealprep' )
-						: __( 'Unlock', 'fastnutrition-mealprep' ) }
-				</button>
-			</div>
 		</div>
 	);
 }
@@ -732,14 +681,12 @@ function Details( { details, setDetails, payments } ) {
 	);
 }
 
-/* ---- Step 3: review + PIN --------------------------------------------- */
+/* ---- Step 3: review + submit ------------------------------------------ */
 function Review( {
 	basket,
 	details,
 	sendEmail,
 	setSendEmail,
-	pin,
-	setPin,
 	onSubmit,
 	busy,
 	err,
@@ -806,24 +753,11 @@ function Review( {
 					) : null }
 				</label>
 			</section>
-			<section>
-				<h3>{ __( 'Staff PIN', 'fastnutrition-mealprep' ) }</h3>
-				<input
-					className="fn-pin"
-					type="password"
-					inputMode="numeric"
-					value={ pin }
-					onChange={ ( e ) =>
-						setPin( e.target.value.replace( /\D/g, '' ) )
-					}
-					placeholder="••••"
-				/>
-			</section>
 			{ err ? <div className="fn-error">{ err }</div> : null }
 			<button
 				type="button"
 				className="fn-primary fn-submit"
-				disabled={ busy || ! pin }
+				disabled={ busy }
 				onClick={ onSubmit }
 			>
 				{ busy
@@ -919,7 +853,7 @@ function BasketBar( {
 
 /* ---- App --------------------------------------------------------------- */
 function App() {
-	const [ phase, setPhase ] = useState( 'loading' ); // loading | unlock | ready
+	const [ phase, setPhase ] = useState( 'loading' ); // loading | ready | error
 	const [ config, setConfig ] = useState( null );
 	const [ ingredients, setIngredients ] = useState( {
 		protein: [],
@@ -948,7 +882,6 @@ function App() {
 		paid: false,
 	} );
 	const [ sendEmail, setSendEmail ] = useState( false );
-	const [ pin, setPin ] = useState( '' );
 	const [ busy, setBusy ] = useState( false );
 	const [ err, setErr ] = useState( '' );
 	const [ done, setDone ] = useState( null );
@@ -975,7 +908,16 @@ function App() {
 	};
 
 	useEffect( () => {
-		loadConfig().catch( () => setPhase( 'unlock' ) );
+		loadConfig().catch( ( e ) => {
+			setErr(
+				e.message ||
+					__(
+						'Could not load the Quick Order screen.',
+						'fastnutrition-mealprep'
+					)
+			);
+			setPhase( 'error' );
+		} );
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [] );
 
@@ -1013,7 +955,6 @@ function App() {
 			const res = await api( 'order', {
 				method: 'POST',
 				data: {
-					pin,
 					lines: basket.map( ( l ) => ( {
 						product_id: l.product_id,
 						quantity: l.qty,
@@ -1070,7 +1011,6 @@ function App() {
 			payment: '',
 			paid: false,
 		} );
-		setPin( '' );
 		setDone( null );
 		setErr( '' );
 		setStep( 'build' );
@@ -1085,14 +1025,11 @@ function App() {
 			</div>
 		);
 	}
-	if ( phase === 'unlock' ) {
+	if ( phase === 'error' ) {
 		return (
-			<Unlock
-				onUnlocked={ () => {
-					setPhase( 'loading' );
-					loadConfig().catch( () => setPhase( 'unlock' ) );
-				} }
-			/>
+			<div className="fn-loading">
+				<div className="fn-error">{ err }</div>
+			</div>
 		);
 	}
 
@@ -1135,7 +1072,7 @@ function App() {
 		onPrimary = () => setStep( 'review' );
 	} else if ( step === 'review' ) {
 		primaryLabel = __( 'Submit', 'fastnutrition-mealprep' );
-		primaryDisabled = ! pin || busy;
+		primaryDisabled = busy;
 		onPrimary = submit;
 	}
 
@@ -1211,8 +1148,6 @@ function App() {
 						details={ details }
 						sendEmail={ sendEmail }
 						setSendEmail={ setSendEmail }
-						pin={ pin }
-						setPin={ setPin }
 						onSubmit={ submit }
 						busy={ busy }
 						err={ err }

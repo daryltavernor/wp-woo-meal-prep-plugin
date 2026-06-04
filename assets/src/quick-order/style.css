@@ -17,17 +17,13 @@
 	--fn-danger: #ff6b6b;
 }
 
-body.fn-quick-order-fullscreen {
-	margin: 0;
-	background: var(--fn-bg);
-	-webkit-text-size-adjust: 100%;
-}
-
 .fn-quick-order {
 	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 	color: var(--fn-text);
-	background: var(--fn-bg);
-	min-height: 100vh;
+}
+
+.fn-quick-order-wrap {
+	margin-right: 20px;
 }
 
 .fn-loading,
@@ -41,16 +37,18 @@ body.fn-quick-order-fullscreen {
 .fn-app {
 	display: flex;
 	flex-direction: column;
-	min-height: 100vh;
-	padding-bottom: 96px; /* room for the sticky bar */
+	height: calc( 100vh - 160px );
+	min-height: 520px;
+	background: var(--fn-bg);
+	border: 1px solid var(--fn-line);
+	border-radius: 12px;
+	overflow: hidden;
 }
 
 .fn-head {
 	display: flex;
 	gap: 6px;
 	padding: 10px 12px;
-	position: sticky;
-	top: 0;
 	background: var(--fn-bg);
 	z-index: 5;
 }
@@ -77,6 +75,7 @@ body.fn-quick-order-fullscreen {
 
 .fn-main {
 	flex: 1;
+	overflow-y: auto;
 	padding: 8px 12px 20px;
 }
 
@@ -266,11 +265,6 @@ body.fn-quick-order-fullscreen {
 	height: 22px;
 }
 
-.fn-pin {
-	letter-spacing: 0.4em;
-	text-align: center;
-	font-size: 24px;
-}
 
 /* ---- Review ---- */
 .fn-revline {
@@ -286,16 +280,11 @@ body.fn-quick-order-fullscreen {
 	margin-top: 16px;
 }
 
-/* ---- Sticky basket bar ---- */
+/* ---- Basket bar (anchored at the foot of the panel) ---- */
 .fn-bar {
-	position: fixed;
-	left: 0;
-	right: 0;
-	bottom: 0;
 	background: var(--fn-surface);
 	border-top: 1px solid var(--fn-line);
 	z-index: 20;
-	padding-bottom: env(safe-area-inset-bottom);
 }
 
 .fn-bar__main {
@@ -374,17 +363,15 @@ body.fn-quick-order-fullscreen {
 	font-size: 22px;
 }
 
-/* ---- Unlock / done ---- */
-.fn-unlock,
+/* ---- Done screen ---- */
 .fn-done {
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	min-height: 100vh;
+	min-height: calc( 100vh - 200px );
 	padding: 20px;
 }
 
-.fn-unlock__card,
 .fn-done__card {
 	width: 100%;
 	max-width: 380px;
@@ -395,12 +382,10 @@ body.fn-quick-order-fullscreen {
 	padding: 28px 24px;
 }
 
-.fn-unlock__card h1,
 .fn-done__card h1 {
 	margin: 0 0 8px;
 }
 
-.fn-unlock__card .fn-primary,
 .fn-done__card .fn-primary {
 	width: 100%;
 	margin-top: 14px;

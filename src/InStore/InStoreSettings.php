@@ -4,24 +4,22 @@ declare( strict_types=1 );
 namespace FastNutrition\MealPrep\InStore;
 
 /**
- * Settings + option storage for the In-Store Quick Order tool.
+ * Settings + option storage for the Quick Order tool.
  *
- * Owns: the store-unlock password (hashed), the signed-token secret, the staff
- * PIN roster (hashed), the three product-set ids (standard / bulk / sweets), the
- * optional per-set ingredient override allow-lists for in-store offers, and the
- * default "send confirmation email" toggle.
+ * Owns the three product-set ids (standard / bulk / sweets), the optional
+ * per-set ingredient override allow-lists for in-store offers, and the default
+ * "send confirmation email" toggle.
  *
- * Payment methods and the paid/unpaid → status mapping are fixed product
- * decisions and live here as constants.
+ * Access to the Quick Order screen is governed by the WordPress login +
+ * `manage_woocommerce` capability (Shop Managers + Administrators); there is no
+ * separate store password or PIN. Payment methods and the paid/unpaid → status
+ * mapping are fixed product decisions and live here as constants.
  */
 final class InStoreSettings {
 
-	public const OPTION_STORE_PW_HASH = 'fn_instore_store_pw_hash';
-	public const OPTION_TOKEN_SECRET  = 'fn_instore_token_secret';
-	public const OPTION_STAFF         = 'fn_instore_staff';
-	public const OPTION_PRODUCTS      = 'fn_instore_products';
-	public const OPTION_OVERRIDES     = 'fn_instore_overrides';
-	public const OPTION_SEND_EMAIL    = 'fn_instore_send_email_default';
+	public const OPTION_PRODUCTS   = 'fn_instore_products';
+	public const OPTION_OVERRIDES  = 'fn_instore_overrides';
+	public const OPTION_SEND_EMAIL = 'fn_instore_send_email_default';
 
 	public const PAGE_SLUG = 'fn-quick-order-settings';
 
@@ -49,40 +47,6 @@ final class InStoreSettings {
 	}
 
 	// --- Option accessors ---------------------------------------------------
-
-	public static function store_password_is_set(): bool {
-		return '' !== (string) get_option( self::OPTION_STORE_PW_HASH, '' );
-	}
-
-	public static function store_password_hash(): string {
-		return (string) get_option( self::OPTION_STORE_PW_HASH, '' );
-	}
-
-	/**
-	 * The HMAC secret used to sign kiosk tokens. Generated on first read so an
-	 * admin never has to think about it; rotating it (via "Sign out all devices")
-	 * invalidates every issued token.
-	 */
-	public static function token_secret(): string {
-		$secret = (string) get_option( self::OPTION_TOKEN_SECRET, '' );
-		if ( '' === $secret ) {
-			$secret = wp_generate_password( 64, true, true );
-			update_option( self::OPTION_TOKEN_SECRET, $secret, false );
-		}
-		return $secret;
-	}
-
-	public static function rotate_token_secret(): void {
-		update_option( self::OPTION_TOKEN_SECRET, wp_generate_password( 64, true, true ), false );
-	}
-
-	/**
-	 * @return array<int,array{id:int,name:string,pin_hash:string}>
-	 */
-	public static function staff(): array {
-		$raw = get_option( self::OPTION_STAFF, [] );
-		return is_array( $raw ) ? array_values( $raw ) : [];
-	}
 
 	/**
 	 * @return array{standard:int,bulk:int,sweets:int}
@@ -164,67 +128,18 @@ final class InStoreSettings {
 		}
 		$action = isset( $_POST['fn_action'] ) ? sanitize_key( wp_unslash( (string) $_POST['fn_action'] ) ) : '';
 
-		if ( 'save_access' === $action ) {
-			$pw = isset( $_POST['fn_store_password'] ) ? (string) wp_unslash( $_POST['fn_store_password'] ) : '';
-			if ( '' !== trim( $pw ) ) {
-				update_option( self::OPTION_STORE_PW_HASH, wp_hash_password( $pw ), false );
-			}
-			set_transient( 'fn_instore_notice', __( 'Store access password saved.', 'fastnutrition-mealprep' ), 30 );
-		} elseif ( 'sign_out_all' === $action ) {
-			self::rotate_token_secret();
-			set_transient( 'fn_instore_notice', __( 'All devices signed out. Staff must re-enter the store password.', 'fastnutrition-mealprep' ), 30 );
-		} elseif ( 'save_staff' === $action ) {
-			$this->save_staff();
-			set_transient( 'fn_instore_notice', __( 'Staff & PINs saved.', 'fastnutrition-mealprep' ), 30 );
-		} elseif ( 'save_products' === $action ) {
+		if ( 'save_products' === $action ) {
 			$map = [];
 			foreach ( self::SETS as $set ) {
 				$map[ $set ] = isset( $_POST[ 'fn_product_' . $set ] ) ? (int) $_POST[ 'fn_product_' . $set ] : 0;
 			}
 			update_option( self::OPTION_PRODUCTS, $map, false );
 			update_option( self::OPTION_SEND_EMAIL, ! empty( $_POST['fn_send_email_default'] ) ? '1' : '0', false );
-			set_transient( 'fn_instore_notice', __( 'Product sets saved.', 'fastnutrition-mealprep' ), 30 );
+			set_transient( 'fn_instore_notice', __( 'Quick Order settings saved.', 'fastnutrition-mealprep' ), 30 );
 		}
 
 		wp_safe_redirect( admin_url( 'admin.php?page=' . self::PAGE_SLUG ) );
 		exit;
-	}
-
-	private function save_staff(): void {
-		$names    = isset( $_POST['fn_staff_name'] ) && is_array( $_POST['fn_staff_name'] ) ? wp_unslash( $_POST['fn_staff_name'] ) : [];
-		$pins     = isset( $_POST['fn_staff_pin'] ) && is_array( $_POST['fn_staff_pin'] ) ? wp_unslash( $_POST['fn_staff_pin'] ) : [];
-		$existing = [];
-		foreach ( self::staff() as $row ) {
-			$existing[ (int) $row['id'] ] = $row;
-		}
-		$ids = isset( $_POST['fn_staff_id'] ) && is_array( $_POST['fn_staff_id'] ) ? array_map( 'intval', wp_unslash( $_POST['fn_staff_id'] ) ) : [];
-
-		$out     = [];
-		$next_id = 1;
-		foreach ( $existing as $eid => $_row ) {
-			$next_id = max( $next_id, $eid + 1 );
-		}
-
-		foreach ( $names as $i => $raw_name ) {
-			$name = sanitize_text_field( (string) $raw_name );
-			if ( '' === $name ) {
-				continue;
-			}
-			$id  = isset( $ids[ $i ] ) ? (int) $ids[ $i ] : 0;
-			$pin = isset( $pins[ $i ] ) ? preg_replace( '/\D/', '', (string) $pins[ $i ] ) : '';
-
-			if ( $id && isset( $existing[ $id ] ) ) {
-				$hash = '' !== $pin ? wp_hash_password( $pin ) : (string) $existing[ $id ]['pin_hash'];
-			} else {
-				if ( '' === $pin ) {
-					continue; // New staff need a PIN.
-				}
-				$id   = $next_id++;
-				$hash = wp_hash_password( $pin );
-			}
-			$out[] = [ 'id' => $id, 'name' => $name, 'pin_hash' => $hash ];
-		}
-		update_option( self::OPTION_STAFF, $out, false );
 	}
 
 	public function render(): void {
@@ -238,64 +153,18 @@ final class InStoreSettings {
 			echo '<div class="notice notice-info is-dismissible"><p>' . esc_html( (string) $notice ) . '</p></div>';
 		}
 
-		$products = self::products();
-		$staff    = self::staff();
-		$page_url = home_url( '/?fn_quick_order=1' );
+		$products   = self::products();
+		$screen_url = admin_url( 'admin.php?page=' . QuickOrderPage::ADMIN_SLUG );
 
 		echo '<div class="wrap"><h1>' . esc_html__( 'Quick Order — Settings', 'fastnutrition-mealprep' ) . '</h1>';
 
 		echo '<div style="background:#f0f6fc;border-left:4px solid #2271b1;padding:10px 14px;margin:14px 0;max-width:820px">';
-		echo '<p style="margin:0"><strong>' . esc_html__( 'In-store / phone order screen', 'fastnutrition-mealprep' ) . '</strong><br>';
-		echo esc_html__( 'A fast, touch-first screen for staff to take phone and walk-in orders straight into WooCommerce. Open it on the iPad, unlock once with the store password, and each order is attributed by staff PIN.', 'fastnutrition-mealprep' );
+		echo '<p style="margin:0"><strong>' . esc_html__( 'Staff order screen', 'fastnutrition-mealprep' ) . '</strong><br>';
+		echo esc_html__( 'A fast, touch-first screen for staff to take phone and walk-in orders straight into WooCommerce. It lives in the WordPress admin and is available to Shop Managers and Administrators — orders are attributed to whoever is signed in.', 'fastnutrition-mealprep' );
 		echo '</p>';
-		echo '<p style="margin:8px 0 0"><strong>' . esc_html__( 'Screen URL:', 'fastnutrition-mealprep' ) . '</strong> <code>' . esc_html( $page_url ) . '</code> ' . esc_html__( '(or place the [fn_quick_order] shortcode on any page).', 'fastnutrition-mealprep' ) . '</p>';
+		echo '<p style="margin:8px 0 0"><a class="button button-primary" href="' . esc_url( $screen_url ) . '">' . esc_html__( 'Open Quick Order screen', 'fastnutrition-mealprep' ) . '</a></p>';
 		echo '</div>';
 
-		// Access password.
-		echo '<h2>' . esc_html__( 'Store access', 'fastnutrition-mealprep' ) . '</h2>';
-		echo '<form method="post">';
-		wp_nonce_field( 'fn_instore_settings', 'fn_instore_nonce' );
-		echo '<input type="hidden" name="fn_action" value="save_access" />';
-		echo '<table class="form-table"><tbody>';
-		printf(
-			'<tr><th><label for="fn_store_password">%s</label></th><td><input type="password" id="fn_store_password" name="fn_store_password" class="regular-text" autocomplete="new-password" placeholder="%s" /><p class="description">%s</p></td></tr>',
-			esc_html__( 'Store password', 'fastnutrition-mealprep' ),
-			esc_attr( self::store_password_is_set() ? __( '•••••••• (set — leave blank to keep)', 'fastnutrition-mealprep' ) : __( 'Set a password to unlock the screen', 'fastnutrition-mealprep' ) ),
-			esc_html__( 'Entered once per device to unlock the screen. The device then stays unlocked indefinitely (it does NOT use a WordPress login, so it never gets logged out).', 'fastnutrition-mealprep' )
-		);
-		echo '</tbody></table>';
-		submit_button( __( 'Save store password', 'fastnutrition-mealprep' ), 'primary', '', false );
-		echo '</form>';
-
-		echo '<form method="post" style="margin-top:10px">';
-		wp_nonce_field( 'fn_instore_settings', 'fn_instore_nonce' );
-		echo '<input type="hidden" name="fn_action" value="sign_out_all" />';
-		echo '<p class="description">' . esc_html__( 'Lost a device? Sign every device out and require the store password again.', 'fastnutrition-mealprep' ) . '</p>';
-		submit_button( __( 'Sign out all devices', 'fastnutrition-mealprep' ), 'delete', '', false );
-		echo '</form>';
-
-		// Staff & PINs.
-		echo '<h2>' . esc_html__( 'Staff & PINs', 'fastnutrition-mealprep' ) . '</h2>';
-		echo '<p class="description">' . esc_html__( 'Each order requires a PIN that identifies the staff member who took it. The PIN is stored on the order for attribution. Leave a PIN blank when editing to keep the existing one.', 'fastnutrition-mealprep' ) . '</p>';
-		echo '<form method="post">';
-		wp_nonce_field( 'fn_instore_settings', 'fn_instore_nonce' );
-		echo '<input type="hidden" name="fn_action" value="save_staff" />';
-		echo '<table class="widefat striped" style="max-width:620px"><thead><tr><th>' . esc_html__( 'Name', 'fastnutrition-mealprep' ) . '</th><th>' . esc_html__( 'PIN (digits)', 'fastnutrition-mealprep' ) . '</th></tr></thead><tbody>';
-		$rows = array_merge( $staff, [ [ 'id' => 0, 'name' => '', 'pin_hash' => '' ] ], [ [ 'id' => 0, 'name' => '', 'pin_hash' => '' ] ] );
-		foreach ( $rows as $row ) {
-			$has_pin = '' !== (string) ( $row['pin_hash'] ?? '' );
-			printf(
-				'<tr><td><input type="hidden" name="fn_staff_id[]" value="%1$d" /><input type="text" name="fn_staff_name[]" value="%2$s" class="regular-text" /></td><td><input type="text" inputmode="numeric" pattern="[0-9]*" name="fn_staff_pin[]" value="" placeholder="%3$s" /></td></tr>',
-				(int) ( $row['id'] ?? 0 ),
-				esc_attr( (string) ( $row['name'] ?? '' ) ),
-				esc_attr( $has_pin ? __( '•••• (set)', 'fastnutrition-mealprep' ) : __( 'e.g. 1234', 'fastnutrition-mealprep' ) )
-			);
-		}
-		echo '</tbody></table>';
-		submit_button( __( 'Save staff & PINs', 'fastnutrition-mealprep' ) );
-		echo '</form>';
-
-		// Product sets.
 		echo '<h2>' . esc_html__( 'Product sets', 'fastnutrition-mealprep' ) . '</h2>';
 		echo '<p class="description">' . esc_html__( 'Map the three screen tabs to your meal products. Defaults are auto-detected from the meal tier / sweet mode you set on each product.', 'fastnutrition-mealprep' ) . '</p>';
 		echo '<form method="post">';
@@ -319,7 +188,7 @@ final class InStoreSettings {
 			esc_html__( 'Default the "send confirmation email" toggle on (only sends when an email address is entered).', 'fastnutrition-mealprep' )
 		);
 		echo '</tbody></table>';
-		submit_button( __( 'Save product sets', 'fastnutrition-mealprep' ) );
+		submit_button( __( 'Save settings', 'fastnutrition-mealprep' ) );
 		echo '</form>';
 
 		echo '</div>';

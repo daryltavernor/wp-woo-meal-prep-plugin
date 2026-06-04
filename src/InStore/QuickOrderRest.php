@@ -11,16 +11,15 @@ use WP_REST_Request;
 use WP_REST_Response;
 
 /**
- * Nonce-free, kiosk-token-protected REST endpoints for the Quick Order screen.
+ * REST endpoints for the Quick Order admin screen.
  *
  * Routes (namespace fastnutrition/v1, prefix /instore):
- *   POST /instore/unlock  — exchange the store password for a signed token cookie.
- *   GET  /instore/config  — hydrate the screen (product sets + payment + statuses).
+ *   GET  /instore/config  — hydrate the screen (product sets + payment).
  *   POST /instore/order   — build a real WooCommerce order via OrderFactory.
  *
- * unlock is public but rate-limited; config + order require a valid kiosk token.
- * The order route additionally resolves the staff PIN. None of these use a WP
- * user session, so the iPad is never logged out by WordPress cookie expiry.
+ * Both require the `manage_woocommerce` capability (Shop Managers +
+ * Administrators) plus the standard logged-in REST cookie nonce. The order is
+ * attributed to the logged-in user who took it.
  */
 final class QuickOrderRest {
 
@@ -33,24 +32,11 @@ final class QuickOrderRest {
 	public function routes(): void {
 		register_rest_route(
 			self::NS,
-			'/instore/unlock',
-			[
-				'methods'             => 'POST',
-				'callback'            => [ $this, 'unlock' ],
-				'permission_callback' => '__return_true',
-				'args'                => [
-					'password' => [ 'type' => 'string', 'required' => true ],
-				],
-			]
-		);
-
-		register_rest_route(
-			self::NS,
 			'/instore/config',
 			[
 				'methods'             => 'GET',
 				'callback'            => [ $this, 'config' ],
-				'permission_callback' => [ $this, 'require_token' ],
+				'permission_callback' => [ $this, 'require_cap' ],
 			]
 		);
 
@@ -60,33 +46,17 @@ final class QuickOrderRest {
 			[
 				'methods'             => 'POST',
 				'callback'            => [ $this, 'create_order' ],
-				'permission_callback' => [ $this, 'require_token' ],
+				'permission_callback' => [ $this, 'require_cap' ],
 			]
 		);
 	}
 
-	/** Permission gate: a valid kiosk token cookie must be present. */
-	public function require_token(): bool|WP_Error {
-		if ( KioskAuth::request_is_authorised() ) {
+	/** Permission gate: Shop Managers + Administrators. */
+	public function require_cap(): bool|WP_Error {
+		if ( current_user_can( 'manage_woocommerce' ) ) {
 			return true;
 		}
-		return new WP_Error( 'fn_locked', __( 'The screen is locked. Enter the store password.', 'fastnutrition-mealprep' ), [ 'status' => 401 ] );
-	}
-
-	public function unlock( WP_REST_Request $req ): WP_REST_Response|WP_Error {
-		if ( ! KioskAuth::unlock_rate_ok() ) {
-			return new WP_Error( 'fn_throttled', __( 'Too many attempts. Wait a few minutes and try again.', 'fastnutrition-mealprep' ), [ 'status' => 429 ] );
-		}
-		if ( ! InStoreSettings::store_password_is_set() ) {
-			return new WP_Error( 'fn_not_configured', __( 'No store password has been set. Configure it under Meal Prep → Quick Order.', 'fastnutrition-mealprep' ), [ 'status' => 503 ] );
-		}
-		$password = (string) $req->get_param( 'password' );
-		if ( ! KioskAuth::verify_password( $password ) ) {
-			return new WP_Error( 'fn_bad_password', __( 'Incorrect store password.', 'fastnutrition-mealprep' ), [ 'status' => 401 ] );
-		}
-		$token = KioskAuth::issue_token();
-		KioskAuth::set_cookie( $token );
-		return new WP_REST_Response( [ 'unlocked' => true ], 200 );
+		return new WP_Error( 'fn_forbidden', __( 'You do not have permission to take orders.', 'fastnutrition-mealprep' ), [ 'status' => 403 ] );
 	}
 
 	public function config(): WP_REST_Response {
@@ -119,10 +89,10 @@ final class QuickOrderRest {
 
 		return new WP_REST_Response(
 			[
-				'sets'         => $sets,
-				'payments'     => $payments,
-				'send_email'   => InStoreSettings::send_email_default(),
-				'currency'     => function_exists( 'get_woocommerce_currency_symbol' ) ? get_woocommerce_currency_symbol() : '£',
+				'sets'       => $sets,
+				'payments'   => $payments,
+				'send_email' => InStoreSettings::send_email_default(),
+				'currency'   => function_exists( 'get_woocommerce_currency_symbol' ) ? get_woocommerce_currency_symbol() : '£',
 			],
 			200
 		);
@@ -132,11 +102,12 @@ final class QuickOrderRest {
 		$body = $req->get_json_params();
 		$body = is_array( $body ) ? $body : [];
 
-		// Resolve the staff PIN → named staff member (attribution gate).
-		$staff = StaffPins::resolve( (string) ( $body['pin'] ?? '' ) );
-		if ( null === $staff ) {
-			return new WP_Error( 'fn_bad_pin', __( 'PIN not recognised.', 'fastnutrition-mealprep' ), [ 'status' => 403 ] );
-		}
+		// The logged-in staff member who took the order (attribution).
+		$user  = wp_get_current_user();
+		$staff = [
+			'id'   => (int) $user->ID,
+			'name' => (string) ( $user->display_name ?: $user->user_login ),
+		];
 
 		$payload = [
 			'lines'      => $body['lines'] ?? [],

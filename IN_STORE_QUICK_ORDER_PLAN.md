@@ -2,6 +2,8 @@
 
 > **Status:** Implemented on `claude/serene-sagan-6WTVU` (v1.10.0). Awaiting WordPress/WooCommerce integration testing before merge to `main`.
 > **Branch:** `claude/serene-sagan-6WTVU` (feature branch; merge to `main` when approved).
+>
+> **Access-model change (superseding the kiosk design below):** the screen is now a **WordPress admin page** under *Meal Prep → Quick Order*, gated to **Shop Managers + Administrators** (`manage_woocommerce`), with orders attributed to the signed-in user. The public page, store-password unlock, signed kiosk token and per-order PIN described in §2/§3 were removed; `KioskAuth` and `StaffPins` no longer exist, and the REST endpoints now use a capability + cookie-nonce check (`/instore/unlock` was dropped). Everything else (OrderFactory, shared pricing, fulfilment, pricing parity) is unchanged.
 > **Prime objective:** fast, touch-first order entry on an iPad with the **fewest possible clicks and steps**, creating real WooCommerce orders identical to online orders for meal composition, fulfilment metadata and reporting.
 
 This is an **extension** of the existing Fast Nutrition Meal Prep plugin. It must not change any existing behaviour. Every addition is additive registration plus two pure, behaviour-preserving extractions of existing logic so the offline tool and the online checkout call the *same* code.
