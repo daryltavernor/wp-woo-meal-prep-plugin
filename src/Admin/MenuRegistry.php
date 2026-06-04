@@ -55,6 +55,9 @@ final class MenuRegistry {
 		// Label printing.
 		add_submenu_page( self::SLUG, __( 'Print Labels', 'fastnutrition-mealprep' ), __( 'Print Labels', 'fastnutrition-mealprep' ), 'manage_woocommerce', 'fn-print-labels', [ LabelsAdmin::class, 'render_static' ] );
 
+		// In-store quick order screen settings.
+		add_submenu_page( self::SLUG, __( 'Quick Order (In-Store)', 'fastnutrition-mealprep' ), __( 'Quick Order', 'fastnutrition-mealprep' ), 'manage_woocommerce', \FastNutrition\MealPrep\InStore\InStoreSettings::PAGE_SLUG, [ \FastNutrition\MealPrep\InStore\InStoreSettings::class, 'render_static' ] );
+
 		// Settings.
 		add_submenu_page( self::SLUG, __( 'Checkout & General Settings', 'fastnutrition-mealprep' ), __( 'Settings', 'fastnutrition-mealprep' ), 'manage_woocommerce', 'fn-settings', [ SettingsPage::class, 'render_static' ] );
 	}
