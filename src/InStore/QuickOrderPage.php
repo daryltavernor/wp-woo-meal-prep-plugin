@@ -61,8 +61,17 @@ final class QuickOrderPage {
 			'v1Url'    => esc_url_raw( rest_url( 'fastnutrition/v1/' ) ),
 			'slotsUrl' => esc_url_raw( rest_url( 'fastnutrition/v1/slots' ) ),
 			'nonce'    => wp_create_nonce( 'wp_rest' ),
-			'currency' => function_exists( 'get_woocommerce_currency_symbol' ) ? get_woocommerce_currency_symbol() : '£',
+			'exitUrl'  => esc_url_raw( admin_url() ),
+			'currency' => self::currency_symbol(),
 		];
+	}
+
+	/** WooCommerce returns the symbol as an HTML entity (e.g. &pound;); decode it. */
+	private static function currency_symbol(): string {
+		if ( ! function_exists( 'get_woocommerce_currency_symbol' ) ) {
+			return '£';
+		}
+		return html_entity_decode( get_woocommerce_currency_symbol(), ENT_QUOTES, 'UTF-8' );
 	}
 
 	public function render_admin(): void {
@@ -74,6 +83,9 @@ final class QuickOrderPage {
 			echo '<div class="notice notice-error"><p>' . esc_html__( 'Quick Order assets are not built. Run "npm run build" in the plugin directory.', 'fastnutrition-mealprep' ) . '</p></div></div>';
 			return;
 		}
-		echo '<div class="wrap fn-quick-order-wrap"><div id="fn-quick-order-root" class="fn-quick-order"></div></div>';
+		echo '<div class="wrap fn-quick-order-wrap">';
+		echo '<a class="fn-qo-exit" href="' . esc_url( admin_url() ) . '" aria-label="' . esc_attr__( 'Close Quick Order', 'fastnutrition-mealprep' ) . '">&times;</a>';
+		echo '<div id="fn-quick-order-root" class="fn-quick-order"></div>';
+		echo '</div>';
 	}
 }

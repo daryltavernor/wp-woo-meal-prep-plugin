@@ -92,7 +92,7 @@ final class QuickOrderRest {
 				'sets'       => $sets,
 				'payments'   => $payments,
 				'send_email' => InStoreSettings::send_email_default(),
-				'currency'   => function_exists( 'get_woocommerce_currency_symbol' ) ? get_woocommerce_currency_symbol() : '£',
+				'currency'   => function_exists( 'get_woocommerce_currency_symbol' ) ? html_entity_decode( get_woocommerce_currency_symbol(), ENT_QUOTES, 'UTF-8' ) : '£',
 			],
 			200
 		);

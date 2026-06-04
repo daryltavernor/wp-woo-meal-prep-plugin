@@ -594,10 +594,15 @@ function Details( { details, setDetails, payments } ) {
 				) : null }
 				{ ! loadingSlots && slots.length === 0 ? (
 					<p className="fn-hint">
-						{ __(
-							'No slots — check the postcode / method.',
-							'fastnutrition-mealprep'
-						) }
+						{ d.fulfilmentType === 'delivery'
+							? __(
+									'No delivery slots for this postcode — check it, or that a delivery profile covers it.',
+									'fastnutrition-mealprep'
+							  )
+							: __(
+									'No collection slots available. Add a Collection profile under Meal Prep → Collection Profiles.',
+									'fastnutrition-mealprep'
+							  ) }
 					</p>
 				) : null }
 				{ slots.map( ( opt ) => (
