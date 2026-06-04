@@ -138,6 +138,16 @@ Three sections: Ingredient totals · Per-order pick list (with tick-off checkbox
 ### Customer favourites
 Logged-in customers can save meal combos to their account and re-add them with a single click from *My Account → Favourites*.
 
+### In-Store Quick Order (staff / phone orders)
+A fast, touch-first screen (built for an iPad) that lets staff take phone and walk-in orders straight into WooCommerce — no checkout flow. It creates a **real** WooCommerce order that appears in *WooCommerce → Orders* exactly like an online one, reusing the same line pricing, bundle tiers, meal-composition meta and `_fn_fulfilment` slot data, so kitchen prep lists and reporting never fork.
+
+* **Open it:** `/?fn_quick_order=1` (clean full-screen kiosk page) or the `[fn_quick_order]` shortcode on any page.
+* **Authentication:** the screen is public but locked. Staff unlock a device **once** with the **store password** (set under *Meal Prep → Quick Order*); the device then holds a long-lived signed token — it does **not** use a WordPress login, so it is never logged out by session/nonce expiry. Each order requires a **staff PIN**, which is stamped on the order for attribution.
+* **Flow:** Step 1 build food (Standard / Bulk / Sweets → protein-or-set-meal, 1 carb + 1 green or 2 greens, one optional add-on, quantity on every line) with instant add-and-reset; Step 2 contact + delivery/collection slot + payment + paid/unpaid; Step 3 PIN + submit.
+* **Order tagging:** `created_via = fn_instore`, `_fn_offline_order = yes`, plus `_fn_staff_name` / `_fn_staff_id`.
+* **Pricing parity:** identical line pricing to online; adds the delivery fee for delivery orders, does **not** add the basket surcharge (see `CHECKOUT_PRICING.md`). Paid → **Completed**, Unpaid → **On hold** (stock is reduced as normal). The standard confirmation email is sent only when an email address was entered and the toggle is on.
+* **Settings:** *Meal Prep → Quick Order* — store password, staff & PINs, the three product-set mappings (auto-detected by tier / sweet mode), optional per-set ingredient override lists for in-store-only offers, and the email default.
+
 ---
 
 ## REST endpoints (namespace `fastnutrition/v1`)
@@ -149,6 +159,9 @@ Logged-in customers can save meal combos to their account and re-add them with a
 | `GET`  | `/slots?postcode=...&method=delivery|collection` | Returns available {date, slot} options for the next 14 days. |
 | `GET/POST` | `/custom-ingredients` | Logged-in users' custom macro-calculator ingredients. |
 | `GET/POST/DELETE` | `/favourites` | Manages saved meal combos. |
+| `POST` | `/instore/unlock` | Exchanges the store password for a signed kiosk-token cookie (rate-limited). |
+| `GET`  | `/instore/config` | In-Store screen hydration: product sets, payment methods, currency. *Kiosk token required.* |
+| `POST` | `/instore/order` | Creates a WooCommerce order from the screen's basket via `InStore\OrderFactory`. *Kiosk token + staff PIN required.* |
 
 Store API extensions (namespace `fastnutrition-mealprep`):
 * Cart endpoint: `extensions.fastnutrition-mealprep.macros` — running macro totals.
@@ -178,12 +191,15 @@ fastnutrition-mealprep/
     Admin/{MenuRegistry,PrepDashboard,PrepSheet,ProfileAdmin,BlockedDatesAdmin,BundleAdmin,ConflictsNotice}.php
     Account/Favourites.php
     Rest/RestController.php
+    InStore/{OrderFactory,KioskAuth,StaffPins,InStoreSettings,QuickOrderRest,QuickOrderPage}.php
+    Cart/MealPricing.php            # shared online/offline line-pricing core
     Support/AssetManager.php
   assets/src/blocks/
     meal-builder/
     macro-calculator/
     multi-step-checkout/
     slot-picker/
+  assets/src/quick-order/         # In-Store Quick Order touch app (non-block entry)
   assets/build/                   # produced by `npm run build`
 ```
 

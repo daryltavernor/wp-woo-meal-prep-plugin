@@ -35,6 +35,33 @@ without re-reading every file: **where does this number come from**, and
   total = subtotal + surcharge + shipping
 ```
 
+## Shared pricing core (`src/Cart/MealPricing.php`)
+
+The per-line unit-price derivation — `unit_base + selection_Δ`, including the
+integer-pence bundle apportionment — lives in `Cart\MealPricing`, **not** inside
+`BundlePricer`. `BundlePricer::apply` (online cart) and
+`InStore\OrderFactory` (offline In-Store Quick Order) both call
+`MealPricing::price_product_group()` / `price_lines()`, so the two order sources
+can never fork on price, bundle maths or meal composition. `BundlePricer::apply`
+is now a thin cart adapter: it reads the cart, asks `MealPricing` for the prices,
+then calls `set_price()` and writes the `fn_bundle` display meta.
+
+## Offline (In-Store) orders — deliberate divergences
+
+In-store orders are built by `InStore\OrderFactory` with WooCommerce's internal
+PHP functions (no cart, no Store API). They reuse the same line pricing and the
+same `_fn_fulfilment` metadata shape, but by product decision they differ from
+online orders in two ways:
+
+* **No basket surcharge.** The `Surcharge` fee is a cart-fees-stage concept and
+  is intentionally not applied to offline orders.
+* **Delivery fee only.** Delivery orders get a shipping line equal to the
+  postcode's WC zone flat rate (via `StoreApiExtensions::fees_for_postcode()`);
+  collection orders get none.
+
+Everything else — line pricing, bundle tiers, macros, prep cache, labels — is
+identical because it flows through the shared code above.
+
 ## Layer-by-layer
 
 ### 1. `Selections` (`src/Cart/Selections.php`)

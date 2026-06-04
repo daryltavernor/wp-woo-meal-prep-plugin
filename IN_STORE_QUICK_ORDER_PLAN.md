@@ -1,6 +1,6 @@
 # In-Store Quick Order System — Implementation Plan
 
-> **Status:** Plan only. No production code written yet.
+> **Status:** Implemented on `claude/serene-sagan-6WTVU` (v1.10.0). Awaiting WordPress/WooCommerce integration testing before merge to `main`.
 > **Branch:** `claude/serene-sagan-6WTVU` (feature branch; merge to `main` when approved).
 > **Prime objective:** fast, touch-first order entry on an iPad with the **fewest possible clicks and steps**, creating real WooCommerce orders identical to online orders for meal composition, fulfilment metadata and reporting.
 
