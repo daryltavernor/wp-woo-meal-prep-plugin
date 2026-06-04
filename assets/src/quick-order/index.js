@@ -652,22 +652,6 @@ function Details( { details, setDetails, payments } ) {
 			<section>
 				<h3>{ __( 'Payment', 'fastnutrition-mealprep' ) }</h3>
 				<PillRow>
-					{ payments.map( ( p ) => (
-						<Pill
-							key={ p.slug }
-							active={ d.payment === p.slug }
-							onClick={ () =>
-								set( {
-									payment: p.slug,
-									paid: p.slug === 'account' ? false : d.paid,
-								} )
-							}
-						>
-							{ p.label }
-						</Pill>
-					) ) }
-				</PillRow>
-				<PillRow>
 					<Pill
 						active={ d.paid === true }
 						onClick={ () => set( { paid: true } ) }
@@ -676,11 +660,44 @@ function Details( { details, setDetails, payments } ) {
 					</Pill>
 					<Pill
 						active={ d.paid === false }
-						onClick={ () => set( { paid: false } ) }
+						onClick={ () => set( { paid: false, payment: '' } ) }
 					>
-						{ __( 'Unpaid', 'fastnutrition-mealprep' ) }
+						{ __( 'Not paid', 'fastnutrition-mealprep' ) }
 					</Pill>
 				</PillRow>
+
+				{ d.paid === true && (
+					<>
+						<h3>
+							{ __( 'Payment method', 'fastnutrition-mealprep' ) }
+						</h3>
+						<PillRow>
+							{ payments.map( ( p ) => (
+								<Pill
+									key={ p.slug }
+									active={ d.payment === p.slug }
+									onClick={ () => set( { payment: p.slug } ) }
+								>
+									{ p.label }
+								</Pill>
+							) ) }
+						</PillRow>
+					</>
+				) }
+
+				{ d.paid === false && (
+					<p className="fn-note">
+						{ d.fulfilmentType === 'delivery'
+							? __(
+									'Not paid — cash on delivery.',
+									'fastnutrition-mealprep'
+							  )
+							: __(
+									'Not paid — cash on collection.',
+									'fastnutrition-mealprep'
+							  ) }
+					</p>
+				) }
 			</section>
 		</div>
 	);
@@ -690,12 +707,33 @@ function Details( { details, setDetails, payments } ) {
 function Review( {
 	basket,
 	details,
+	payments,
 	sendEmail,
 	setSendEmail,
 	onSubmit,
 	busy,
 	err,
 } ) {
+	let paymentText;
+	if ( details.paid ) {
+		const label =
+			( payments.find( ( p ) => p.slug === details.payment ) || {} )
+				.label || details.payment;
+		paymentText = `${ label } · ${ __(
+			'Paid',
+			'fastnutrition-mealprep'
+		) }`;
+	} else if ( details.fulfilmentType === 'delivery' ) {
+		paymentText = __(
+			'Not paid — cash on delivery',
+			'fastnutrition-mealprep'
+		);
+	} else {
+		paymentText = __(
+			'Not paid — cash on collection',
+			'fastnutrition-mealprep'
+		);
+	}
 	return (
 		<div className="fn-review">
 			<section>
@@ -727,12 +765,7 @@ function Review( {
 				</div>
 				<div className="fn-revline">
 					<span>{ __( 'Payment', 'fastnutrition-mealprep' ) }</span>
-					<span>
-						{ details.payment } ·{ ' ' }
-						{ details.paid
-							? __( 'Paid', 'fastnutrition-mealprep' )
-							: __( 'Unpaid', 'fastnutrition-mealprep' ) }
-					</span>
+					<span>{ paymentText }</span>
 				</div>
 			</section>
 			<section>
@@ -884,7 +917,7 @@ function App() {
 		date: '',
 		slot: null,
 		payment: '',
-		paid: false,
+		paid: null,
 	} );
 	const [ sendEmail, setSendEmail ] = useState( false );
 	const [ busy, setBusy ] = useState( false );
@@ -941,7 +974,14 @@ function App() {
 		);
 
 	const detailsValid = ( () => {
-		if ( ! details.phone.trim() || ! details.payment || ! details.slot ) {
+		if ( ! details.phone.trim() || ! details.slot ) {
+			return false;
+		}
+		// Paid / Not paid must be chosen; a method is required only when paid.
+		if ( details.paid !== true && details.paid !== false ) {
+			return false;
+		}
+		if ( details.paid === true && ! details.payment ) {
 			return false;
 		}
 		if (
@@ -1014,7 +1054,7 @@ function App() {
 			date: '',
 			slot: null,
 			payment: '',
-			paid: false,
+			paid: null,
 		} );
 		setDone( null );
 		setErr( '' );
@@ -1151,6 +1191,7 @@ function App() {
 					<Review
 						basket={ basket }
 						details={ details }
+						payments={ config.payments || [] }
 						sendEmail={ sendEmail }
 						setSendEmail={ setSendEmail }
 						onSubmit={ submit }

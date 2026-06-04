@@ -121,6 +121,15 @@
 	font-size: 12px;
 }
 
+.fn-note {
+	margin: 4px 0 0;
+	padding: 12px 14px;
+	border: 2px dashed var(--fn-line);
+	border-radius: 12px;
+	color: var(--fn-text);
+	font-weight: 600;
+}
+
 /* ---- Set tabs ---- */
 .fn-settabs {
 	display: flex;

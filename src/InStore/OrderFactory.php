@@ -84,9 +84,22 @@ final class OrderFactory {
 			return new WP_Error( 'fn_address_required', __( 'A delivery address is required.', 'fastnutrition-mealprep' ), [ 'status' => 400 ] );
 		}
 
-		$payment = (string) ( $payload['payment'] ?? '' );
-		if ( ! isset( InStoreSettings::PAYMENT_METHODS[ $payment ] ) ) {
-			return new WP_Error( 'fn_payment_invalid', __( 'Choose a payment method.', 'fastnutrition-mealprep' ), [ 'status' => 400 ] );
+		// Payment: a method is only required when the order is marked paid. An
+		// unpaid order is "cash on collection/delivery" — recorded with a clear
+		// title and left to be settled (status maps to On hold below).
+		$paid = ! empty( $payload['paid'] );
+		if ( $paid ) {
+			$payment = (string) ( $payload['payment'] ?? '' );
+			if ( ! isset( InStoreSettings::PAYMENT_METHODS[ $payment ] ) ) {
+				return new WP_Error( 'fn_payment_invalid', __( 'Choose a payment method.', 'fastnutrition-mealprep' ), [ 'status' => 400 ] );
+			}
+			$method_slug  = $payment;
+			$method_title = InStoreSettings::payment_label( $payment );
+		} else {
+			$method_slug  = 'cod';
+			$method_title = $is_delivery
+				? __( 'Cash on delivery', 'fastnutrition-mealprep' )
+				: __( 'Cash on collection', 'fastnutrition-mealprep' );
 		}
 
 		// 3. Create the order shell.
@@ -143,8 +156,8 @@ final class OrderFactory {
 		}
 
 		// 8. Payment.
-		$order->set_payment_method( $payment );
-		$order->set_payment_method_title( InStoreSettings::payment_label( $payment ) );
+		$order->set_payment_method( $method_slug );
+		$order->set_payment_method_title( $method_title );
 
 		// 9. Offline + staff attribution tags.
 		$staff = (array) ( $payload['staff'] ?? [] );
@@ -153,17 +166,17 @@ final class OrderFactory {
 		$order->update_meta_data( '_fn_staff_id', (int) ( $staff['id'] ?? 0 ) );
 		$order->add_order_note(
 			sprintf(
-				/* translators: 1: staff name, 2: payment method label */
-				__( 'In-store order taken by %1$s. Payment: %2$s.', 'fastnutrition-mealprep' ),
+				/* translators: 1: staff name, 2: paid/unpaid, 3: payment method label */
+				__( 'In-store order taken by %1$s. %2$s — %3$s.', 'fastnutrition-mealprep' ),
 				(string) ( $staff['name'] ?? '—' ),
-				InStoreSettings::payment_label( $payment )
+				$paid ? __( 'Paid', 'fastnutrition-mealprep' ) : __( 'Not paid', 'fastnutrition-mealprep' ),
+				$method_title
 			)
 		);
 
 		// 10. Totals, status + email handling.
 		$order->calculate_totals();
 
-		$paid        = ! empty( $payload['paid'] );
 		$status      = $paid ? InStoreSettings::STATUS_PAID : InStoreSettings::STATUS_UNPAID;
 		$send_email  = ! empty( $payload['send_email'] ) && '' !== $email;
 
