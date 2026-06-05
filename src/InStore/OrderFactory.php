@@ -72,8 +72,13 @@ final class OrderFactory {
 			return $fulfilment;
 		}
 
-		$customer = (array) ( $payload['customer'] ?? [] );
-		$phone    = sanitize_text_field( (string) ( $customer['phone'] ?? '' ) );
+		$customer   = (array) ( $payload['customer'] ?? [] );
+		$first_name = sanitize_text_field( (string) ( $customer['first_name'] ?? '' ) );
+		$last_name  = sanitize_text_field( (string) ( $customer['last_name'] ?? '' ) );
+		if ( '' === trim( $first_name ) || '' === trim( $last_name ) ) {
+			return new WP_Error( 'fn_name_required', __( 'A first and last name are required.', 'fastnutrition-mealprep' ), [ 'status' => 400 ] );
+		}
+		$phone = sanitize_text_field( (string) ( $customer['phone'] ?? '' ) );
 		if ( '' === $phone ) {
 			return new WP_Error( 'fn_phone_required', __( 'A phone number is required.', 'fastnutrition-mealprep' ), [ 'status' => 400 ] );
 		}
@@ -129,8 +134,8 @@ final class OrderFactory {
 
 		// 5. Addresses + contact.
 		$billing = [
-			'first_name' => sanitize_text_field( (string) ( $customer['first_name'] ?? '' ) ),
-			'last_name'  => sanitize_text_field( (string) ( $customer['last_name'] ?? '' ) ),
+			'first_name' => $first_name,
+			'last_name'  => $last_name,
 			'phone'      => $phone,
 			'email'      => $email,
 			'address_1'  => sanitize_text_field( (string) ( $customer['address_1'] ?? '' ) ),

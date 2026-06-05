@@ -488,6 +488,32 @@ function Details( { details, setDetails, payments } ) {
 		<div className="fn-details">
 			<section>
 				<h3>{ __( 'Contact', 'fastnutrition-mealprep' ) }</h3>
+				<div className="fn-row2">
+					<label>
+						{ __(
+							'First name (required)',
+							'fastnutrition-mealprep'
+						) }
+						<input
+							value={ d.first_name }
+							onChange={ ( e ) =>
+								set( { first_name: e.target.value } )
+							}
+						/>
+					</label>
+					<label>
+						{ __(
+							'Last name (required)',
+							'fastnutrition-mealprep'
+						) }
+						<input
+							value={ d.last_name }
+							onChange={ ( e ) =>
+								set( { last_name: e.target.value } )
+							}
+						/>
+					</label>
+				</div>
 				<label>
 					{ __( 'Phone (required)', 'fastnutrition-mealprep' ) }
 					<input
@@ -532,15 +558,6 @@ function Details( { details, setDetails, payments } ) {
 					<h3>
 						{ __( 'Delivery address', 'fastnutrition-mealprep' ) }
 					</h3>
-					<label>
-						{ __( 'Name', 'fastnutrition-mealprep' ) }
-						<input
-							value={ d.first_name }
-							onChange={ ( e ) =>
-								set( { first_name: e.target.value } )
-							}
-						/>
-					</label>
 					<label>
 						{ __( 'Address line 1', 'fastnutrition-mealprep' ) }
 						<input
@@ -909,6 +926,7 @@ function App() {
 		email: '',
 		fulfilmentType: 'collection',
 		first_name: '',
+		last_name: '',
 		address_1: '',
 		address_2: '',
 		city: '',
@@ -974,7 +992,12 @@ function App() {
 		);
 
 	const detailsValid = ( () => {
-		if ( ! details.phone.trim() || ! details.slot ) {
+		if (
+			! details.first_name.trim() ||
+			! details.last_name.trim() ||
+			! details.phone.trim() ||
+			! details.slot
+		) {
 			return false;
 		}
 		// Paid / Not paid must be chosen; a method is required only when paid.
@@ -1009,6 +1032,7 @@ function App() {
 						phone: details.phone,
 						email: details.email,
 						first_name: details.first_name,
+						last_name: details.last_name,
 						address_1: details.address_1,
 						address_2: details.address_2,
 						city: details.city,
@@ -1046,6 +1070,7 @@ function App() {
 			email: '',
 			fulfilmentType: 'collection',
 			first_name: '',
+			last_name: '',
 			address_1: '',
 			address_2: '',
 			city: '',
