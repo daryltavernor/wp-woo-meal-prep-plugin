@@ -308,6 +308,17 @@
 	border-bottom: 1px solid var(--fn-line);
 }
 
+.fn-revtotal {
+	font-size: 18px;
+	font-weight: 800;
+	border-bottom: 0;
+	padding-top: 12px;
+}
+
+.fn-revtotal span:last-child {
+	color: var(--fn-lime);
+}
+
 .fn-submit {
 	width: 100%;
 	margin-top: 16px;

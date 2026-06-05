@@ -24,6 +24,7 @@ use FastNutrition\MealPrep\Checkout\MultiStep;
 use FastNutrition\MealPrep\Checkout\StoreApiExtensions;
 use FastNutrition\MealPrep\Delivery\BlockedDates;
 use FastNutrition\MealPrep\InStore\InStoreSettings;
+use FastNutrition\MealPrep\InStore\OrdersListColumn;
 use FastNutrition\MealPrep\InStore\QuickOrderPage;
 use FastNutrition\MealPrep\InStore\QuickOrderRest;
 use FastNutrition\MealPrep\Delivery\Profile;
@@ -101,5 +102,6 @@ final class Plugin {
 		( new InStoreSettings() )->register();
 		( new QuickOrderRest() )->register();
 		( new QuickOrderPage() )->register();
+		( new OrdersListColumn() )->register();
 	}
 }

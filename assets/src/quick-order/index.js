@@ -27,6 +27,54 @@ if ( boot.nonce ) {
 const money = ( n ) => `${ CURRENCY }${ Number( n || 0 ).toFixed( 2 ) }`;
 const uid = () => Math.random().toString( 36 ).slice( 2 );
 
+/* ---- Bundle pricing (mirrors Cart\BundlePricer::calculate) -------------- */
+function bundleTotalFor( qty, bundles ) {
+	let tier = null;
+	( bundles || [] ).forEach( ( t ) => {
+		const tq = Number( t.qty ) || 0;
+		const tp = Number( t.price ) || 0;
+		if ( tq <= 0 || tp <= 0 || qty < tq ) {
+			return;
+		}
+		if ( ! tier || tq > Number( tier.qty ) ) {
+			tier = t;
+		}
+	} );
+	if ( ! tier ) {
+		return null;
+	}
+	const thresh = Number( tier.qty );
+	const bp = Number( tier.price );
+	const extra = qty - thresh;
+	const ratePence = Math.ceil( Math.round( bp * 100 ) / thresh );
+	return bp + extra * ( ratePence / 100 );
+}
+
+/* Total the basket with bundle pricing applied per product, exactly as the
+   server does: a bundle covers the meal base for every unit in the group, and
+   per-line deltas (ingredient swaps + add-ons) are charged on top. */
+function computeTotals( basket, config ) {
+	const sets = ( config && config.sets ) || {};
+	const groups = {};
+	basket.forEach( ( l ) => {
+		const g =
+			groups[ l.product_id ] ||
+			( groups[ l.product_id ] = { qty: 0, sumEst: 0, set: l.set } );
+		g.qty += l.qty;
+		g.sumEst += l.estimate;
+	} );
+	let total = 0;
+	Object.keys( groups ).forEach( ( pid ) => {
+		const g = groups[ pid ];
+		const setCfg = sets[ g.set ] || {};
+		const base = Number( setCfg.price ) || 0;
+		const bt = bundleTotalFor( g.qty, setCfg.bundles );
+		total += bt !== null ? bt + ( g.sumEst - base * g.qty ) : g.sumEst;
+	} );
+	const rack = basket.reduce( ( s, l ) => s + l.estimate, 0 );
+	return { total, saving: Math.max( 0, rack - total ) };
+}
+
 /* ---- API helpers ------------------------------------------------------- */
 const api = ( path, options = {} ) =>
 	apiFetch( { url: boot.restUrl + path, ...options } );
@@ -725,6 +773,7 @@ function Review( {
 	basket,
 	details,
 	payments,
+	totals,
 	sendEmail,
 	setSendEmail,
 	onSubmit,
@@ -764,6 +813,18 @@ function Review( {
 						<span>{ money( l.estimate ) }</span>
 					</div>
 				) ) }
+				{ totals.saving > 0 ? (
+					<div className="fn-revline">
+						<span>
+							{ __( 'Bundle saving', 'fastnutrition-mealprep' ) }
+						</span>
+						<span>−{ money( totals.saving ) }</span>
+					</div>
+				) : null }
+				<div className="fn-revline fn-revtotal">
+					<span>{ __( 'Total', 'fastnutrition-mealprep' ) }</span>
+					<span>{ money( totals.total ) }</span>
+				</div>
 			</section>
 			<section>
 				<div className="fn-revline">
@@ -830,12 +891,12 @@ function BasketBar( {
 	onToggle,
 	onRemove,
 	onQty,
+	total,
 	primaryLabel,
 	onPrimary,
 	primaryDisabled,
 } ) {
 	const count = basket.reduce( ( n, l ) => n + l.qty, 0 );
-	const total = basket.reduce( ( s, l ) => s + l.estimate, 0 );
 	return (
 		<div className="fn-bar">
 			{ expanded && (
@@ -976,6 +1037,11 @@ function App() {
 		} );
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [] );
+
+	const totals = useMemo(
+		() => computeTotals( basket, config ),
+		[ basket, config ]
+	);
 
 	const addLine = ( line ) => {
 		setBasket( ( b ) => [ ...b, line ] );
@@ -1217,6 +1283,7 @@ function App() {
 						basket={ basket }
 						details={ details }
 						payments={ config.payments || [] }
+						totals={ totals }
 						sendEmail={ sendEmail }
 						setSendEmail={ setSendEmail }
 						onSubmit={ submit }
@@ -1232,6 +1299,7 @@ function App() {
 				onToggle={ () => setExpanded( ! expanded ) }
 				onRemove={ removeLine }
 				onQty={ setQty }
+				total={ totals.total }
 				primaryLabel={ primaryLabel }
 				onPrimary={ onPrimary }
 				primaryDisabled={ primaryDisabled }

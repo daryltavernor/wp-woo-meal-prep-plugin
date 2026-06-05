@@ -182,25 +182,31 @@ final class OrderFactory {
 		// 10. Totals, status + email handling.
 		$order->calculate_totals();
 
-		$status      = $paid ? InStoreSettings::STATUS_PAID : InStoreSettings::STATUS_UNPAID;
-		$send_email  = ! empty( $payload['send_email'] ) && '' !== $email;
+		$status     = $paid ? InStoreSettings::STATUS_PAID : InStoreSettings::STATUS_UNPAID;
+		$send_email = ! empty( $payload['send_email'] ) && '' !== $email;
 
 		if ( $paid ) {
 			$order->set_date_paid( time() );
 		}
 
 		// Setting the status here means the first save() runs the transition,
-		// which both fires WooCommerce's transactional emails and reduces stock
-		// (matching the online flow). Suppress the emails unless requested.
+		// which reduces stock (matching the online flow). We ALWAYS suppress the
+		// automatic transactional-email cascade for offline orders, because the
+		// "confirmation email" is an explicit per-order choice — and several of
+		// these statuses (e.g. on hold for unpaid) have no customer email at all.
+		// When requested we then send the customer the order-details email
+		// directly, which works regardless of status.
 		$order->set_status( $status, sprintf( __( 'In-store order (%s).', 'fastnutrition-mealprep' ), $paid ? __( 'paid', 'fastnutrition-mealprep' ) : __( 'unpaid', 'fastnutrition-mealprep' ) ) );
 
-		$suppress = ! $send_email;
-		if ( $suppress ) {
-			self::suppress_order_emails( true );
-		}
+		self::suppress_order_emails( true );
 		$order->save();
-		if ( $suppress ) {
-			self::suppress_order_emails( false );
+		self::suppress_order_emails( false );
+
+		if ( $send_email && function_exists( 'WC' ) && WC() && WC()->mailer() ) {
+			// The order-details ("invoice") email is the canonical on-demand
+			// confirmation. Delivery depends on the site's mail transport — e.g.
+			// Post SMTP — being configured; this only hands the mail to wp_mail().
+			WC()->mailer()->customer_invoice( $order );
 		}
 
 		return $order;
