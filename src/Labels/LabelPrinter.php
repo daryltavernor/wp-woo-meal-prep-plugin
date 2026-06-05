@@ -48,13 +48,30 @@ final class LabelPrinter {
 	 *                                      labels.
 	 */
 	public static function stream( array $order_ids, string $mode = self::MODE_FULL, int $limit_meals_per_order = 0, bool $is_test = false ): void {
+		$orders = array_values( array_filter( array_map( static fn( $id ) => wc_get_order( (int) $id ), $order_ids ) ) );
+		self::stream_orders( $orders, $mode, $limit_meals_per_order, $is_test );
+	}
+
+	/**
+	 * Stream a labels PDF for a single in-memory order object — used by the Quick
+	 * Label Maker, which never persists an order. The label output is identical
+	 * to an order's labels (summary + meal labels, including the payment block).
+	 */
+	public static function stream_order_object( \WC_Order $order, string $mode = self::MODE_FULL, bool $is_test = false ): void {
+		self::stream_orders( [ $order ], $mode, 0, $is_test );
+	}
+
+	/**
+	 * @param \WC_Order[] $orders
+	 */
+	private static function stream_orders( array $orders, string $mode = self::MODE_FULL, int $limit_meals_per_order = 0, bool $is_test = false ): void {
 		if ( ! class_exists( \Dompdf\Dompdf::class ) ) {
 			wp_die( esc_html__( 'Dompdf is not installed. Run composer install in the plugin directory.', 'fastnutrition-mealprep' ) );
 		}
 		if ( ! defined( 'DONOTCACHEPAGE' ) ) {
 			define( 'DONOTCACHEPAGE', true );
 		}
-		$html   = self::build_html( $order_ids, $mode, $limit_meals_per_order, $is_test );
+		$html   = self::build_html( $orders, $mode, $limit_meals_per_order, $is_test );
 		$dompdf = new \Dompdf\Dompdf(
 			[
 				'isRemoteEnabled'      => true,
@@ -113,7 +130,8 @@ final class LabelPrinter {
 		if ( ! defined( 'DONOTCACHEPAGE' ) ) {
 			define( 'DONOTCACHEPAGE', true );
 		}
-		$html = self::build_html( $order_ids, $mode, $limit_meals_per_order, true );
+		$orders = array_values( array_filter( array_map( static fn( $id ) => wc_get_order( (int) $id ), $order_ids ) ) );
+		$html   = self::build_html( $orders, $mode, $limit_meals_per_order, true );
 
 		// Inject a screen-mode stylesheet so each .label looks like a real
 		// label card on a grey background. Print-mode CSS is untouched —
@@ -166,7 +184,10 @@ CSS;
 		exit;
 	}
 
-	private static function build_html( array $order_ids, string $mode = self::MODE_FULL, int $limit_meals_per_order = 0, bool $is_test = false ): string {
+	/**
+	 * @param \WC_Order[] $orders
+	 */
+	private static function build_html( array $orders, string $mode = self::MODE_FULL, int $limit_meals_per_order = 0, bool $is_test = false ): string {
 		$brand                  = SettingsPage::brand_info();
 		$brand['logo_data_uri'] = self::logo_data_uri( $brand );
 		ob_start();
@@ -407,9 +428,8 @@ CSS;
 <body>
 		<?php
 		$has_labels = false;
-		foreach ( $order_ids as $order_id ) {
-			$order = wc_get_order( (int) $order_id );
-			if ( ! $order ) {
+		foreach ( $orders as $order ) {
+			if ( ! $order instanceof \WC_Order ) {
 				continue;
 			}
 			if ( self::MODE_MEAL !== $mode ) {
@@ -465,7 +485,9 @@ CSS;
 				<?php self::render_test_stamp( $is_test ); ?>
 				<?php self::render_head( $brand, null ); ?>
 				<div class="lbl-name">
-					<span class="lbl-name-id">#<?php echo (int) $order->get_id(); ?></span>
+					<?php if ( $order->get_id() ) : ?>
+						<span class="lbl-name-id">#<?php echo (int) $order->get_id(); ?></span>
+					<?php endif; ?>
 					<?php echo esc_html( $order->get_formatted_billing_full_name() ); ?>
 				</div>
 				<div class="lbl-address"><?php echo $is_collection ? '<em class="muted">' . esc_html__( 'Collection — no delivery address', 'fastnutrition-mealprep' ) . '</em>' : wp_kses_post( $address ); ?></div>
@@ -526,7 +548,9 @@ CSS;
 				<?php self::render_test_stamp( $is_test ); ?>
 				<?php self::render_head( $brand, $idx . '/' . $total ); ?>
 				<div class="lbl-name">
-					<span class="lbl-name-id">#<?php echo (int) $order->get_id(); ?></span>
+					<?php if ( $order->get_id() ) : ?>
+						<span class="lbl-name-id">#<?php echo (int) $order->get_id(); ?></span>
+					<?php endif; ?>
 					<?php echo esc_html( $order->get_formatted_billing_full_name() ); ?>
 				</div>
 				<div class="lbl-desc"><?php echo esc_html( $desc ); ?></div>

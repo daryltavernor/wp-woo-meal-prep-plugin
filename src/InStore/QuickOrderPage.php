@@ -4,32 +4,51 @@ declare( strict_types=1 );
 namespace FastNutrition\MealPrep\InStore;
 
 /**
- * The Quick Order screen as a WordPress admin page.
+ * The Quick Order and Quick Label Maker screens as WordPress admin pages.
  *
- * Lives under Meal Prep → Quick Order and is only reachable by users with the
- * `manage_woocommerce` capability (Shop Managers + Administrators). The screen
- * is the touch-first React app; access is governed entirely by the WordPress
- * login + capability, exactly like the plugin's other settings pages.
+ * Both run the same touch-first React app (assets/build/quick-order) in a
+ * full-screen modal, distinguished by a `mode` flag:
+ *   - order : builds a real WooCommerce order (Meal Prep → Quick Order).
+ *   - label : builds labels only, no order (Meal Prep → Quick Label Maker).
+ *
+ * Only users with the `manage_woocommerce` capability (Shop Managers +
+ * Administrators) can reach either page.
  */
 final class QuickOrderPage {
 
 	public const ADMIN_SLUG = 'fn-quick-order';
+	public const LABEL_SLUG = 'fn-quick-label';
 	private const HANDLE     = 'fn-quick-order';
 
 	public function register(): void {
 		add_action( 'admin_enqueue_scripts', [ $this, 'maybe_enqueue' ] );
 	}
 
-	public static function render_admin_static(): void {
-		( new self() )->render_admin();
+	public static function render_order_static(): void {
+		( new self() )->render( __( 'Quick Order', 'fastnutrition-mealprep' ) );
 	}
 
-	/** Enqueue the app bundle only on our admin page. */
+	public static function render_label_static(): void {
+		( new self() )->render( __( 'Quick Label Maker', 'fastnutrition-mealprep' ) );
+	}
+
+	private function mode_for_page( string $page ): string {
+		if ( self::LABEL_SLUG === $page ) {
+			return 'label';
+		}
+		if ( self::ADMIN_SLUG === $page ) {
+			return 'order';
+		}
+		return '';
+	}
+
+	/** Enqueue the app bundle only on our two admin pages. */
 	public function maybe_enqueue( string $hook ): void {
 		unset( $hook );
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- admin page routing, read-only.
 		$page = isset( $_GET['page'] ) ? sanitize_key( wp_unslash( $_GET['page'] ) ) : '';
-		if ( self::ADMIN_SLUG !== $page ) {
+		$mode = $this->mode_for_page( $page );
+		if ( '' === $mode ) {
 			return;
 		}
 
@@ -50,19 +69,20 @@ final class QuickOrderPage {
 		}
 		wp_add_inline_script(
 			self::HANDLE,
-			'window.fnQuickOrder = ' . wp_json_encode( $this->boot_data() ) . ';',
+			'window.fnQuickOrder = ' . wp_json_encode( $this->boot_data( $mode ) ) . ';',
 			'before'
 		);
 	}
 
-	private function boot_data(): array {
+	private function boot_data( string $mode ): array {
 		return [
-			'restUrl'  => esc_url_raw( rest_url( 'fastnutrition/v1/instore/' ) ),
-			'v1Url'    => esc_url_raw( rest_url( 'fastnutrition/v1/' ) ),
-			'slotsUrl' => esc_url_raw( rest_url( 'fastnutrition/v1/slots' ) ),
-			'nonce'    => wp_create_nonce( 'wp_rest' ),
-			'exitUrl'  => esc_url_raw( admin_url() ),
-			'currency' => self::currency_symbol(),
+			'mode'      => $mode,
+			'restUrl'   => esc_url_raw( rest_url( 'fastnutrition/v1/instore/' ) ),
+			'v1Url'     => esc_url_raw( rest_url( 'fastnutrition/v1/' ) ),
+			'slotsUrl'  => esc_url_raw( rest_url( 'fastnutrition/v1/slots' ) ),
+			'nonce'     => wp_create_nonce( 'wp_rest' ),
+			'exitUrl'   => esc_url_raw( admin_url() ),
+			'currency'  => self::currency_symbol(),
 		];
 	}
 
@@ -74,17 +94,17 @@ final class QuickOrderPage {
 		return html_entity_decode( get_woocommerce_currency_symbol(), ENT_QUOTES, 'UTF-8' );
 	}
 
-	public function render_admin(): void {
+	private function render( string $title ): void {
 		if ( ! current_user_can( 'manage_woocommerce' ) ) {
-			wp_die( esc_html__( 'You do not have permission to take orders.', 'fastnutrition-mealprep' ) );
+			wp_die( esc_html__( 'You do not have permission to access this screen.', 'fastnutrition-mealprep' ) );
 		}
 		if ( ! wp_script_is( self::HANDLE, 'enqueued' ) ) {
-			echo '<div class="wrap"><h1>' . esc_html__( 'Quick Order', 'fastnutrition-mealprep' ) . '</h1>';
+			echo '<div class="wrap"><h1>' . esc_html( $title ) . '</h1>';
 			echo '<div class="notice notice-error"><p>' . esc_html__( 'Quick Order assets are not built. Run "npm run build" in the plugin directory.', 'fastnutrition-mealprep' ) . '</p></div></div>';
 			return;
 		}
 		echo '<div class="wrap fn-quick-order-wrap">';
-		echo '<a class="fn-qo-exit" href="' . esc_url( admin_url() ) . '" aria-label="' . esc_attr__( 'Close Quick Order', 'fastnutrition-mealprep' ) . '">&times;</a>';
+		echo '<a class="fn-qo-exit" href="' . esc_url( admin_url() ) . '" aria-label="' . esc_attr__( 'Close', 'fastnutrition-mealprep' ) . '">&times;</a>';
 		echo '<div id="fn-quick-order-root" class="fn-quick-order"></div>';
 		echo '</div>';
 	}

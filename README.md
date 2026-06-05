@@ -148,6 +148,9 @@ A fast, touch-first screen (works well on an iPad) that lets staff take phone an
 * **Confirmation email:** when an email address is entered and the toggle is on, the customer is sent WooCommerce's order-details ("invoice") email. Delivery requires a working mail transport on the site — e.g. the **Post SMTP** plugin configured with your provider; the plugin only hands the message to `wp_mail()`.
 * **Settings:** *Meal Prep → Quick Order Settings* — the three product-set mappings (auto-detected by tier / sweet mode), optional per-set ingredient override lists for in-store-only offers, and the email default.
 
+### Quick Label Maker
+*Meal Prep → Quick Label Maker* is the same touch screen, but on submit it produces a **labels PDF** (opened in a new tab to print) **without creating a WooCommerce order**. Use it to print meal labels on demand. The flow is identical to Quick Order — build the meals, enter the customer name (required) + optional phone, pick collection/delivery + slot, and set paid / not-paid + method (this prints on the label) — minus the customer-email option. Labels are built from an in-memory order so they are byte-identical to an order's labels (summary + one label per meal, with macros and USE BY). Phone is optional on both the Quick Order and Quick Label Maker screens.
+
 ---
 
 ## REST endpoints (namespace `fastnutrition/v1`)

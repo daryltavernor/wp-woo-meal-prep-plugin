@@ -55,8 +55,9 @@ final class MenuRegistry {
 		// Label printing.
 		add_submenu_page( self::SLUG, __( 'Print Labels', 'fastnutrition-mealprep' ), __( 'Print Labels', 'fastnutrition-mealprep' ), 'manage_woocommerce', 'fn-print-labels', [ LabelsAdmin::class, 'render_static' ] );
 
-		// Quick Order — the staff order-taking screen + its settings.
-		add_submenu_page( self::SLUG, __( 'Quick Order', 'fastnutrition-mealprep' ), __( 'Quick Order', 'fastnutrition-mealprep' ), 'manage_woocommerce', \FastNutrition\MealPrep\InStore\QuickOrderPage::ADMIN_SLUG, [ \FastNutrition\MealPrep\InStore\QuickOrderPage::class, 'render_admin_static' ] );
+		// Quick Order — the staff order-taking screen, the label maker, + settings.
+		add_submenu_page( self::SLUG, __( 'Quick Order', 'fastnutrition-mealprep' ), __( 'Quick Order', 'fastnutrition-mealprep' ), 'manage_woocommerce', \FastNutrition\MealPrep\InStore\QuickOrderPage::ADMIN_SLUG, [ \FastNutrition\MealPrep\InStore\QuickOrderPage::class, 'render_order_static' ] );
+		add_submenu_page( self::SLUG, __( 'Quick Label Maker', 'fastnutrition-mealprep' ), __( 'Quick Label Maker', 'fastnutrition-mealprep' ), 'manage_woocommerce', \FastNutrition\MealPrep\InStore\QuickOrderPage::LABEL_SLUG, [ \FastNutrition\MealPrep\InStore\QuickOrderPage::class, 'render_label_static' ] );
 		add_submenu_page( self::SLUG, __( 'Quick Order Settings', 'fastnutrition-mealprep' ), __( 'Quick Order Settings', 'fastnutrition-mealprep' ), 'manage_woocommerce', \FastNutrition\MealPrep\InStore\InStoreSettings::PAGE_SLUG, [ \FastNutrition\MealPrep\InStore\InStoreSettings::class, 'render_static' ] );
 
 		// Settings.

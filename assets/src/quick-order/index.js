@@ -18,6 +18,9 @@ import './style.css';
 const boot = window.fnQuickOrder || {};
 const CURRENCY = boot.currency || '£';
 const ROOT_V1 = boot.v1Url || ( boot.restUrl || '' ).replace( 'instore/', '' );
+// 'order' builds a WooCommerce order; 'label' produces a labels PDF only.
+const MODE = boot.mode === 'label' ? 'label' : 'order';
+const IS_LABEL = MODE === 'label';
 
 // Authenticate REST writes with the logged-in user's cookie nonce.
 if ( boot.nonce ) {
@@ -563,7 +566,7 @@ function Details( { details, setDetails, payments } ) {
 					</label>
 				</div>
 				<label>
-					{ __( 'Phone (required)', 'fastnutrition-mealprep' ) }
+					{ __( 'Phone (optional)', 'fastnutrition-mealprep' ) }
 					<input
 						type="tel"
 						inputMode="numeric"
@@ -571,14 +574,18 @@ function Details( { details, setDetails, payments } ) {
 						onChange={ ( e ) => set( { phone: e.target.value } ) }
 					/>
 				</label>
-				<label>
-					{ __( 'Email (optional)', 'fastnutrition-mealprep' ) }
-					<input
-						type="email"
-						value={ d.email }
-						onChange={ ( e ) => set( { email: e.target.value } ) }
-					/>
-				</label>
+				{ ! IS_LABEL && (
+					<label>
+						{ __( 'Email (optional)', 'fastnutrition-mealprep' ) }
+						<input
+							type="email"
+							value={ d.email }
+							onChange={ ( e ) =>
+								set( { email: e.target.value } )
+							}
+						/>
+					</label>
+				) }
 			</section>
 
 			<section>
@@ -846,29 +853,33 @@ function Review( {
 					<span>{ paymentText }</span>
 				</div>
 			</section>
-			<section>
-				<label className="fn-check">
-					<input
-						type="checkbox"
-						checked={ !! sendEmail }
-						onChange={ ( e ) => setSendEmail( e.target.checked ) }
-						disabled={ ! details.email }
-					/>
-					{ __(
-						'Email confirmation to customer',
-						'fastnutrition-mealprep'
-					) }
-					{ ! details.email ? (
-						<span className="fn-hint">
-							{ ' ' }
-							{ __(
-								'(needs an email)',
-								'fastnutrition-mealprep'
-							) }
-						</span>
-					) : null }
-				</label>
-			</section>
+			{ ! IS_LABEL && (
+				<section>
+					<label className="fn-check">
+						<input
+							type="checkbox"
+							checked={ !! sendEmail }
+							onChange={ ( e ) =>
+								setSendEmail( e.target.checked )
+							}
+							disabled={ ! details.email }
+						/>
+						{ __(
+							'Email confirmation to customer',
+							'fastnutrition-mealprep'
+						) }
+						{ ! details.email ? (
+							<span className="fn-hint">
+								{ ' ' }
+								{ __(
+									'(needs an email)',
+									'fastnutrition-mealprep'
+								) }
+							</span>
+						) : null }
+					</label>
+				</section>
+			) }
 			{ err ? <div className="fn-error">{ err }</div> : null }
 			<button
 				type="button"
@@ -876,9 +887,14 @@ function Review( {
 				disabled={ busy }
 				onClick={ onSubmit }
 			>
-				{ busy
-					? __( 'Submitting…', 'fastnutrition-mealprep' )
-					: __( 'Submit order', 'fastnutrition-mealprep' ) }
+				{ ( () => {
+					if ( busy ) {
+						return __( 'Working…', 'fastnutrition-mealprep' );
+					}
+					return IS_LABEL
+						? __( 'Generate labels', 'fastnutrition-mealprep' )
+						: __( 'Submit order', 'fastnutrition-mealprep' );
+				} )() }
 			</button>
 		</div>
 	);
@@ -1082,48 +1098,84 @@ function App() {
 		return true;
 	} )();
 
+	const orderData = () => ( {
+		lines: basket.map( ( l ) => ( {
+			product_id: l.product_id,
+			quantity: l.qty,
+			selection: l.selection,
+		} ) ),
+		customer: {
+			phone: details.phone,
+			email: details.email,
+			first_name: details.first_name,
+			last_name: details.last_name,
+			address_1: details.address_1,
+			address_2: details.address_2,
+			city: details.city,
+			postcode: details.postcode,
+		},
+		fulfilment: {
+			type: details.fulfilmentType,
+			profile_id: details.profile_id,
+			date: details.date,
+			slot: details.slot,
+		},
+		payment: details.payment,
+		paid: details.paid,
+		send_email: sendEmail && !! details.email,
+	} );
+
+	const openPdf = ( blob ) => {
+		const url = URL.createObjectURL( blob );
+		const a = document.createElement( 'a' );
+		a.href = url;
+		a.target = '_blank';
+		a.rel = 'noopener';
+		document.body.appendChild( a );
+		a.click();
+		a.remove();
+		setTimeout( () => URL.revokeObjectURL( url ), 60000 );
+	};
+
 	const submit = async () => {
 		setBusy( true );
 		setErr( '' );
 		try {
-			const res = await api( 'order', {
-				method: 'POST',
-				data: {
-					lines: basket.map( ( l ) => ( {
-						product_id: l.product_id,
-						quantity: l.qty,
-						selection: l.selection,
-					} ) ),
-					customer: {
-						phone: details.phone,
-						email: details.email,
-						first_name: details.first_name,
-						last_name: details.last_name,
-						address_1: details.address_1,
-						address_2: details.address_2,
-						city: details.city,
-						postcode: details.postcode,
-					},
-					fulfilment: {
-						type: details.fulfilmentType,
-						profile_id: details.profile_id,
-						date: details.date,
-						slot: details.slot,
-					},
-					payment: details.payment,
-					paid: details.paid,
-					send_email: sendEmail && !! details.email,
-				},
-			} );
-			setDone( res );
-			setStep( 'done' );
+			if ( IS_LABEL ) {
+				const res = await apiFetch( {
+					url: boot.restUrl + 'labels',
+					method: 'POST',
+					data: orderData(),
+					parse: false,
+				} );
+				if ( ! res.ok ) {
+					let msg = __(
+						'Could not generate labels.',
+						'fastnutrition-mealprep'
+					);
+					try {
+						const j = await res.json();
+						msg = j.message || msg;
+					} catch ( e ) {
+						// non-JSON error body; keep the default message.
+					}
+					throw new Error( msg );
+				}
+				openPdf( await res.blob() );
+				setDone( { labels: true } );
+				setStep( 'done' );
+			} else {
+				const res = await api( 'order', {
+					method: 'POST',
+					data: orderData(),
+				} );
+				setDone( res );
+				setStep( 'done' );
+			}
 		} catch ( e ) {
 			setErr(
 				e.message ||
-					__(
-						'Could not create the order.',
-						'fastnutrition-mealprep'
-					)
+					__( 'Something went wrong.', 'fastnutrition-mealprep' )
 			);
 		}
 		setBusy( false );
@@ -1181,23 +1233,56 @@ function App() {
 			<div className="fn-done">
 				<div className="fn-done__card">
 					<div className="fn-done__tick">✓</div>
-					<h1>{ __( 'Order placed', 'fastnutrition-mealprep' ) }</h1>
-					<p className="fn-done__num">
-						{ __( 'Order', 'fastnutrition-mealprep' ) } #
-						{ done.order_number }
-					</p>
-					<p className="fn-done__total">{ done.total }</p>
+					{ done && done.labels ? (
+						<>
+							<h1>
+								{ __(
+									'Labels generated',
+									'fastnutrition-mealprep'
+								) }
+							</h1>
+							<p className="fn-done__num">
+								{ __(
+									'The labels PDF opened in a new tab — print it from there.',
+									'fastnutrition-mealprep'
+								) }
+							</p>
+						</>
+					) : (
+						<>
+							<h1>
+								{ __(
+									'Order placed',
+									'fastnutrition-mealprep'
+								) }
+							</h1>
+							<p className="fn-done__num">
+								{ __( 'Order', 'fastnutrition-mealprep' ) } #
+								{ done.order_number }
+							</p>
+							<p className="fn-done__total">{ done.total }</p>
+						</>
+					) }
 					<button
 						type="button"
 						className="fn-primary"
 						onClick={ reset }
 					>
-						{ __( 'Start next order', 'fastnutrition-mealprep' ) }
+						{ IS_LABEL
+							? __( 'Start next batch', 'fastnutrition-mealprep' )
+							: __(
+									'Start next order',
+									'fastnutrition-mealprep'
+							  ) }
 					</button>
 				</div>
 			</div>
 		);
 	}
+
+	const submitLabel = IS_LABEL
+		? __( 'Generate labels', 'fastnutrition-mealprep' )
+		: __( 'Submit', 'fastnutrition-mealprep' );
 
 	let primaryLabel = __( 'Next', 'fastnutrition-mealprep' );
 	let primaryDisabled = basket.length === 0;
@@ -1207,7 +1292,7 @@ function App() {
 		primaryDisabled = ! detailsValid;
 		onPrimary = () => setStep( 'review' );
 	} else if ( step === 'review' ) {
-		primaryLabel = __( 'Submit', 'fastnutrition-mealprep' );
+		primaryLabel = submitLabel;
 		primaryDisabled = busy;
 		onPrimary = submit;
 	}
@@ -1242,7 +1327,9 @@ function App() {
 					disabled={ ! detailsValid }
 					onClick={ () => setStep( 'review' ) }
 				>
-					{ __( '3 · Submit', 'fastnutrition-mealprep' ) }
+					{ IS_LABEL
+						? __( '3 · Labels', 'fastnutrition-mealprep' )
+						: __( '3 · Submit', 'fastnutrition-mealprep' ) }
 				</button>
 			</header>
 

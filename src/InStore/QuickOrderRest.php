@@ -3,6 +3,7 @@ declare( strict_types=1 );
 
 namespace FastNutrition\MealPrep\InStore;
 
+use FastNutrition\MealPrep\Labels\LabelPrinter;
 use FastNutrition\MealPrep\Products\AddOnMeta;
 use FastNutrition\MealPrep\Products\BundleMeta;
 use FastNutrition\MealPrep\Products\MealProduct;
@@ -46,6 +47,16 @@ final class QuickOrderRest {
 			[
 				'methods'             => 'POST',
 				'callback'            => [ $this, 'create_order' ],
+				'permission_callback' => [ $this, 'require_cap' ],
+			]
+		);
+
+		register_rest_route(
+			self::NS,
+			'/instore/labels',
+			[
+				'methods'             => 'POST',
+				'callback'            => [ $this, 'create_labels' ],
 				'permission_callback' => [ $this, 'require_cap' ],
 			]
 		);
@@ -98,28 +109,30 @@ final class QuickOrderRest {
 		);
 	}
 
-	public function create_order( WP_REST_Request $req ): WP_REST_Response|WP_Error {
+	/** Build the OrderFactory payload from the request body + current user. */
+	private function payload_from( WP_REST_Request $req ): array {
 		$body = $req->get_json_params();
 		$body = is_array( $body ) ? $body : [];
 
 		// The logged-in staff member who took the order (attribution).
-		$user  = wp_get_current_user();
-		$staff = [
-			'id'   => (int) $user->ID,
-			'name' => (string) ( $user->display_name ?: $user->user_login ),
-		];
+		$user = wp_get_current_user();
 
-		$payload = [
+		return [
 			'lines'      => $body['lines'] ?? [],
 			'customer'   => $body['customer'] ?? [],
 			'fulfilment' => $body['fulfilment'] ?? [],
 			'payment'    => (string) ( $body['payment'] ?? '' ),
 			'paid'       => ! empty( $body['paid'] ),
 			'send_email' => ! empty( $body['send_email'] ),
-			'staff'      => $staff,
+			'staff'      => [
+				'id'   => (int) $user->ID,
+				'name' => (string) ( $user->display_name ?: $user->user_login ),
+			],
 		];
+	}
 
-		$order = OrderFactory::create( $payload );
+	public function create_order( WP_REST_Request $req ): WP_REST_Response|WP_Error {
+		$order = OrderFactory::create( $this->payload_from( $req ) );
 		if ( is_wp_error( $order ) ) {
 			return $order;
 		}
@@ -133,5 +146,21 @@ final class QuickOrderRest {
 			],
 			201
 		);
+	}
+
+	/**
+	 * Quick Label Maker: build an in-memory order (never saved) and stream a
+	 * labels PDF. On success this streams the PDF and exits; on validation
+	 * failure it returns a normal REST error.
+	 */
+	public function create_labels( WP_REST_Request $req ): WP_Error {
+		$order = OrderFactory::assemble_for_labels( $this->payload_from( $req ) );
+		if ( is_wp_error( $order ) ) {
+			return $order;
+		}
+		// Streams the PDF (inline) and exits.
+		LabelPrinter::stream_order_object( $order, LabelPrinter::MODE_FULL );
+		// Unreachable, but satisfies the return type if streaming is short-circuited.
+		return new WP_Error( 'fn_labels_failed', __( 'Could not generate labels.', 'fastnutrition-mealprep' ), [ 'status' => 500 ] );
 	}
 }
