@@ -23,6 +23,10 @@ use FastNutrition\MealPrep\Checkout\FulfilmentDisplay;
 use FastNutrition\MealPrep\Checkout\MultiStep;
 use FastNutrition\MealPrep\Checkout\StoreApiExtensions;
 use FastNutrition\MealPrep\Delivery\BlockedDates;
+use FastNutrition\MealPrep\InStore\InStoreSettings;
+use FastNutrition\MealPrep\InStore\OrdersListColumn;
+use FastNutrition\MealPrep\InStore\QuickOrderPage;
+use FastNutrition\MealPrep\InStore\QuickOrderRest;
 use FastNutrition\MealPrep\Delivery\Profile;
 use FastNutrition\MealPrep\Delivery\ProfileResolver;
 use FastNutrition\MealPrep\Delivery\SlotAvailability;
@@ -93,5 +97,11 @@ final class Plugin {
 		( new Favourites() )->register();
 		( new RestController() )->register();
 		( new AssetManager() )->register();
+
+		// In-Store Quick Order (offline / phone order entry).
+		( new InStoreSettings() )->register();
+		( new QuickOrderRest() )->register();
+		( new QuickOrderPage() )->register();
+		( new OrdersListColumn() )->register();
 	}
 }

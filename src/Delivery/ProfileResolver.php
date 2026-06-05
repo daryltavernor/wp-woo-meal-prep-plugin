@@ -11,16 +11,19 @@ final class ProfileResolver {
 
 	public static function match_postcode( string $postcode, ?string $method = null ): array {
 		$postcode = self::normalize( $postcode );
-		if ( '' === $postcode ) {
-			return [];
-		}
-		$results = [];
-		foreach ( Profile::all( true ) as $profile ) {
-			if ( $method && $profile['method'] !== $method && $profile['method'] !== 'collection' ) {
-				continue;
-			}
-			if ( self::postcode_matches( $postcode, Profile::effective_postcodes( $profile ) ) ) {
-				$results[] = $profile;
+		$results  = [];
+		// Delivery (and postcode-scoped) matching only runs when we have a
+		// postcode. Collection profiles are added unconditionally below, so an
+		// empty postcode still yields the collection options (the offline Quick
+		// Order tool collects no address for collection orders).
+		if ( '' !== $postcode ) {
+			foreach ( Profile::all( true ) as $profile ) {
+				if ( $method && $profile['method'] !== $method && $profile['method'] !== 'collection' ) {
+					continue;
+				}
+				if ( self::postcode_matches( $postcode, Profile::effective_postcodes( $profile ) ) ) {
+					$results[] = $profile;
+				}
 			}
 		}
 		// Collection profiles always apply regardless of postcode.

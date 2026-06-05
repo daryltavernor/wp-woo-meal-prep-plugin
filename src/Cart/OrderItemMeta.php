@@ -18,8 +18,25 @@ final class OrderItemMeta {
 		if ( empty( $values[ Selections::CART_KEY ] ) ) {
 			return;
 		}
-		$selection = $values[ Selections::CART_KEY ];
-		$macros    = Calculator::macros_for_selection( (int) $values['product_id'], $selection );
+		self::write_line_meta( $item, (int) $values['product_id'], (array) $values[ Selections::CART_KEY ] );
+	}
+
+	/**
+	 * Write the meal-composition meta onto an order line item.
+	 *
+	 * Extracted from persist() so BOTH the online checkout
+	 * (woocommerce_checkout_create_order_line_item) and the offline In-Store
+	 * Quick Order builder (InStore\OrderFactory) stamp identical meta —
+	 * _fn_selection + _fn_macros_snapshot + the human-readable
+	 * Protein/Carb/Greens/Set Meal/Sweet/Add-ons/Macros lines — so prep lists,
+	 * labels and reporting never fork between the two order sources.
+	 *
+	 * @param WC_Order_Item_Product $item       The order line item.
+	 * @param int                   $product_id The meal product id.
+	 * @param array                 $selection  The normalised fn_selection array.
+	 */
+	public static function write_line_meta( WC_Order_Item_Product $item, int $product_id, array $selection ): void {
+		$macros = Calculator::macros_for_selection( $product_id, $selection );
 
 		$item->add_meta_data( '_fn_selection', $selection, true );
 		$item->add_meta_data( '_fn_macros_snapshot', $macros, true );

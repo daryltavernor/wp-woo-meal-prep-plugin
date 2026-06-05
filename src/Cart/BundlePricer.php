@@ -38,91 +38,40 @@ final class BundlePricer {
 			return;
 		}
 
-		$groups        = [];
-		$catalog_cache = [];
+		$items_by_group = [];
+		$catalog_cache  = [];
 		foreach ( $cart->get_cart() as $key => $item ) {
 			if ( empty( $item[ Selections::CART_KEY ] ) || empty( $item['data'] ) ) {
 				continue;
 			}
-			$pid                       = (int) $item['product_id'];
-			$groups[ $pid ][ $key ]    = $item;
+			$pid                            = (int) $item['product_id'];
+			$items_by_group[ $pid ][ $key ] = $item;
 			if ( ! isset( $catalog_cache[ $pid ] ) ) {
-				$product                = function_exists( 'wc_get_product' ) ? wc_get_product( $pid ) : null;
-				$catalog_cache[ $pid ]  = $product ? (float) $product->get_price( 'edit' ) : 0.0;
+				$product               = function_exists( 'wc_get_product' ) ? wc_get_product( $pid ) : null;
+				$catalog_cache[ $pid ] = $product ? (float) $product->get_price( 'edit' ) : 0.0;
 			}
 		}
 
-		foreach ( $groups as $product_id => $items ) {
-			$catalog_base = $catalog_cache[ $product_id ];
-			$bundles      = BundleMeta::get_bundles( $product_id );
+		foreach ( $items_by_group as $product_id => $items ) {
+			$bundles = BundleMeta::get_bundles( $product_id );
 
-			$total_qty = 0;
-			foreach ( $items as $item ) {
-				$total_qty += (int) $item['quantity'];
+			// Build the per-line group (quantity + canonical selection delta) and
+			// delegate the bundle apportionment to the shared MealPricing core so
+			// the cart and the offline order builder price meals identically.
+			$group = [];
+			foreach ( $items as $key => $item ) {
+				$group[ $key ] = [
+					'quantity' => (int) $item['quantity'],
+					'delta'    => Selections::compute_price_delta( $product_id, $item[ Selections::CART_KEY ] ?? [] ),
+				];
 			}
 
-			$result         = self::calculate( $total_qty, $bundles );
-			$bundle_applied = ! empty( $result['applied'] );
-
-			if ( ! $bundle_applied ) {
-				foreach ( $items as $key => $item ) {
-					$delta      = Selections::compute_price_delta( $product_id, $item[ Selections::CART_KEY ] ?? [] );
-					$line_price = max( 0.0, $catalog_base + $delta );
-					$item['data']->set_price( $line_price );
-					$cart->cart_contents[ $key ]['fn_bundle'] = null;
-				}
-				continue;
-			}
-
-			// Bundle applies. The bundle total covers the meal BASE for every
-			// unit in the group; per-line add-on deltas are charged on top.
-			//
-			// We cannot simply price every unit at total/qty: WooCommerce
-			// rounds each line's (unit_price × qty) to the store's currency
-			// precision INDEPENDENTLY, so the sum of those rounded line totals
-			// drifts off the exact bundle total. Example: 15 meals at £50 split
-			// across three 5-meal lines prices each unit at £3.3333…, and WC
-			// rounds each line to £16.67, summing to £50.01 instead of £50.00.
-			//
-			// Instead we apportion the bundle total across the lines in integer
-			// pence and hand the rounding remainder to the final line, so the
-			// per-line totals always sum to exactly the bundle total. Because
-			// (meal_line_total + delta × qty) is penny-clean for each line, WC's
-			// multiply-then-round introduces no further drift.
-			$total_pence = (int) round( (float) $result['total'] * 100 );
-			$assigned    = 0;
-			$line_count  = count( $items );
-			$index       = 0;
+			$priced = MealPricing::price_product_group( $catalog_cache[ $product_id ], $bundles, $group );
 
 			foreach ( $items as $key => $item ) {
-				++$index;
-				$qty = (int) $item['quantity'];
-
-				if ( $index === $line_count ) {
-					// Final line absorbs whatever pence remain so the group
-					// sums to the bundle total exactly.
-					$meal_pence = $total_pence - $assigned;
-				} else {
-					$meal_pence = $total_qty > 0 ? (int) round( $total_pence * $qty / $total_qty ) : 0;
-					$assigned  += $meal_pence;
-				}
-
-				$delta           = Selections::compute_price_delta( $product_id, $item[ Selections::CART_KEY ] ?? [] );
-				$meal_line_total = $meal_pence / 100;
-				$unit_price      = $qty > 0 ? max( 0.0, ( $meal_line_total / $qty ) + $delta ) : 0.0;
-				$item['data']->set_price( $unit_price );
-
-				$cart->cart_contents[ $key ]['fn_bundle'] = [
-					'applied_tier'    => $result['tier'],
-					'effective_unit'  => $result['effective_unit'],
-					'bundle_units'    => $total_qty,
-					'remainder_units' => 0,
-					'bundle_total'    => $result['total'],
-					'per_meal_rate'   => $result['per_meal_rate'],
-					'threshold_qty'   => $result['threshold_qty'],
-					'extra_qty'       => $result['extra_qty'],
-					'bundle_price'    => $result['bundle_price'],
-				];
+				$res = $priced[ $key ];
+				$item['data']->set_price( (float) $res['unit_price'] );
+				$cart->cart_contents[ $key ]['fn_bundle'] = $res['bundle'];
 			}
 		}
 	}
