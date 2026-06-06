@@ -123,6 +123,20 @@ final class OrderFactory {
 		$order->save();
 		self::suppress_order_emails( false );
 
+		// Diagnostic + resilience: if WooCommerce didn't keep the custom status
+		// (e.g. it wasn't registered when the order saved), record what it became
+		// so the cause is visible in the order notes instead of failing silently.
+		if ( PrepOrderStatus::STATUS !== $order->get_status() ) {
+			$order->add_order_note(
+				sprintf(
+					/* translators: %s: the order status WooCommerce kept instead */
+					__( 'Note: the "Prep / label only" status could not be applied — order saved as "%s" instead.', 'fastnutrition-mealprep' ),
+					$order->get_status()
+				)
+			);
+			$order->save();
+		}
+
 		return $order;
 	}
 
@@ -283,21 +297,30 @@ final class OrderFactory {
 		if ( $prep['paid'] ) {
 			$order->set_date_paid( time() );
 		}
+		$is_prep = ! empty( $prep['prep_only'] );
 		$order->set_status(
 			$prep['status'],
-			sprintf( __( 'In-store order (%s).', 'fastnutrition-mealprep' ), $prep['paid'] ? __( 'paid', 'fastnutrition-mealprep' ) : __( 'unpaid', 'fastnutrition-mealprep' ) )
+			$is_prep
+				? __( 'Quick Label Maker — prep / label only (not a sale).', 'fastnutrition-mealprep' )
+				: sprintf( __( 'In-store order (%s).', 'fastnutrition-mealprep' ), $prep['paid'] ? __( 'paid', 'fastnutrition-mealprep' ) : __( 'unpaid', 'fastnutrition-mealprep' ) )
 		);
 
 		// An order note needs a persisted order id; only add it for real orders.
 		if ( $order->get_id() ) {
 			$order->add_order_note(
-				sprintf(
-					/* translators: 1: staff name, 2: paid/unpaid, 3: payment method label */
-					__( 'In-store order taken by %1$s. %2$s — %3$s.', 'fastnutrition-mealprep' ),
-					(string) ( $staff['name'] ?? '—' ),
-					$prep['paid'] ? __( 'Paid', 'fastnutrition-mealprep' ) : __( 'Not paid', 'fastnutrition-mealprep' ),
-					$prep['method_title']
-				)
+				$is_prep
+					? sprintf(
+						/* translators: %s: staff member */
+						__( 'PREP / LABEL ONLY — created by %s via the Quick Label Maker. Excluded from sales; feeds the prep sheet only.', 'fastnutrition-mealprep' ),
+						(string) ( $staff['name'] ?? '—' )
+					)
+					: sprintf(
+						/* translators: 1: staff name, 2: paid/unpaid, 3: payment method label */
+						__( 'In-store order taken by %1$s. %2$s — %3$s.', 'fastnutrition-mealprep' ),
+						(string) ( $staff['name'] ?? '—' ),
+						$prep['paid'] ? __( 'Paid', 'fastnutrition-mealprep' ) : __( 'Not paid', 'fastnutrition-mealprep' ),
+						$prep['method_title']
+					)
 			);
 		}
 	}
