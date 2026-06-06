@@ -276,7 +276,7 @@ final class OrderFactory {
 		foreach ( array_values( $lines ) as $i => $line ) {
 			$pid = isset( $line['product_id'] ) ? (int) $line['product_id'] : 0;
 			$qty = isset( $line['quantity'] ) ? max( 1, (int) $line['quantity'] ) : 1;
-			if ( ! $pid || ! MealProduct::is_meal( $pid ) ) {
+			if ( ! $pid || ! MealProduct::is_configurable( $pid ) ) {
 				return new WP_Error( 'fn_line_invalid', __( 'One of the items is not a valid meal product.', 'fastnutrition-mealprep' ), [ 'status' => 400 ] );
 			}
 			$raw       = isset( $line['selection'] ) && is_array( $line['selection'] ) ? $line['selection'] : [];

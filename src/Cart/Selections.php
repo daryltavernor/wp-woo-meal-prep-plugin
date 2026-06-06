@@ -6,7 +6,7 @@ namespace FastNutrition\MealPrep\Cart;
 use FastNutrition\MealPrep\PostTypes\Ingredient;
 use FastNutrition\MealPrep\Products\AddOnMeta;
 use FastNutrition\MealPrep\Products\MealProduct;
-use FastNutrition\MealPrep\Taxonomies\IngredientType;
+use FastNutrition\MealPrep\Products\StandaloneProduct;
 
 final class Selections {
 
@@ -19,7 +19,7 @@ final class Selections {
 	}
 
 	public function attach_selection( array $cart_item_data, int $product_id, int $variation_id ): array {
-		if ( ! MealProduct::is_meal( $product_id ) ) {
+		if ( ! MealProduct::is_configurable( $product_id ) ) {
 			return $cart_item_data;
 		}
 
@@ -42,7 +42,7 @@ final class Selections {
 	}
 
 	public function validate( bool $passed, int $product_id, int $quantity ): bool {
-		if ( ! MealProduct::is_meal( $product_id ) ) {
+		if ( ! MealProduct::is_configurable( $product_id ) ) {
 			return $passed;
 		}
 		$raw = isset( $_REQUEST['fn_selection'] )
@@ -52,20 +52,27 @@ final class Selections {
 		$selection = self::normalize( $product_id, $raw );
 
 		if ( empty( $selection ) ) {
-			wc_add_notice( __( 'Please choose your meal ingredients before adding to cart.', 'fastnutrition-mealprep' ), 'error' );
+			wc_add_notice(
+				StandaloneProduct::is_enabled( $product_id )
+					? __( 'Please choose an option before adding to cart.', 'fastnutrition-mealprep' )
+					: __( 'Please choose your meal ingredients before adding to cart.', 'fastnutrition-mealprep' ),
+				'error'
+			);
 			return false;
 		}
 
+		$mode = $selection['mode'] ?? '';
+
+		// Standalone selections are fully validated in normalize() (the chosen
+		// item must be in the product's allow-list and of the configured type).
+		if ( 'standalone' === $mode ) {
+			return $passed;
+		}
+
 		$config = MealProduct::get_config( $product_id );
-		$mode   = $selection['mode'] ?? '';
 		if ( 'set' === $mode ) {
 			if ( ! $config['allow_set_meal_mode'] || empty( $selection['set_meal_id'] ) ) {
 				wc_add_notice( __( 'Please choose a valid set meal.', 'fastnutrition-mealprep' ), 'error' );
-				return false;
-			}
-		} elseif ( 'sweet' === $mode ) {
-			if ( ! $config['allow_sweet_mode'] || empty( $selection['sweet_id'] ) ) {
-				wc_add_notice( __( 'Please choose a sweet.', 'fastnutrition-mealprep' ), 'error' );
 				return false;
 			}
 		} elseif ( 'build' === $mode ) {
@@ -99,66 +106,31 @@ final class Selections {
 		if ( ! is_array( $selection ) ) {
 			return $item_data;
 		}
-		if ( 'set' === ( $selection['mode'] ?? '' ) && ! empty( $selection['set_meal_id'] ) ) {
-			$item_data[] = [
-				'key'   => __( 'Set Meal', 'fastnutrition-mealprep' ),
-				'value' => get_the_title( (int) $selection['set_meal_id'] ),
-			];
-		} elseif ( 'sweet' === ( $selection['mode'] ?? '' ) && ! empty( $selection['sweet_id'] ) ) {
-			$item_data[] = [
-				'key'   => __( 'Sweet', 'fastnutrition-mealprep' ),
-				'value' => get_the_title( (int) $selection['sweet_id'] ),
-			];
-		} else {
-			if ( ! empty( $selection['protein_id'] ) ) {
-				$item_data[] = [
-					'key'   => __( 'Protein', 'fastnutrition-mealprep' ),
-					'value' => get_the_title( (int) $selection['protein_id'] ),
-				];
-			}
-			if ( ! empty( $selection['carb_id'] ) ) {
-				$item_data[] = [
-					'key'   => __( 'Carb', 'fastnutrition-mealprep' ),
-					'value' => get_the_title( (int) $selection['carb_id'] ),
-				];
-			}
-			if ( ! empty( $selection['greens_ids'] ) && is_array( $selection['greens_ids'] ) ) {
-				$names       = array_filter( array_map( 'get_the_title', array_map( 'intval', $selection['greens_ids'] ) ) );
-				$item_data[] = [
-					'key'   => 2 === count( $names ) ? __( 'Greens (2)', 'fastnutrition-mealprep' ) : __( 'Greens', 'fastnutrition-mealprep' ),
-					'value' => implode( ' + ', $names ),
-				];
-			}
+		foreach ( Selection::composition_pairs( $selection ) as $pair ) {
+			$item_data[] = $pair;
 		}
-		if ( ! empty( $selection['addons'] ) && is_array( $selection['addons'] ) ) {
-			$parts = [];
-			foreach ( $selection['addons'] as $addon ) {
-				$label = isset( $addon['label'] ) ? (string) $addon['label'] : '';
-				if ( '' === $label ) {
-					continue;
-				}
-				$price = isset( $addon['price'] ) ? (float) $addon['price'] : 0;
-				$parts[] = $price > 0
-					? sprintf( '%s (+%s)', $label, wp_strip_all_tags( wc_price( $price ) ) )
-					: $label;
-			}
-			if ( ! empty( $parts ) ) {
-				$item_data[] = [
-					'key'   => __( 'Add-ons', 'fastnutrition-mealprep' ),
-					'value' => implode( ', ', $parts ),
-				];
-			}
+		$addons = Selection::addons_summary( $selection );
+		if ( '' !== $addons ) {
+			$item_data[] = [
+				'key'   => __( 'Add-ons', 'fastnutrition-mealprep' ),
+				'value' => $addons,
+			];
 		}
 		return $item_data;
 	}
 
 	public static function normalize( int $product_id, array $raw ): array {
+		// Standalone products: a single chosen item of the configured type.
+		if ( StandaloneProduct::is_enabled( $product_id ) ) {
+			return self::normalize_standalone( $product_id, $raw );
+		}
+
 		$config = MealProduct::get_config( $product_id );
 		if ( ! $config['is_meal'] ) {
 			return [];
 		}
 
-		$mode = isset( $raw['mode'] ) && in_array( $raw['mode'], [ 'build', 'set', 'sweet' ], true ) ? (string) $raw['mode'] : 'build';
+		$mode = isset( $raw['mode'] ) && in_array( $raw['mode'], [ 'build', 'set' ], true ) ? (string) $raw['mode'] : 'build';
 
 		if ( 'set' === $mode && $config['allow_set_meal_mode'] ) {
 			$set_meal_id = isset( $raw['set_meal_id'] ) ? (int) $raw['set_meal_id'] : 0;
@@ -174,23 +146,6 @@ final class Selections {
 				'set_meal_id' => $set_meal_id,
 				'addons'      => $addons,
 				'tier'        => $config['tier'],
-			];
-		}
-
-		if ( 'sweet' === $mode && $config['allow_sweet_mode'] ) {
-			$sweet_id = isset( $raw['sweet_id'] ) ? (int) $raw['sweet_id'] : 0;
-			if ( ! $sweet_id || ( ! empty( $config['allowed_sweets'] ) && ! in_array( $sweet_id, $config['allowed_sweets'], true ) ) ) {
-				return [];
-			}
-			if ( 'sweet' !== Ingredient::get_type_slug( $sweet_id ) ) {
-				return [];
-			}
-			$addons = self::sanitize_addons( $product_id, $raw['addons'] ?? [] );
-			return [
-				'mode'     => 'sweet',
-				'sweet_id' => $sweet_id,
-				'addons'   => $addons,
-				'tier'     => $config['tier'],
 			];
 		}
 
@@ -240,6 +195,40 @@ final class Selections {
 		];
 	}
 
+	/**
+	 * Normalise a standalone product selection: a single item chosen from the
+	 * product's configured allow-list. When the product offers exactly one item
+	 * it is auto-selected, so the customer needs no on-page choice.
+	 */
+	private static function normalize_standalone( int $product_id, array $raw ): array {
+		$cfg = StandaloneProduct::get_config( $product_id );
+		if ( ! $cfg['enabled'] || empty( $cfg['ids'] ) ) {
+			return [];
+		}
+
+		$item_id = isset( $raw['item_id'] ) ? (int) $raw['item_id'] : 0;
+		// Single-item products are fixed: accept the lone item even if the client
+		// didn't echo it back.
+		if ( ! $item_id && 1 === count( $cfg['ids'] ) ) {
+			$item_id = (int) $cfg['ids'][0];
+		}
+		if ( ! $item_id || ! in_array( $item_id, $cfg['ids'], true ) ) {
+			return [];
+		}
+		// The chosen item must really be of the configured type.
+		if ( $cfg['type'] !== Ingredient::get_type_slug( $item_id ) ) {
+			return [];
+		}
+
+		return [
+			'mode'      => 'standalone',
+			'item_id'   => $item_id,
+			'item_type' => $cfg['type'],
+			'addons'    => self::sanitize_addons( $product_id, $raw['addons'] ?? [] ),
+			'tier'      => (string) ( get_post_meta( $product_id, '_fn_meal_tier', true ) ?: 'standard' ),
+		];
+	}
+
 	private static function sanitize_addons( int $product_id, mixed $raw ): array {
 		if ( ! is_array( $raw ) ) {
 			return [];
@@ -266,25 +255,13 @@ final class Selections {
 		return $chosen;
 	}
 
+	/**
+	 * Price delta for a selection (ingredient swaps + add-ons), added to the
+	 * product's catalog/bundle base. Thin wrapper around the central interpreter
+	 * so MealPricing and the online/offline carts share one definition.
+	 */
 	public static function compute_price_delta( int $product_id, array $selection ): float {
-		$delta = 0.0;
-		if ( ( $selection['mode'] ?? '' ) === 'set' && ! empty( $selection['set_meal_id'] ) ) {
-			$delta += (float) get_post_meta( (int) $selection['set_meal_id'], '_fn_price_delta', true );
-		} elseif ( ( $selection['mode'] ?? '' ) === 'sweet' && ! empty( $selection['sweet_id'] ) ) {
-			$delta += (float) get_post_meta( (int) $selection['sweet_id'], '_fn_price_delta', true );
-		} else {
-			foreach ( [ 'protein_id', 'carb_id' ] as $k ) {
-				if ( ! empty( $selection[ $k ] ) ) {
-					$delta += (float) get_post_meta( (int) $selection[ $k ], '_fn_price_delta', true );
-				}
-			}
-			foreach ( ( $selection['greens_ids'] ?? [] ) as $id ) {
-				$delta += (float) get_post_meta( (int) $id, '_fn_price_delta', true );
-			}
-		}
-		foreach ( ( $selection['addons'] ?? [] ) as $addon ) {
-			$delta += (float) ( $addon['price'] ?? 0 );
-		}
-		return $delta;
+		unset( $product_id );
+		return Selection::price_delta( $selection );
 	}
 }

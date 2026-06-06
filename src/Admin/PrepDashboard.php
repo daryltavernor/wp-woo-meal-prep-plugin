@@ -3,6 +3,7 @@ declare( strict_types=1 );
 
 namespace FastNutrition\MealPrep\Admin;
 
+use FastNutrition\MealPrep\Cart\Selection;
 use FastNutrition\MealPrep\PostTypes\Ingredient;
 
 final class PrepDashboard {
@@ -141,24 +142,12 @@ final class PrepDashboard {
 		echo '</tbody></table>';
 	}
 
+	/**
+	 * Human-readable meal description. Kept as a thin wrapper around the central
+	 * Selection interpreter so existing callers (labels, prep sheet) are unchanged.
+	 */
 	public static function describe_selection( array $sel ): string {
-		if ( 'set' === ( $sel['mode'] ?? '' ) && ! empty( $sel['set_meal_id'] ) ) {
-			return get_the_title( (int) $sel['set_meal_id'] );
-		}
-		if ( 'sweet' === ( $sel['mode'] ?? '' ) && ! empty( $sel['sweet_id'] ) ) {
-			return get_the_title( (int) $sel['sweet_id'] );
-		}
-		$parts = [];
-		if ( ! empty( $sel['protein_id'] ) ) {
-			$parts[] = get_the_title( (int) $sel['protein_id'] );
-		}
-		if ( ! empty( $sel['carb_id'] ) ) {
-			$parts[] = get_the_title( (int) $sel['carb_id'] );
-		}
-		foreach ( (array) ( $sel['greens_ids'] ?? [] ) as $id ) {
-			$parts[] = get_the_title( (int) $id );
-		}
-		return implode( ' + ', array_filter( $parts ) );
+		return Selection::describe( $sel );
 	}
 
 	public static function get_day_totals( string $date ): array {

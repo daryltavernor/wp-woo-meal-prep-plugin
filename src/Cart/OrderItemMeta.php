@@ -27,8 +27,8 @@ final class OrderItemMeta {
 	 * Extracted from persist() so BOTH the online checkout
 	 * (woocommerce_checkout_create_order_line_item) and the offline In-Store
 	 * Quick Order builder (InStore\OrderFactory) stamp identical meta —
-	 * _fn_selection + _fn_macros_snapshot + the human-readable
-	 * Protein/Carb/Greens/Set Meal/Sweet/Add-ons/Macros lines — so prep lists,
+	 * _fn_selection + _fn_macros_snapshot + the human-readable composition lines
+	 * (from Selection::composition_pairs) + Add-ons + Macros — so prep lists,
 	 * labels and reporting never fork between the two order sources.
 	 *
 	 * @param WC_Order_Item_Product $item       The order line item.
@@ -41,40 +41,12 @@ final class OrderItemMeta {
 		$item->add_meta_data( '_fn_selection', $selection, true );
 		$item->add_meta_data( '_fn_macros_snapshot', $macros, true );
 
-		if ( 'set' === ( $selection['mode'] ?? '' ) && ! empty( $selection['set_meal_id'] ) ) {
-			$item->add_meta_data( __( 'Set Meal', 'fastnutrition-mealprep' ), get_the_title( (int) $selection['set_meal_id'] ) );
-		} elseif ( 'sweet' === ( $selection['mode'] ?? '' ) && ! empty( $selection['sweet_id'] ) ) {
-			$item->add_meta_data( __( 'Sweet', 'fastnutrition-mealprep' ), get_the_title( (int) $selection['sweet_id'] ) );
-		} else {
-			if ( ! empty( $selection['protein_id'] ) ) {
-				$item->add_meta_data( __( 'Protein', 'fastnutrition-mealprep' ), get_the_title( (int) $selection['protein_id'] ) );
-			}
-			if ( ! empty( $selection['carb_id'] ) ) {
-				$item->add_meta_data( __( 'Carb', 'fastnutrition-mealprep' ), get_the_title( (int) $selection['carb_id'] ) );
-			}
-			if ( ! empty( $selection['greens_ids'] ) ) {
-				$names = array_map( 'get_the_title', array_map( 'intval', $selection['greens_ids'] ) );
-				$item->add_meta_data(
-					count( $names ) === 2 ? __( 'Greens (2)', 'fastnutrition-mealprep' ) : __( 'Greens', 'fastnutrition-mealprep' ),
-					implode( ' + ', $names )
-				);
-			}
+		foreach ( Selection::composition_pairs( $selection ) as $pair ) {
+			$item->add_meta_data( $pair['key'], $pair['value'] );
 		}
-		if ( ! empty( $selection['addons'] ) && is_array( $selection['addons'] ) ) {
-			$parts = [];
-			foreach ( $selection['addons'] as $addon ) {
-				$label = isset( $addon['label'] ) ? (string) $addon['label'] : '';
-				if ( '' === $label ) {
-					continue;
-				}
-				$price   = isset( $addon['price'] ) ? (float) $addon['price'] : 0;
-				$parts[] = $price > 0
-					? sprintf( '%s (+%s)', $label, wp_strip_all_tags( wc_price( $price ) ) )
-					: $label;
-			}
-			if ( ! empty( $parts ) ) {
-				$item->add_meta_data( __( 'Add-ons', 'fastnutrition-mealprep' ), implode( ', ', $parts ) );
-			}
+		$addons = Selection::addons_summary( $selection );
+		if ( '' !== $addons ) {
+			$item->add_meta_data( __( 'Add-ons', 'fastnutrition-mealprep' ), $addons );
 		}
 
 		$item->add_meta_data(
@@ -140,23 +112,7 @@ final class OrderItemMeta {
 					continue;
 				}
 				$qty = (int) $item->get_quantity();
-				$ids = [];
-				if ( 'set' === ( $sel['mode'] ?? '' ) && ! empty( $sel['set_meal_id'] ) ) {
-					$ids[] = (int) $sel['set_meal_id'];
-				} elseif ( 'sweet' === ( $sel['mode'] ?? '' ) && ! empty( $sel['sweet_id'] ) ) {
-					$ids[] = (int) $sel['sweet_id'];
-				} else {
-					if ( ! empty( $sel['protein_id'] ) ) {
-						$ids[] = (int) $sel['protein_id'];
-					}
-					if ( ! empty( $sel['carb_id'] ) ) {
-						$ids[] = (int) $sel['carb_id'];
-					}
-					foreach ( (array) ( $sel['greens_ids'] ?? [] ) as $gid ) {
-						$ids[] = (int) $gid;
-					}
-				}
-				foreach ( $ids as $ing_id ) {
+				foreach ( Selection::ingredient_ids( $sel ) as $ing_id ) {
 					$totals[ $ing_id ] = ( $totals[ $ing_id ] ?? 0 ) + $qty;
 				}
 			}

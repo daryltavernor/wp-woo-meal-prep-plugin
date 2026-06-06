@@ -126,31 +126,36 @@ function Stepper( { value, onChange, min = 1 } ) {
 /* ---- Ingredient filtering --------------------------------------------- */
 function allowedFor( set, ingredients ) {
 	if ( ! set ) {
-		return { protein: [], carb: [], greens: [], set_meal: [], sweet: [] };
+		return { protein: [], carb: [], greens: [], set_meal: [] };
 	}
 	const cfg = set.config || {};
 	const tier = cfg.tier || 'standard';
-	const ov = set.overrides || {};
-	const pick = ( list, allowList, override ) => {
-		const allow = override && override.length ? override : allowList;
+	const pick = ( list, allowList ) => {
 		const base = ( list || [] ).filter(
 			( i ) => ! i.tier || i.tier === tier
 		);
-		return ! allow || ! allow.length
+		return ! allowList || ! allowList.length
 			? base
-			: base.filter( ( i ) => allow.includes( i.id ) );
+			: base.filter( ( i ) => allowList.includes( i.id ) );
 	};
 	return {
-		protein: pick( ingredients.protein, cfg.allowed_proteins, ov.proteins ),
-		carb: pick( ingredients.carb, cfg.allowed_carbs, ov.carbs ),
-		greens: pick( ingredients.greens, cfg.allowed_greens, ov.greens ),
-		set_meal: pick(
-			ingredients.set_meal,
-			cfg.allowed_set_meals,
-			ov.set_meals
-		),
-		sweet: pick( ingredients.sweet, cfg.allowed_sweets, ov.sweets ),
+		protein: pick( ingredients.protein, cfg.allowed_proteins ),
+		carb: pick( ingredients.carb, cfg.allowed_carbs ),
+		greens: pick( ingredients.greens, cfg.allowed_greens ),
+		set_meal: pick( ingredients.set_meal, cfg.allowed_set_meals ),
 	};
+}
+
+/* The items a standalone product offers: ingredients of its configured type
+   filtered to its allow-list. */
+function standaloneItems( set, ingredients ) {
+	const sa = ( set && set.standalone ) || {};
+	if ( ! sa.enabled ) {
+		return [];
+	}
+	const list = ingredients[ sa.type ] || [];
+	const ids = sa.ids || [];
+	return ids.length ? list.filter( ( i ) => ids.includes( i.id ) ) : list;
 }
 
 /* ---- Build form (one item) -------------------------------------------- */
@@ -158,7 +163,7 @@ const emptyBuild = () => ( {
 	mode: 'build',
 	protein_id: 0,
 	set_meal_id: 0,
-	sweet_id: 0,
+	item_id: 0,
 	carb_id: 0,
 	greens_ids: [],
 	addons: [],
@@ -171,7 +176,11 @@ function BuildForm( { setKey, set, ingredients, onAdd } ) {
 		() => allowedFor( set, ingredients ),
 		[ set, ingredients ]
 	);
-	const isSweets = setKey === 'sweets';
+	const isStandalone = !! ( set && set.kind === 'standalone' );
+	const items = useMemo(
+		() => standaloneItems( set, ingredients ),
+		[ set, ingredients ]
+	);
 	const cfg = set ? set.config || {} : {};
 	const addons = set ? set.addons || [] : [];
 
@@ -189,7 +198,8 @@ function BuildForm( { setKey, set, ingredients, onAdd } ) {
 			carb_id: 0,
 			greens_ids: [],
 		} );
-	const chooseSweet = ( id ) => setB( { ...b, mode: 'sweet', sweet_id: id } );
+	const chooseItem = ( id ) =>
+		setB( { ...b, mode: 'standalone', item_id: id } );
 
 	const toggleGreen = ( id ) => {
 		let g = b.greens_ids.includes( id )
@@ -211,8 +221,8 @@ function BuildForm( { setKey, set, ingredients, onAdd } ) {
 
 	/* Validity mirrors the server-side Selections::validate. */
 	const valid = ( () => {
-		if ( isSweets || b.mode === 'sweet' ) {
-			return !! b.sweet_id;
+		if ( isStandalone ) {
+			return !! b.item_id;
 		}
 		if ( b.mode === 'set' ) {
 			return !! b.set_meal_id;
@@ -235,10 +245,10 @@ function BuildForm( { setKey, set, ingredients, onAdd } ) {
 	const estimate = ( () => {
 		const base = set ? set.price || 0 : 0;
 		let d = 0;
-		if ( b.mode === 'set' ) {
+		if ( isStandalone ) {
+			d += deltaOf( items, b.item_id );
+		} else if ( b.mode === 'set' ) {
 			d += deltaOf( allow.set_meal, b.set_meal_id );
-		} else if ( isSweets || b.mode === 'sweet' ) {
-			d += deltaOf( allow.sweet, b.sweet_id );
 		} else {
 			d +=
 				deltaOf( allow.protein, b.protein_id ) +
@@ -252,11 +262,11 @@ function BuildForm( { setKey, set, ingredients, onAdd } ) {
 	} )();
 
 	const buildLabel = ( () => {
+		if ( isStandalone ) {
+			return nameOf( items, b.item_id );
+		}
 		if ( b.mode === 'set' ) {
 			return nameOf( allow.set_meal, b.set_meal_id );
-		}
-		if ( isSweets || b.mode === 'sweet' ) {
-			return nameOf( allow.sweet, b.sweet_id );
 		}
 		const parts = [ nameOf( allow.protein, b.protein_id ) ];
 		if ( b.carb_id ) {
@@ -269,8 +279,13 @@ function BuildForm( { setKey, set, ingredients, onAdd } ) {
 	} )();
 
 	const buildSelection = () => {
-		if ( isSweets || b.mode === 'sweet' ) {
-			return { mode: 'sweet', sweet_id: b.sweet_id, addons: b.addons };
+		if ( isStandalone ) {
+			return {
+				mode: 'standalone',
+				item_id: b.item_id,
+				item_type: set.standalone.type,
+				addons: b.addons,
+			};
 		}
 		if ( b.mode === 'set' ) {
 			return {
@@ -310,26 +325,30 @@ function BuildForm( { setKey, set, ingredients, onAdd } ) {
 		return (
 			<div className="fn-empty">
 				{ __(
-					'This product set is not configured. Set it under Meal Prep → Quick Order.',
+					'No products are enabled for this screen yet. Tick products under Meal Prep → Quick Order Settings.',
 					'fastnutrition-mealprep'
 				) }
 			</div>
 		);
 	}
 
-	const showSides = ! isSweets && b.mode === 'build' && !! b.protein_id;
+	const showSides = ! isStandalone && b.mode === 'build' && !! b.protein_id;
 
 	return (
 		<div className="fn-build">
-			{ isSweets ? (
+			{ isStandalone ? (
 				<section>
-					<h3>{ __( 'Sweet', 'fastnutrition-mealprep' ) }</h3>
+					<h3>
+						{ set.standalone.type === 'sweet'
+							? __( 'Sweet', 'fastnutrition-mealprep' )
+							: __( 'Meal', 'fastnutrition-mealprep' ) }
+					</h3>
 					<PillRow>
-						{ allow.sweet.map( ( i ) => (
+						{ items.map( ( i ) => (
 							<Pill
 								key={ i.id }
-								active={ b.sweet_id === i.id }
-								onClick={ () => chooseSweet( i.id ) }
+								active={ b.item_id === i.id }
+								onClick={ () => chooseItem( i.id ) }
 								sub={
 									i.price_delta
 										? `+${ money( i.price_delta ) }`
@@ -451,7 +470,7 @@ function BuildForm( { setKey, set, ingredients, onAdd } ) {
 			) }
 
 			{ addons.length > 0 &&
-			( b.protein_id || b.set_meal_id || b.sweet_id ) ? (
+			( b.protein_id || b.set_meal_id || b.item_id ) ? (
 				<section>
 					<h3>
 						{ __( 'Add-on', 'fastnutrition-mealprep' ) }{ ' ' }
@@ -995,7 +1014,7 @@ function App() {
 		sweet: [],
 	} );
 	const [ step, setStep ] = useState( 'build' ); // build | details | review | done
-	const [ setKey, setSetKey ] = useState( 'standard' );
+	const [ setKey, setSetKey ] = useState( '' );
 	const [ basket, setBasket ] = useState( [] );
 	const [ expanded, setExpanded ] = useState( false );
 	const [ details, setDetails ] = useState( {
@@ -1020,9 +1039,10 @@ function App() {
 	const [ done, setDone ] = useState( null );
 
 	const loadConfig = async () => {
-		const cfg = await api( 'config' );
+		const cfg = await api( 'config?mode=' + MODE );
 		setConfig( cfg );
 		setSendEmail( !! cfg.send_email );
+		setSetKey( Object.keys( cfg.sets || {} )[ 0 ] || '' );
 		const [ p, c, g, s, sw ] = await Promise.all( [
 			apiV1( 'ingredients?type=protein' ),
 			apiV1( 'ingredients?type=carb' ),
@@ -1202,7 +1222,7 @@ function App() {
 		setDone( null );
 		setErr( '' );
 		setStep( 'build' );
-		setSetKey( 'standard' );
+		setSetKey( Object.keys( ( config && config.sets ) || {} )[ 0 ] || '' );
 		setSendEmail( config && config.send_email );
 	};
 
@@ -1222,11 +1242,10 @@ function App() {
 	}
 
 	const sets = config.sets || {};
-	const tabs = [
-		[ 'standard', __( 'Standard', 'fastnutrition-mealprep' ) ],
-		[ 'bulk', __( 'Bulk', 'fastnutrition-mealprep' ) ],
-		[ 'sweets', __( 'Sweets', 'fastnutrition-mealprep' ) ],
-	];
+	const tabs = Object.keys( sets ).map( ( key ) => [
+		key,
+		sets[ key ].name,
+	] );
 
 	if ( step === 'done' ) {
 		return (

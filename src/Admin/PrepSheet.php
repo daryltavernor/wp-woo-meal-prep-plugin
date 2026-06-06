@@ -3,6 +3,7 @@ declare( strict_types=1 );
 
 namespace FastNutrition\MealPrep\Admin;
 
+use FastNutrition\MealPrep\Cart\Selection;
 use FastNutrition\MealPrep\PostTypes\Ingredient;
 
 final class PrepSheet {
@@ -219,23 +220,7 @@ final class PrepSheet {
 	 * @return int[]
 	 */
 	private static function selection_ingredient_ids( array $sel ): array {
-		$ids = [];
-		if ( 'set' === ( $sel['mode'] ?? '' ) && ! empty( $sel['set_meal_id'] ) ) {
-			$ids[] = (int) $sel['set_meal_id'];
-		} elseif ( 'sweet' === ( $sel['mode'] ?? '' ) && ! empty( $sel['sweet_id'] ) ) {
-			$ids[] = (int) $sel['sweet_id'];
-		} else {
-			if ( ! empty( $sel['protein_id'] ) ) {
-				$ids[] = (int) $sel['protein_id'];
-			}
-			if ( ! empty( $sel['carb_id'] ) ) {
-				$ids[] = (int) $sel['carb_id'];
-			}
-			foreach ( (array) ( $sel['greens_ids'] ?? [] ) as $gid ) {
-				$ids[] = (int) $gid;
-			}
-		}
-		return $ids;
+		return Selection::ingredient_ids( $sel );
 	}
 
 	/**

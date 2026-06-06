@@ -37,6 +37,7 @@ use FastNutrition\MealPrep\PostTypes\Ingredient;
 use FastNutrition\MealPrep\Products\AddOnMeta;
 use FastNutrition\MealPrep\Products\BundleMeta;
 use FastNutrition\MealPrep\Products\MealProduct;
+use FastNutrition\MealPrep\Products\StandaloneProduct;
 use FastNutrition\MealPrep\Rest\RestController;
 use FastNutrition\MealPrep\Support\AssetManager;
 use FastNutrition\MealPrep\Taxonomies\Allergen;
@@ -61,6 +62,7 @@ final class Plugin {
 		( new Ingredient() )->register();
 
 		( new MealProduct() )->register();
+		( new StandaloneProduct() )->register();
 		( new AddOnMeta() )->register();
 		( new BundleMeta() )->register();
 

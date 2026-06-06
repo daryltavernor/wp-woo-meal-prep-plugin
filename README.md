@@ -60,11 +60,17 @@ Everything lives under the **Meal Prep** top-level menu in WP admin (the only pe
 6. **Meal Prep → Prep Dashboard / Prep Sheet** — daily kitchen views.
 7. **Edit Product** (any simple Woo product) — the extras live on the product itself because they're product-specific:
    * **Meal Builder** tab — enable the builder, choose tier (standard/bulk), allow double greens, allow set meal mode, restrict allowed ingredients.
+   * **Standalone Product** tab — sell a single pre-made item directly (a **Set Meal** or a **Sweet**) instead of building a meal. Pick the type, then tick one or more items: one item = no choice for the customer, several = a dropdown on the product page. Used for sweets, individual set-meal special offers, and any single-item product.
    * **Meal Add-ons** meta box — per-line-item extras (e.g. *+£1 boiled eggs*).
    * **Quantity Bundles** meta box — e.g. `10 / £35`, `15 / £50`. Applies only to this product ID.
 
 ### Where do I add Set Meals?
 Meal Prep → **Ingredients → Add Ingredient**. In the right-hand sidebar, under **Ingredient Type**, tick **Set Meal**. Set the macros for the complete meal and (optionally) a price modifier. Then on each meal product that should offer set meals, tick **Allow set meal mode** in the Meal Builder tab and select which set meals are allowed.
+
+### Selling sweets, single meals & special offers (Standalone Products)
+Sweets and other single, pre-made items aren't built from components, so they live **outside** the meal builder. On the product, open the **Standalone Product** tab, enable it, choose **Item type** (Set Meal or Sweet) and tick the item(s) to offer — one for a fixed product (no customer choice) or several to show a dropdown. Standalone products still flow through macros, the prep dashboard/sheet, meal labels, the Quick Order screen and the Quick Label Maker exactly like meal-builder products.
+
+> **Upgrading from 1.11 or earlier:** the meal builder's old *"Sweets product (Sweet mode)"* option has been removed and sweets decoupled from the builder. Re-create those products using the **Standalone Product** tab (Item type = Sweet). Existing orders are unaffected — their labels and prep data still render.
 
 ## Checkout — how it works now
 
@@ -92,6 +98,9 @@ When a simple product has "Enable meal builder" ticked, the default Add-to-Cart 
 * Per-line add-ons (e.g. *boiled eggs +£1*).
 * Live macro total.
 * Server-side validation rejects disallowed combinations.
+
+### Standalone products (on product pages)
+When a product has the **Standalone Product** tab enabled, the page sells the chosen item directly instead of showing the builder: a single configured item adds straight to the basket, while two or more render a dropdown (same styling as the builder). Sweets, individual set meals and special offers are sold this way, and still carry full macros, prep and label data.
 
 ### Bundle pricing
 Per-product quantity tiers (e.g. `10 for £35`). Applies only to matching product IDs so desserts and other non-bundle products are untouched. The largest tier that fits is chosen; remaining qty is priced at base. Each cart line shows an effective per-meal price (e.g. *10 for £35 (~£3.50 each)*).
@@ -142,11 +151,11 @@ Logged-in customers can save meal combos to their account and re-add them with a
 A fast, touch-first screen (works well on an iPad) that lets staff take phone and walk-in orders straight into WooCommerce — no checkout flow. It creates a **real** WooCommerce order that appears in *WooCommerce → Orders* exactly like an online one, reusing the same line pricing, bundle tiers, meal-composition meta and `_fn_fulfilment` slot data, so kitchen prep lists and reporting never fork.
 
 * **Open it:** *Meal Prep → Quick Order* in the WordPress admin. It is a normal admin page, gated to **Shop Managers and Administrators** (the `manage_woocommerce` capability) just like the plugin's other settings. The order is attributed to whoever is signed in — no separate password or PIN.
-* **Flow:** Step 1 build food (Standard / Bulk / Sweets → protein-or-set-meal, 1 carb + 1 green or 2 greens, one optional add-on, quantity on every line) with instant add-and-reset; Step 2 contact + delivery/collection slot + payment + paid/unpaid; Step 3 review + submit.
+* **Flow:** Step 1 build food (one tab per enabled product — the meal builder for meal products, or an item picker for standalone products — with one optional add-on and quantity on every line) with instant add-and-reset; Step 2 contact + delivery/collection slot + payment + paid/unpaid; Step 3 review + submit.
 * **Order tagging + filtering:** every offline order carries `created_via = fn_instore`, `_fn_offline_order = yes`, and `_fn_staff_name` / `_fn_staff_id` (the signed-in user). In *WooCommerce → Orders* a **Source** column shows an **In-store** badge on offline orders (online orders are untouched and show nothing), and a toolbar dropdown filters the list to **In-store / Online / All**.
 * **Pricing parity:** identical line pricing **and bundle/quantity tiers** to online; adds the delivery fee for delivery orders, does **not** add the basket surcharge (see `CHECKOUT_PRICING.md`). Paid → **Completed**, Unpaid → **On hold** (stock is reduced as normal). Macros are stored on each line item, so the printed meal labels include them just like online orders.
 * **Confirmation email:** when an email address is entered and the toggle is on, the customer is sent WooCommerce's order-details ("invoice") email. Delivery requires a working mail transport on the site — e.g. the **Post SMTP** plugin configured with your provider; the plugin only hands the message to `wp_mail()`.
-* **Settings:** *Meal Prep → Quick Order Settings* — the three product-set mappings (auto-detected by tier / sweet mode), optional per-set ingredient override lists for in-store-only offers, and the email default.
+* **Settings:** *Meal Prep → Quick Order Settings* — tick which products appear in the Quick Order screen and which appear in the Quick Label Maker (any product with the Meal Builder or a Standalone Product enabled is listed; the two lists are independent), plus the confirmation-email default.
 
 ### Quick Label Maker
 *Meal Prep → Quick Label Maker* is the same touch screen, but on submit it produces a **labels PDF** (opened in a new tab to print) **without creating a WooCommerce order**. Use it to print meal labels on demand. The flow is identical to Quick Order — build the meals, enter the customer name (required) + optional phone, pick collection/delivery + slot, and set paid / not-paid + method (this prints on the label) — minus the customer-email option. Labels are built from an in-memory order so they are byte-identical to an order's labels (summary + one label per meal, with macros and USE BY). Phone is optional on both the Quick Order and Quick Label Maker screens.

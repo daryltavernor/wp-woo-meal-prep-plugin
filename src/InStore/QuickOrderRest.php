@@ -7,6 +7,7 @@ use FastNutrition\MealPrep\Labels\LabelPrinter;
 use FastNutrition\MealPrep\Products\AddOnMeta;
 use FastNutrition\MealPrep\Products\BundleMeta;
 use FastNutrition\MealPrep\Products\MealProduct;
+use FastNutrition\MealPrep\Products\StandaloneProduct;
 use WP_Error;
 use WP_REST_Request;
 use WP_REST_Response;
@@ -70,26 +71,34 @@ final class QuickOrderRest {
 		return new WP_Error( 'fn_forbidden', __( 'You do not have permission to take orders.', 'fastnutrition-mealprep' ), [ 'status' => 403 ] );
 	}
 
-	public function config(): WP_REST_Response {
-		$products  = InStoreSettings::products();
-		$overrides = InStoreSettings::overrides();
-		$sets      = [];
+	public function config( WP_REST_Request $req ): WP_REST_Response {
+		$mode = 'label' === $req->get_param( 'mode' ) ? 'label' : 'order';
+		$ids  = 'label' === $mode ? InStoreSettings::label_product_ids() : InStoreSettings::order_product_ids();
 
-		foreach ( InStoreSettings::SETS as $set ) {
-			$pid = (int) $products[ $set ];
-			if ( ! $pid || ! MealProduct::is_meal( $pid ) ) {
-				$sets[ $set ] = null;
+		// Tabs are keyed by product id and rendered in the order the settings
+		// screen lists them. Each carries enough config for the screen to render
+		// the meal builder or the standalone item picker without another request.
+		$sets = [];
+		foreach ( $ids as $pid ) {
+			$pid = (int) $pid;
+			if ( ! MealProduct::is_configurable( $pid ) ) {
 				continue;
 			}
 			$product = wc_get_product( $pid );
-			$sets[ $set ] = [
+			if ( ! $product ) {
+				continue;
+			}
+			$standalone           = StandaloneProduct::get_config( $pid );
+			$sets[ (string) $pid ] = [
+				'key'        => (string) $pid,
 				'product_id' => $pid,
-				'name'       => $product ? $product->get_name() : '',
-				'price'      => $product ? (float) $product->get_price() : 0.0,
+				'name'       => $product->get_name(),
+				'price'      => (float) $product->get_price(),
+				'kind'       => $standalone['enabled'] ? 'standalone' : 'meal',
 				'config'     => MealProduct::get_config( $pid ),
+				'standalone' => $standalone,
 				'addons'     => AddOnMeta::get_addons( $pid ),
 				'bundles'    => BundleMeta::get_bundles( $pid ),
-				'overrides'  => $overrides[ $set ],
 			];
 		}
 

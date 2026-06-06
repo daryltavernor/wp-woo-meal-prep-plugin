@@ -3,6 +3,7 @@ declare( strict_types=1 );
 
 namespace FastNutrition\MealPrep\Macros;
 
+use FastNutrition\MealPrep\Cart\Selection;
 use FastNutrition\MealPrep\PostTypes\Ingredient;
 
 final class Calculator {
@@ -19,23 +20,10 @@ final class Calculator {
 	}
 
 	public static function macros_for_selection( int $product_id, array $selection ): array {
+		unset( $product_id ); // Macros derive purely from the selection's ingredients + add-ons.
 		$total = self::EMPTY;
-		if ( 'set' === ( $selection['mode'] ?? '' ) && ! empty( $selection['set_meal_id'] ) ) {
-			$total = self::add( $total, Ingredient::get_macros( (int) $selection['set_meal_id'] ) );
-			return self::add( $total, self::addons_total( $selection['addons'] ?? [] ) );
-		}
-		if ( 'sweet' === ( $selection['mode'] ?? '' ) && ! empty( $selection['sweet_id'] ) ) {
-			$total = self::add( $total, Ingredient::get_macros( (int) $selection['sweet_id'] ) );
-			return self::add( $total, self::addons_total( $selection['addons'] ?? [] ) );
-		}
-		if ( ! empty( $selection['protein_id'] ) ) {
-			$total = self::add( $total, Ingredient::get_macros( (int) $selection['protein_id'] ) );
-		}
-		if ( ! empty( $selection['carb_id'] ) ) {
-			$total = self::add( $total, Ingredient::get_macros( (int) $selection['carb_id'] ) );
-		}
-		foreach ( ( $selection['greens_ids'] ?? [] ) as $id ) {
-			$total = self::add( $total, Ingredient::get_macros( (int) $id ) );
+		foreach ( Selection::ingredient_ids( $selection ) as $id ) {
+			$total = self::add( $total, Ingredient::get_macros( $id ) );
 		}
 		return self::add( $total, self::addons_total( $selection['addons'] ?? [] ) );
 	}
