@@ -80,6 +80,8 @@ final class OrderFactory {
 		$order->save();
 		self::suppress_order_emails( false );
 
+		self::maybe_note_status_mismatch( $order, (string) $prep['status'] );
+
 		if ( $prep['send_email'] && function_exists( 'WC' ) && WC() && WC()->mailer() ) {
 			// Delivery depends on the site's mail transport — e.g. Post SMTP —
 			// being configured; this only hands the mail to wp_mail().
@@ -87,6 +89,27 @@ final class OrderFactory {
 		}
 
 		return $order;
+	}
+
+	/**
+	 * Diagnostic: if WooCommerce didn't keep the status we set (e.g. it reverted
+	 * to "pending"), record both the intended and actual status as an order note,
+	 * so the cause is visible instead of failing silently. Helps pin down
+	 * environment-specific status-handling issues (HPOS, custom statuses, etc.).
+	 */
+	private static function maybe_note_status_mismatch( WC_Order $order, string $expected ): void {
+		if ( ! $order->get_id() || $expected === $order->get_status() ) {
+			return;
+		}
+		$order->add_order_note(
+			sprintf(
+				/* translators: 1: intended order status, 2: status WooCommerce actually saved */
+				__( 'FN diagnostic: order was set to "%1$s" but WooCommerce saved it as "%2$s".', 'fastnutrition-mealprep' ),
+				$expected,
+				$order->get_status()
+			)
+		);
+		$order->save();
 	}
 
 	/**
@@ -123,19 +146,7 @@ final class OrderFactory {
 		$order->save();
 		self::suppress_order_emails( false );
 
-		// Diagnostic + resilience: if WooCommerce didn't keep the custom status
-		// (e.g. it wasn't registered when the order saved), record what it became
-		// so the cause is visible in the order notes instead of failing silently.
-		if ( PrepOrderStatus::STATUS !== $order->get_status() ) {
-			$order->add_order_note(
-				sprintf(
-					/* translators: %s: the order status WooCommerce kept instead */
-					__( 'Note: the "Prep / label only" status could not be applied — order saved as "%s" instead.', 'fastnutrition-mealprep' ),
-					$order->get_status()
-				)
-			);
-			$order->save();
-		}
+		self::maybe_note_status_mismatch( $order, PrepOrderStatus::STATUS );
 
 		return $order;
 	}
