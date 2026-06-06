@@ -3,6 +3,7 @@ declare( strict_types=1 );
 
 namespace FastNutrition\MealPrep\Admin;
 
+use FastNutrition\MealPrep\InStore\PrepOrderStatus;
 use FastNutrition\MealPrep\Labels\LabelPrinter;
 
 final class LabelsAdmin {
@@ -245,7 +246,7 @@ final class LabelsAdmin {
 		}
 		$orders = wc_get_orders(
 			[
-				'status'   => [ 'processing', 'completed', 'on-hold' ],
+				'status'   => PrepOrderStatus::active_statuses(),
 				'limit'    => -1,
 				'meta_key' => '_fn_fulfilment',
 				'orderby'  => 'date',

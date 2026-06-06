@@ -158,7 +158,15 @@ A fast, touch-first screen (works well on an iPad) that lets staff take phone an
 * **Settings:** *Meal Prep → Quick Order Settings* — tick which products appear in the Quick Order screen and which appear in the Quick Label Maker (any product with the Meal Builder or a Standalone Product enabled is listed; the two lists are independent), plus the confirmation-email default.
 
 ### Quick Label Maker
-*Meal Prep → Quick Label Maker* is the same touch screen, but on submit it produces a **labels PDF** (opened in a new tab to print) **without creating a WooCommerce order**. Use it to print meal labels on demand. The flow is identical to Quick Order — build the meals, enter the customer name (required) + optional phone, pick collection/delivery + slot, and set paid / not-paid + method (this prints on the label) — minus the customer-email option. Labels are built from an in-memory order so they are byte-identical to an order's labels (summary + one label per meal, with macros and USE BY). Phone is optional on both the Quick Order and Quick Label Maker screens.
+*Meal Prep → Quick Label Maker* is the same touch screen, but on submit it produces a **labels PDF** (opened in a new tab to print). By default it creates **no WooCommerce order**. The flow is identical to Quick Order — build the meals, enter the customer name (required) + optional phone, pick collection/delivery + slot, and set paid / not-paid + method (this prints on the label) — minus the customer-email option. Labels are byte-identical to an order's labels (summary + one label per meal, with macros and USE BY). Phone is optional on both the Quick Order and Quick Label Maker screens.
+
+* **Also add to prep sheet (opt-in):** tick this on the review step to have the batch also feed the kitchen. It creates a real order in a dedicated **"Prep / label only"** status that is **excluded from sales/analytics**, reduces no stock and sends no emails — so the meals show up in the prep dashboard, prep sheet, ingredient totals and slot capacity, while never counting as revenue. These orders appear in *WooCommerce → Orders* with an amber **Label/Prep** badge.
+
+### Order cut-off (in-store vs website)
+The public website honours the **order cut-off** time set under *Meal Prep → Settings* (default 18:00): after it, the earliest fulfilment date rolls forward a day. The **Quick Order** and **Quick Label Maker** tools use a relaxed **23:55** cut-off instead, so staff can still book tomorrow when taking orders in the evening. The one-day lead time still applies.
+
+### Sweet labels
+Sweets have variable shelf lives (made fresh or weeks ahead), so on a **sweet** meal label the **USE BY** line is printed **blank** for staff to date by hand, and the cook/reheat/storage guidance is omitted (the allergen-info pointer is kept). All other labels — built meals and set meals — are unchanged, with the auto-calculated USE BY and full storage line.
 
 ---
 
@@ -171,8 +179,10 @@ A fast, touch-first screen (works well on an iPad) that lets staff take phone an
 | `GET`  | `/slots?postcode=...&method=delivery|collection` | Returns available {date, slot} options for the next 14 days. |
 | `GET/POST` | `/custom-ingredients` | Logged-in users' custom macro-calculator ingredients. |
 | `GET/POST/DELETE` | `/favourites` | Manages saved meal combos. |
-| `GET`  | `/instore/config` | Quick Order screen hydration: product sets, payment methods, currency. *Requires `manage_woocommerce`.* |
+| `GET`  | `/instore/config?mode=order|label` | Quick Order/Label screen hydration: enabled products, payment methods, currency. *Requires `manage_woocommerce`.* |
+| `GET`  | `/instore/slots?postcode=...&method=...` | Same as `/slots` but with the relaxed in-store 23:55 cut-off. *Requires `manage_woocommerce`.* |
 | `POST` | `/instore/order` | Creates a WooCommerce order from the screen's basket via `InStore\OrderFactory`, attributed to the current user. *Requires `manage_woocommerce`.* |
+| `POST` | `/instore/labels` | Streams a labels PDF; with `add_to_prep`, first persists a non-sales "Prep / label only" order. *Requires `manage_woocommerce`.* |
 
 Store API extensions (namespace `fastnutrition-mealprep`):
 * Cart endpoint: `extensions.fastnutrition-mealprep.macros` — running macro totals.

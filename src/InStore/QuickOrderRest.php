@@ -3,6 +3,8 @@ declare( strict_types=1 );
 
 namespace FastNutrition\MealPrep\InStore;
 
+use FastNutrition\MealPrep\Delivery\Profile;
+use FastNutrition\MealPrep\Delivery\SlotAvailability;
 use FastNutrition\MealPrep\Labels\LabelPrinter;
 use FastNutrition\MealPrep\Products\AddOnMeta;
 use FastNutrition\MealPrep\Products\BundleMeta;
@@ -60,6 +62,33 @@ final class QuickOrderRest {
 				'callback'            => [ $this, 'create_labels' ],
 				'permission_callback' => [ $this, 'require_cap' ],
 			]
+		);
+
+		// In-store slot list: same data as the public /slots, but with the
+		// relaxed 23:55 cut-off so staff can book tomorrow all evening.
+		register_rest_route(
+			self::NS,
+			'/instore/slots',
+			[
+				'methods'             => 'GET',
+				'callback'            => [ $this, 'slots' ],
+				'permission_callback' => [ $this, 'require_cap' ],
+				'args'                => [
+					'postcode' => [ 'type' => 'string' ],
+					'method'   => [ 'type' => 'string' ],
+				],
+			]
+		);
+	}
+
+	public function slots( WP_REST_Request $req ): WP_REST_Response {
+		$postcode = (string) $req->get_param( 'postcode' );
+		$method   = (string) $req->get_param( 'method' );
+		$method   = in_array( $method, [ Profile::METHOD_DELIVERY, Profile::METHOD_COLLECTION ], true ) ? $method : null;
+
+		return new WP_REST_Response(
+			[ 'options' => SlotAvailability::options( $postcode, $method, InStoreSettings::INSTORE_CUTOFF ) ],
+			200
 		);
 	}
 
@@ -130,10 +159,11 @@ final class QuickOrderRest {
 			'lines'      => $body['lines'] ?? [],
 			'customer'   => $body['customer'] ?? [],
 			'fulfilment' => $body['fulfilment'] ?? [],
-			'payment'    => (string) ( $body['payment'] ?? '' ),
-			'paid'       => ! empty( $body['paid'] ),
-			'send_email' => ! empty( $body['send_email'] ),
-			'staff'      => [
+			'payment'      => (string) ( $body['payment'] ?? '' ),
+			'paid'         => ! empty( $body['paid'] ),
+			'send_email'   => ! empty( $body['send_email'] ),
+			'add_to_prep'  => ! empty( $body['add_to_prep'] ),
+			'staff'        => [
 				'id'   => (int) $user->ID,
 				'name' => (string) ( $user->display_name ?: $user->user_login ),
 			],
@@ -163,7 +193,12 @@ final class QuickOrderRest {
 	 * failure it returns a normal REST error.
 	 */
 	public function create_labels( WP_REST_Request $req ): WP_Error {
-		$order = OrderFactory::assemble_for_labels( $this->payload_from( $req ) );
+		$payload = $this->payload_from( $req );
+		// When staff opt in, persist a non-sales "Prep / label only" order so the
+		// meals feed the prep sheet; otherwise keep the order purely in memory.
+		$order = ! empty( $payload['add_to_prep'] )
+			? OrderFactory::create_prep_order( $payload )
+			: OrderFactory::assemble_for_labels( $payload );
 		if ( is_wp_error( $order ) ) {
 			return $order;
 		}

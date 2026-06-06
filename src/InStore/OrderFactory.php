@@ -90,6 +90,43 @@ final class OrderFactory {
 	}
 
 	/**
+	 * Create a persisted "Prep / label only" order from the same payload.
+	 *
+	 * Used by the Quick Label Maker when staff opt to add the batch to the prep
+	 * sheet. It is a real order so it flows through the prep totals, pick list,
+	 * slot capacity and label reprints — but it is parked in the non-sales
+	 * PrepOrderStatus, so it never counts toward revenue/analytics, reduces no
+	 * stock and sends no emails. The paid/unpaid choice is still honoured purely
+	 * so the label's PAID/UNPAID block renders correctly.
+	 *
+	 * @return WC_Order|WP_Error
+	 */
+	public static function create_prep_order( array $payload ) {
+		if ( ! function_exists( 'wc_create_order' ) ) {
+			return new WP_Error( 'fn_wc_unavailable', __( 'WooCommerce is not available.', 'fastnutrition-mealprep' ), [ 'status' => 503 ] );
+		}
+		$prep = self::prepare( $payload );
+		if ( is_wp_error( $prep ) ) {
+			return $prep;
+		}
+		// Park it in the prep-only status regardless of the paid/unpaid mapping.
+		$prep['status']    = PrepOrderStatus::STATUS;
+		$prep['prep_only'] = true;
+
+		$order = wc_create_order();
+		if ( is_wp_error( $order ) ) {
+			return $order;
+		}
+		self::apply( $order, $prep );
+
+		self::suppress_order_emails( true );
+		$order->save();
+		self::suppress_order_emails( false );
+
+		return $order;
+	}
+
+	/**
 	 * Build an in-memory (unsaved) order from the same payload, for the Quick
 	 * Label Maker. It is never persisted — it exists only so the label renderer
 	 * can produce identical labels (including the payment block) without
@@ -237,6 +274,9 @@ final class OrderFactory {
 		$order->update_meta_data( '_fn_offline_order', 'yes' );
 		$order->update_meta_data( '_fn_staff_name', sanitize_text_field( (string) ( $staff['name'] ?? '' ) ) );
 		$order->update_meta_data( '_fn_staff_id', (int) ( $staff['id'] ?? 0 ) );
+		if ( ! empty( $prep['prep_only'] ) ) {
+			$order->update_meta_data( '_fn_prep_only', 'yes' );
+		}
 
 		// Totals + status (in memory; the caller saves if persisting).
 		$order->calculate_totals();
@@ -315,7 +355,9 @@ final class OrderFactory {
 		if ( ! $profile || $profile['method'] !== $type ) {
 			return new WP_Error( 'fn_fulfilment_invalid', __( 'That slot is no longer available.', 'fastnutrition-mealprep' ), [ 'status' => 400 ] );
 		}
-		if ( BlockedDates::is_blocked( $date ) || $date < SlotAvailability::earliest_allowed_date() ) {
+		// In-store staff take orders all evening, so the cut-off is relaxed to
+		// 23:55 here (the public website keeps its configured cut-off).
+		if ( BlockedDates::is_blocked( $date ) || $date < SlotAvailability::earliest_allowed_date( InStoreSettings::INSTORE_CUTOFF ) ) {
 			return new WP_Error( 'fn_fulfilment_date', __( 'That date can no longer be selected.', 'fastnutrition-mealprep' ), [ 'status' => 400 ] );
 		}
 		return [

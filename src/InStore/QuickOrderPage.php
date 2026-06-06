@@ -79,7 +79,8 @@ final class QuickOrderPage {
 			'mode'      => $mode,
 			'restUrl'   => esc_url_raw( rest_url( 'fastnutrition/v1/instore/' ) ),
 			'v1Url'     => esc_url_raw( rest_url( 'fastnutrition/v1/' ) ),
-			'slotsUrl'  => esc_url_raw( rest_url( 'fastnutrition/v1/slots' ) ),
+			// In-store slots use the relaxed 23:55 cut-off (staff take orders all evening).
+			'slotsUrl'  => esc_url_raw( rest_url( 'fastnutrition/v1/instore/slots' ) ),
 			'nonce'     => wp_create_nonce( 'wp_rest' ),
 			'exitUrl'   => esc_url_raw( admin_url() ),
 			'currency'  => self::currency_symbol(),

@@ -25,6 +25,7 @@ use FastNutrition\MealPrep\Checkout\StoreApiExtensions;
 use FastNutrition\MealPrep\Delivery\BlockedDates;
 use FastNutrition\MealPrep\InStore\InStoreSettings;
 use FastNutrition\MealPrep\InStore\OrdersListColumn;
+use FastNutrition\MealPrep\InStore\PrepOrderStatus;
 use FastNutrition\MealPrep\InStore\QuickOrderPage;
 use FastNutrition\MealPrep\InStore\QuickOrderRest;
 use FastNutrition\MealPrep\Delivery\Profile;
@@ -102,6 +103,7 @@ final class Plugin {
 
 		// In-Store Quick Order (offline / phone order entry).
 		( new InStoreSettings() )->register();
+		( new PrepOrderStatus() )->register();
 		( new QuickOrderRest() )->register();
 		( new QuickOrderPage() )->register();
 		( new OrdersListColumn() )->register();

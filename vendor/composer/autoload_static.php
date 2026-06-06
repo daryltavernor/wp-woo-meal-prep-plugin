@@ -250,6 +250,7 @@ class ComposerStaticInita137623878dc30cbd11bee5e0cb9930d
         'FastNutrition\\MealPrep\\InStore\\InStoreSettings' => __DIR__ . '/../..' . '/src/InStore/InStoreSettings.php',
         'FastNutrition\\MealPrep\\InStore\\OrderFactory' => __DIR__ . '/../..' . '/src/InStore/OrderFactory.php',
         'FastNutrition\\MealPrep\\InStore\\OrdersListColumn' => __DIR__ . '/../..' . '/src/InStore/OrdersListColumn.php',
+        'FastNutrition\\MealPrep\\InStore\\PrepOrderStatus' => __DIR__ . '/../..' . '/src/InStore/PrepOrderStatus.php',
         'FastNutrition\\MealPrep\\InStore\\QuickOrderPage' => __DIR__ . '/../..' . '/src/InStore/QuickOrderPage.php',
         'FastNutrition\\MealPrep\\InStore\\QuickOrderRest' => __DIR__ . '/../..' . '/src/InStore/QuickOrderRest.php',
         'FastNutrition\\MealPrep\\Install\\Activator' => __DIR__ . '/../..' . '/src/Install/Activator.php',

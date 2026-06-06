@@ -81,6 +81,18 @@ final class OrdersListColumn {
 			return;
 		}
 		$staff = (string) $order->get_meta( '_fn_staff_name' );
+
+		// Prep / label-only orders (from the Quick Label Maker) get their own
+		// amber badge so staff don't mistake them for sellable in-store orders.
+		if ( 'yes' === $order->get_meta( '_fn_prep_only' ) ) {
+			printf(
+				'<span title="%1$s" style="display:inline-block;padding:2px 8px;border-radius:10px;background:#dba617;color:#fff;font-weight:600;font-size:11px;line-height:1.6">%2$s</span>',
+				esc_attr( '' !== $staff ? sprintf( /* translators: %s: staff member */ __( 'Prep / label only — by %s', 'fastnutrition-mealprep' ), $staff ) : __( 'Prep / label only (no sale)', 'fastnutrition-mealprep' ) ),
+				esc_html__( 'Label/Prep', 'fastnutrition-mealprep' )
+			);
+			return;
+		}
+
 		printf(
 			'<span title="%1$s" style="display:inline-block;padding:2px 8px;border-radius:10px;background:#c6f432;color:#16210a;font-weight:600;font-size:11px;line-height:1.6">%2$s</span>',
 			esc_attr( '' !== $staff ? sprintf( /* translators: %s: staff member */ __( 'Taken by %s', 'fastnutrition-mealprep' ), $staff ) : __( 'In-store order', 'fastnutrition-mealprep' ) ),

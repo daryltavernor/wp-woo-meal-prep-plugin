@@ -115,6 +115,7 @@ return array(
     'FastNutrition\\MealPrep\\InStore\\InStoreSettings' => $baseDir . '/src/InStore/InStoreSettings.php',
     'FastNutrition\\MealPrep\\InStore\\OrderFactory' => $baseDir . '/src/InStore/OrderFactory.php',
     'FastNutrition\\MealPrep\\InStore\\OrdersListColumn' => $baseDir . '/src/InStore/OrdersListColumn.php',
+    'FastNutrition\\MealPrep\\InStore\\PrepOrderStatus' => $baseDir . '/src/InStore/PrepOrderStatus.php',
     'FastNutrition\\MealPrep\\InStore\\QuickOrderPage' => $baseDir . '/src/InStore/QuickOrderPage.php',
     'FastNutrition\\MealPrep\\InStore\\QuickOrderRest' => $baseDir . '/src/InStore/QuickOrderRest.php',
     'FastNutrition\\MealPrep\\Install\\Activator' => $baseDir . '/src/Install/Activator.php',

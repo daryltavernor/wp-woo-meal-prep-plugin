@@ -63,6 +63,18 @@ final class SelectionTest extends TestCase {
 		$this->assertSame( [], Selection::ingredient_ids( [ 'mode' => 'build' ] ) );
 	}
 
+	public function test_is_sweet_detects_standalone_and_legacy(): void {
+		$this->assertTrue( Selection::is_sweet( [ 'mode' => 'standalone', 'item_id' => 1, 'item_type' => 'sweet' ] ) );
+		$this->assertTrue( Selection::is_sweet( [ 'mode' => 'sweet', 'sweet_id' => 9 ] ) );
+	}
+
+	public function test_is_sweet_false_for_meals_and_set_meals(): void {
+		$this->assertFalse( Selection::is_sweet( [ 'mode' => 'standalone', 'item_id' => 1, 'item_type' => 'set_meal' ] ) );
+		$this->assertFalse( Selection::is_sweet( [ 'mode' => 'set', 'set_meal_id' => 7 ] ) );
+		$this->assertFalse( Selection::is_sweet( [ 'mode' => 'build', 'protein_id' => 1 ] ) );
+		$this->assertFalse( Selection::is_sweet( [] ) );
+	}
+
 	public function test_zero_greens_ids_are_skipped(): void {
 		$sel = [
 			'mode'       => 'build',

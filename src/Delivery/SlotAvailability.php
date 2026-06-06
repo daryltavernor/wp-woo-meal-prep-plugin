@@ -5,6 +5,7 @@ namespace FastNutrition\MealPrep\Delivery;
 
 use DateTimeImmutable;
 use FastNutrition\MealPrep\Admin\SettingsPage;
+use FastNutrition\MealPrep\InStore\PrepOrderStatus;
 
 final class SlotAvailability {
 
@@ -22,10 +23,14 @@ final class SlotAvailability {
 	 * If a daily cut-off is configured and the current local time is at or
 	 * past the cut-off, tomorrow is skipped — earliest becomes day-after-
 	 * tomorrow. E.g. cut-off 18:00, 18:01 on Monday → earliest is Wednesday.
+	 *
+	 * Pass $cutoff_override to use a different cut-off than the configured one
+	 * (the in-store tools pass 23:55 so staff can still book tomorrow all
+	 * evening). Pass '' to disable the cut-off entirely (earliest = tomorrow).
 	 */
-	public static function earliest_allowed_date(): string {
+	public static function earliest_allowed_date( ?string $cutoff_override = null ): string {
 		$now    = new DateTimeImmutable( 'now', wp_timezone() );
-		$cutoff = SettingsPage::order_cutoff();
+		$cutoff = null !== $cutoff_override ? $cutoff_override : SettingsPage::order_cutoff();
 		$offset = 1;
 		if ( '' !== $cutoff ) {
 			[ $h, $m ]    = explode( ':', $cutoff );
@@ -42,9 +47,10 @@ final class SlotAvailability {
 	 *
 	 * @param string $postcode
 	 * @param string|null $method 'delivery' | 'collection' | null (both)
+	 * @param string|null $cutoff_override Optional cut-off override (see earliest_allowed_date()).
 	 * @return array<int,array{date:string,day_label:string,method:string,profile_id:int,profile_name:string,slots:array<int,array{start:string,end:string,remaining:int|null}>}>
 	 */
-	public static function options( string $postcode, ?string $method = null ): array {
+	public static function options( string $postcode, ?string $method = null, ?string $cutoff_override = null ): array {
 		$postcode = ProfileResolver::normalize( $postcode );
 		$profiles = ProfileResolver::match_postcode( $postcode );
 		if ( $method ) {
@@ -54,7 +60,7 @@ final class SlotAvailability {
 			return [];
 		}
 
-		$start = new DateTimeImmutable( self::earliest_allowed_date(), wp_timezone() );
+		$start = new DateTimeImmutable( self::earliest_allowed_date( $cutoff_override ), wp_timezone() );
 		$out   = [];
 
 		for ( $i = 0; $i <= self::WINDOW_DAYS; $i++ ) {
@@ -101,7 +107,7 @@ final class SlotAvailability {
 	private static function count_booked( int $profile_id, string $date, string $start, string $end ): int {
 		$orders = wc_get_orders(
 			[
-				'status'   => [ 'processing', 'completed', 'on-hold' ],
+				'status'   => PrepOrderStatus::active_statuses(),
 				'limit'    => -1,
 				'meta_key' => '_fn_fulfilment',
 				'return'   => 'ids',

@@ -802,6 +802,8 @@ function Review( {
 	totals,
 	sendEmail,
 	setSendEmail,
+	addToPrep,
+	setAddToPrep,
 	onSubmit,
 	busy,
 	err,
@@ -896,6 +898,30 @@ function Review( {
 								) }
 							</span>
 						) : null }
+					</label>
+				</section>
+			) }
+			{ IS_LABEL && (
+				<section>
+					<label className="fn-check">
+						<input
+							type="checkbox"
+							checked={ !! addToPrep }
+							onChange={ ( e ) =>
+								setAddToPrep( e.target.checked )
+							}
+						/>
+						{ __(
+							'Also add to prep sheet',
+							'fastnutrition-mealprep'
+						) }
+						<span className="fn-hint">
+							{ ' ' }
+							{ __(
+								'(creates a no-sale prep order so the kitchen counts these meals)',
+								'fastnutrition-mealprep'
+							) }
+						</span>
 					</label>
 				</section>
 			) }
@@ -1034,6 +1060,8 @@ function App() {
 		paid: null,
 	} );
 	const [ sendEmail, setSendEmail ] = useState( false );
+	// Label mode only: also create a no-sale "prep / label only" order.
+	const [ addToPrep, setAddToPrep ] = useState( false );
 	const [ busy, setBusy ] = useState( false );
 	const [ err, setErr ] = useState( '' );
 	const [ done, setDone ] = useState( null );
@@ -1143,6 +1171,7 @@ function App() {
 		payment: details.payment,
 		paid: details.paid,
 		send_email: sendEmail && !! details.email,
+		add_to_prep: addToPrep,
 	} );
 
 	const openPdf = ( blob ) => {
@@ -1224,6 +1253,7 @@ function App() {
 		setStep( 'build' );
 		setSetKey( Object.keys( ( config && config.sets ) || {} )[ 0 ] || '' );
 		setSendEmail( config && config.send_email );
+		setAddToPrep( false );
 	};
 
 	if ( phase === 'loading' ) {
@@ -1392,6 +1422,8 @@ function App() {
 						totals={ totals }
 						sendEmail={ sendEmail }
 						setSendEmail={ setSendEmail }
+						addToPrep={ addToPrep }
+						setAddToPrep={ setAddToPrep }
 						onSubmit={ submit }
 						busy={ busy }
 						err={ err }

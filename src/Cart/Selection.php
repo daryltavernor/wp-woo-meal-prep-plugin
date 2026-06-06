@@ -71,6 +71,19 @@ final class Selection {
 	}
 
 	/**
+	 * True when the selection is a sweet — either a standalone product of type
+	 * 'sweet' or a legacy 'sweet'-mode line. Used to give sweet labels their own
+	 * treatment (blank USE BY, no storage/reheat text).
+	 */
+	public static function is_sweet( array $sel ): bool {
+		$mode = (string) ( $sel['mode'] ?? '' );
+		if ( 'sweet' === $mode ) {
+			return true; // Legacy.
+		}
+		return 'standalone' === $mode && 'sweet' === (string) ( $sel['item_type'] ?? '' );
+	}
+
+	/**
 	 * Human-readable description of the meal composition, e.g. "Chicken + Rice +
 	 * Broccoli" or "Peanut Butter Protein Flapjack". Used by the prep dashboard,
 	 * prep sheet and meal labels.

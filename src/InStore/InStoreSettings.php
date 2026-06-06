@@ -41,6 +41,14 @@ final class InStoreSettings {
 	public const STATUS_PAID   = 'completed';
 	public const STATUS_UNPAID = 'on-hold';
 
+	/**
+	 * Order cut-off used by the in-store tools (Quick Order + Quick Label Maker).
+	 * Staff take orders all evening, so the in-store cut-off is effectively
+	 * midnight (23:55) rather than the public website's configured cut-off — i.e.
+	 * tomorrow stays bookable right up to the end of the day.
+	 */
+	public const INSTORE_CUTOFF = '23:55';
+
 	public function register(): void {
 		add_action( 'admin_init', [ $this, 'handle_actions' ] );
 	}

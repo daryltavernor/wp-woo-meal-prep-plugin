@@ -4,6 +4,7 @@ declare( strict_types=1 );
 namespace FastNutrition\MealPrep\Admin;
 
 use FastNutrition\MealPrep\Cart\Selection;
+use FastNutrition\MealPrep\InStore\PrepOrderStatus;
 use FastNutrition\MealPrep\PostTypes\Ingredient;
 
 final class PrepSheet {
@@ -137,7 +138,7 @@ final class PrepSheet {
 	private static function collect_matched_by_date( string $date, string $method ): array {
 		$orders = wc_get_orders(
 			[
-				'status'   => [ 'processing', 'completed', 'on-hold' ],
+				'status'   => PrepOrderStatus::active_statuses(),
 				'limit'    => -1,
 				'meta_key' => '_fn_fulfilment',
 			]

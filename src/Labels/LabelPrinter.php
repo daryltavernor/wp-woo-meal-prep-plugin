@@ -5,6 +5,7 @@ namespace FastNutrition\MealPrep\Labels;
 
 use FastNutrition\MealPrep\Admin\PrepDashboard;
 use FastNutrition\MealPrep\Admin\SettingsPage;
+use FastNutrition\MealPrep\Cart\Selection;
 use FastNutrition\MealPrep\Cart\Selections;
 use FastNutrition\MealPrep\Macros\Calculator;
 
@@ -542,6 +543,13 @@ CSS;
 		$macros = is_array( $selection ) ? Calculator::macros_for_selection( (int) $item->get_product_id(), $selection ) : Calculator::EMPTY;
 		$addons = is_array( $selection ) && ! empty( $selection['addons'] ) ? array_filter( array_map( static fn( $a ) => (string) ( $a['label'] ?? '' ), (array) $selection['addons'] ) ) : [];
 		$ff     = $order->get_meta( '_fn_fulfilment' );
+		// Sweets carry their own (variable) shelf life, so staff write the USE BY
+		// by hand and the cook/reheat guidance doesn't apply — the allergen
+		// pointer is kept. All other items keep the standard storage line + an
+		// auto-calculated USE BY.
+		$is_sweet      = is_array( $selection ) && Selection::is_sweet( $selection );
+		$allergen_line = __( 'Allergens & prep: fastnutrition.co.uk/info/allergeninfo.pdf', 'fastnutrition-mealprep' );
+		$storage_line  = __( 'Refrigerate up to 3 days or freeze for 3 months · Microwave 3½ min to reheat', 'fastnutrition-mealprep' );
 		?>
 		<div class="label meal">
 			<div class="label-body">
@@ -565,13 +573,16 @@ CSS;
 					<?php echo (int) round( (float) $macros['fat_g'] ); ?>g Fat
 				</div>
 				<div class="lbl-fulfilment"><?php echo esc_html( self::format_fulfilment( $ff ) ); ?></div>
-				<?php $use_by = self::use_by_text( $ff ); ?>
-				<?php if ( '' !== $use_by ) : ?>
-					<div class="lbl-use-by"><strong><?php esc_html_e( 'USE BY:', 'fastnutrition-mealprep' ); ?></strong> <?php echo esc_html( $use_by ); ?></div>
+				<?php if ( $is_sweet ) : ?>
+					<div class="lbl-use-by"><strong><?php esc_html_e( 'USE BY:', 'fastnutrition-mealprep' ); ?></strong> </div>
+					<div class="lbl-fineprint"><?php echo esc_html( $allergen_line ); ?></div>
+				<?php else : ?>
+					<?php $use_by = self::use_by_text( $ff ); ?>
+					<?php if ( '' !== $use_by ) : ?>
+						<div class="lbl-use-by"><strong><?php esc_html_e( 'USE BY:', 'fastnutrition-mealprep' ); ?></strong> <?php echo esc_html( $use_by ); ?></div>
+					<?php endif; ?>
+					<div class="lbl-fineprint"><?php echo esc_html( $storage_line . ' · ' . $allergen_line ); ?></div>
 				<?php endif; ?>
-				<div class="lbl-fineprint">
-					<?php esc_html_e( 'Refrigerate up to 3 days or freeze for 3 months · Microwave 3½ min to reheat · Allergens & prep: fastnutrition.co.uk/info/allergeninfo.pdf', 'fastnutrition-mealprep' ); ?>
-				</div>
 			</div>
 			<?php self::render_foot( $brand ); ?>
 		</div>

@@ -3,6 +3,7 @@ declare( strict_types=1 );
 
 namespace FastNutrition\MealPrep\Cart;
 
+use FastNutrition\MealPrep\InStore\PrepOrderStatus;
 use FastNutrition\MealPrep\Macros\Calculator;
 use WC_Order_Item_Product;
 
@@ -86,7 +87,7 @@ final class OrderItemMeta {
 
 		$orders = wc_get_orders(
 			[
-				'status'     => [ 'processing', 'completed' ],
+				'status'     => [ 'processing', 'completed', PrepOrderStatus::STATUS ],
 				'limit'      => -1,
 				'meta_key'   => '_fn_fulfilment',
 				'return'     => 'ids',
