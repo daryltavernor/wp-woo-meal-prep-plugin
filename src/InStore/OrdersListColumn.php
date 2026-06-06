@@ -75,16 +75,23 @@ final class OrdersListColumn {
 		}
 	}
 
+	/** Is this a prep / label-only order (from the Quick Label Maker)? */
+	public static function is_prep_only( WC_Order $order ): bool {
+		// Either signal is sufficient — they're set together, but checking both
+		// keeps the badge correct even if one didn't take.
+		return 'yes' === $order->get_meta( '_fn_prep_only' ) || PrepOrderStatus::STATUS === $order->get_status();
+	}
+
 	/** Print the in-store badge (online orders render nothing). */
 	private function badge( WC_Order $order ): void {
-		if ( ! self::is_offline( $order ) ) {
+		if ( ! self::is_offline( $order ) && ! self::is_prep_only( $order ) ) {
 			return;
 		}
 		$staff = (string) $order->get_meta( '_fn_staff_name' );
 
 		// Prep / label-only orders (from the Quick Label Maker) get their own
 		// amber badge so staff don't mistake them for sellable in-store orders.
-		if ( 'yes' === $order->get_meta( '_fn_prep_only' ) ) {
+		if ( self::is_prep_only( $order ) ) {
 			printf(
 				'<span title="%1$s" style="display:inline-block;padding:2px 8px;border-radius:10px;background:#dba617;color:#fff;font-weight:600;font-size:11px;line-height:1.6">%2$s</span>',
 				esc_attr( '' !== $staff ? sprintf( /* translators: %s: staff member */ __( 'Prep / label only — by %s', 'fastnutrition-mealprep' ), $staff ) : __( 'Prep / label only (no sale)', 'fastnutrition-mealprep' ) ),

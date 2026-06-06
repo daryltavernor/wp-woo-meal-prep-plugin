@@ -29,13 +29,14 @@ final class PrepOrderStatus {
 	}
 
 	public function register_status(): void {
+		// Mirrors how WooCommerce core registers its own order statuses, so
+		// WC_Order::set_status() accepts it and orders persist in this status.
 		register_post_status(
 			self::SLUG,
 			[
 				'label'                     => _x( 'Prep / label only', 'Order status', 'fastnutrition-mealprep' ),
 				'public'                    => false,
-				'internal'                  => false,
-				'exclude_from_search'       => true,
+				'exclude_from_search'       => false,
 				'show_in_admin_all_list'    => true,
 				'show_in_admin_status_list' => true,
 				/* translators: %s: order count */
