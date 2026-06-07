@@ -168,7 +168,9 @@ final class OrderFactory {
 			return $prep;
 		}
 		$order = new WC_Order();
-		self::apply( $order, $prep );
+		// Build in memory only — pass $calc_totals = false so calculate_totals()
+		// (which saves) never runs and no order is persisted for a label batch.
+		self::apply( $order, $prep, false );
 		return $order;
 	}
 
@@ -248,10 +250,15 @@ final class OrderFactory {
 	}
 
 	/**
-	 * Populate an order object from a prepared spec. Does NOT save — the caller
-	 * decides whether to persist (create) or keep it in memory (label maker).
+	 * Populate an order object from a prepared spec.
+	 *
+	 * NOTE: WooCommerce's WC_Order::calculate_totals() persists the order (it
+	 * calls save() internally). So when $calc_totals is true this WILL create/
+	 * save the order. The label-only path passes false to keep the order purely
+	 * in memory (labels don't show the order total), so generating labels never
+	 * leaves a phantom order in WooCommerce.
 	 */
-	private static function apply( WC_Order $order, array $prep ): void {
+	private static function apply( WC_Order $order, array $prep, bool $calc_totals = true ): void {
 		$order->set_created_via( 'fn_instore' );
 
 		// Line items, priced through the shared bundle pipeline.
@@ -303,8 +310,11 @@ final class OrderFactory {
 			$order->update_meta_data( '_fn_prep_only', 'yes' );
 		}
 
-		// Totals + status (in memory; the caller saves if persisting).
-		$order->calculate_totals();
+		// Totals. WC_Order::calculate_totals() saves the order, so the label-only
+		// path (which passes $calc_totals = false) skips it to stay in memory.
+		if ( $calc_totals ) {
+			$order->calculate_totals();
+		}
 		if ( $prep['paid'] ) {
 			$order->set_date_paid( time() );
 		}
