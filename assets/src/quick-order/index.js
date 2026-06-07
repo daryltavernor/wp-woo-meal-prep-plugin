@@ -1125,7 +1125,6 @@ function App() {
 		if (
 			! details.first_name.trim() ||
 			! details.last_name.trim() ||
-			! details.phone.trim() ||
 			! details.slot
 		) {
 			return false;
