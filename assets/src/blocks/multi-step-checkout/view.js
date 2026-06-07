@@ -556,6 +556,20 @@ function apply( root ) {
 		);
 	};
 
+	// When the customer moves between steps, jump to the top of the flow so the
+	// new step starts at the top of the view instead of wherever the previous
+	// step was scrolled to. Instant (no smooth animation), per the brief. Only
+	// called on an explicit Next/Back/nav change — never from render() — so the
+	// MutationObserver's re-renders don't keep yanking the page upward.
+	const scrollToStepTop = () => {
+		const target = checkout.querySelector( '.fn-steps-nav' ) || checkout;
+		if ( target && typeof target.scrollIntoView === 'function' ) {
+			target.scrollIntoView();
+		} else {
+			window.scrollTo( 0, 0 );
+		}
+	};
+
 	nav.addEventListener( 'click', ( e ) => {
 		if ( e.target.tagName !== 'LI' ) {
 			return;
@@ -577,6 +591,7 @@ function apply( root ) {
 		}
 		active = target;
 		render();
+		scrollToStepTop();
 	} );
 	checkout.addEventListener( 'click', ( e ) => {
 		if ( e.target.classList.contains( 'fn-step-next' ) ) {
@@ -593,6 +608,7 @@ function apply( root ) {
 			if ( idx < STEPS.length - 1 ) {
 				active = STEPS[ idx + 1 ].key;
 				render();
+				scrollToStepTop();
 			}
 		}
 		if ( e.target.classList.contains( 'fn-step-back' ) ) {
@@ -607,6 +623,7 @@ function apply( root ) {
 			}
 			active = STEPS[ idx - 1 ].key;
 			render();
+			scrollToStepTop();
 		}
 	} );
 
