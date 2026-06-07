@@ -147,6 +147,9 @@ Three sections: Ingredient totals · Per-order pick list (with tick-off checkbox
 ### Customer favourites
 Logged-in customers can save meal combos to their account and re-add them with a single click from *My Account → Favourites*.
 
+### Reorder (WooCommerce "Order again")
+When a logged-in customer uses WooCommerce's native **Order again** on a past order, the full meal composition is restored to the cart — protein/carb/greens, set meal or standalone item, **plus any add-ons** — for both meal-builder and standalone products. Bundle pricing reapplies automatically from the re-added quantities, and everything is re-priced at **today's** prices. Each line is re-validated against the live catalogue: any meal whose ingredient/item is no longer published or active is skipped, and the customer gets a single notice listing what to rebuild. (Orders placed before meal selections were stored can't be reconstructed.)
+
 ### Quick Order (staff / phone orders)
 A fast, touch-first screen (works well on an iPad) that lets staff take phone and walk-in orders straight into WooCommerce — no checkout flow. It creates a **real** WooCommerce order that appears in *WooCommerce → Orders* exactly like an online one, reusing the same line pricing, bundle tiers, meal-composition meta and `_fn_fulfilment` slot data, so kitchen prep lists and reporting never fork.
 

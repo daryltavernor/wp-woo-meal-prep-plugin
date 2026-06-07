@@ -15,11 +15,17 @@ final class Selections {
 	public function register(): void {
 		add_filter( 'woocommerce_add_cart_item_data', [ $this, 'attach_selection' ], 10, 3 );
 		add_filter( 'woocommerce_get_item_data', [ $this, 'display_selection' ], 10, 2 );
-		add_filter( 'woocommerce_add_to_cart_validation', [ $this, 'validate' ], 10, 3 );
+		add_filter( 'woocommerce_add_to_cart_validation', [ $this, 'validate' ], 10, 6 );
 	}
 
 	public function attach_selection( array $cart_item_data, int $product_id, int $variation_id ): array {
 		if ( ! MealProduct::is_configurable( $product_id ) ) {
+			return $cart_item_data;
+		}
+
+		// Respect a selection already attached upstream (e.g. by the Reorder
+		// handler) — don't overwrite it with an empty build from a blank request.
+		if ( ! empty( $cart_item_data[ self::CART_KEY ] ) ) {
 			return $cart_item_data;
 		}
 
@@ -41,24 +47,32 @@ final class Selections {
 		return $cart_item_data;
 	}
 
-	public function validate( bool $passed, int $product_id, int $quantity ): bool {
+	public function validate( bool $passed, int $product_id, int $quantity, int $variation_id = 0, array $variations = [], array $cart_item_data = [] ): bool {
+		unset( $quantity, $variation_id, $variations );
 		if ( ! MealProduct::is_configurable( $product_id ) ) {
 			return $passed;
 		}
-		$raw = isset( $_REQUEST['fn_selection'] )
-			? ( is_string( $_REQUEST['fn_selection'] ) ? json_decode( wp_unslash( (string) $_REQUEST['fn_selection'] ), true ) : (array) wp_unslash( $_REQUEST['fn_selection'] ) )
-			: [];
-		$raw = is_array( $raw ) ? $raw : [];
-		$selection = self::normalize( $product_id, $raw );
+
+		// During a reorder, a failed line is reported once by Reorder (a combined
+		// "no longer available" notice) rather than a per-line "please choose…"
+		// error, so stay quiet here and just record the product.
+		$fail = static function ( string $message ) use ( $product_id ): bool {
+			if ( Reorder::is_active() ) {
+				Reorder::record_skipped( $product_id );
+			} else {
+				wc_add_notice( $message, 'error' );
+			}
+			return false;
+		};
+
+		$selection = self::normalize( $product_id, self::read_raw_selection( $cart_item_data ) );
 
 		if ( empty( $selection ) ) {
-			wc_add_notice(
+			return $fail(
 				StandaloneProduct::is_enabled( $product_id )
 					? __( 'Please choose an option before adding to cart.', 'fastnutrition-mealprep' )
-					: __( 'Please choose your meal ingredients before adding to cart.', 'fastnutrition-mealprep' ),
-				'error'
+					: __( 'Please choose your meal ingredients before adding to cart.', 'fastnutrition-mealprep' )
 			);
-			return false;
 		}
 
 		$mode = $selection['mode'] ?? '';
@@ -72,33 +86,44 @@ final class Selections {
 		$config = MealProduct::get_config( $product_id );
 		if ( 'set' === $mode ) {
 			if ( ! $config['allow_set_meal_mode'] || empty( $selection['set_meal_id'] ) ) {
-				wc_add_notice( __( 'Please choose a valid set meal.', 'fastnutrition-mealprep' ), 'error' );
-				return false;
+				return $fail( __( 'Please choose a valid set meal.', 'fastnutrition-mealprep' ) );
 			}
 		} elseif ( 'build' === $mode ) {
 			if ( empty( $selection['protein_id'] ) ) {
-				wc_add_notice( __( 'Please choose a protein.', 'fastnutrition-mealprep' ), 'error' );
-				return false;
+				return $fail( __( 'Please choose a protein.', 'fastnutrition-mealprep' ) );
 			}
 			$greens = $selection['greens_ids'] ?? [];
 			if ( count( $greens ) === 2 && ! $config['allow_double_greens'] ) {
-				wc_add_notice( __( 'Double greens is not available for this meal.', 'fastnutrition-mealprep' ), 'error' );
-				return false;
+				return $fail( __( 'Double greens is not available for this meal.', 'fastnutrition-mealprep' ) );
 			}
 			if ( count( $greens ) !== 1 && count( $greens ) !== 2 ) {
-				wc_add_notice( __( 'Please choose your greens.', 'fastnutrition-mealprep' ), 'error' );
-				return false;
+				return $fail( __( 'Please choose your greens.', 'fastnutrition-mealprep' ) );
 			}
 			if ( count( $greens ) === 1 && empty( $selection['carb_id'] ) ) {
-				wc_add_notice( __( 'Please choose a carb, or pick a second greens.', 'fastnutrition-mealprep' ), 'error' );
-				return false;
+				return $fail( __( 'Please choose a carb, or pick a second greens.', 'fastnutrition-mealprep' ) );
 			}
 		} else {
-			wc_add_notice( __( 'Invalid meal selection.', 'fastnutrition-mealprep' ), 'error' );
-			return false;
+			return $fail( __( 'Invalid meal selection.', 'fastnutrition-mealprep' ) );
 		}
 
 		return $passed;
+	}
+
+	/**
+	 * The raw selection to validate: a selection already attached to the cart
+	 * item (e.g. by the Reorder handler) wins; otherwise read the request.
+	 */
+	private static function read_raw_selection( array $cart_item_data ): array {
+		if ( ! empty( $cart_item_data[ self::CART_KEY ] ) && is_array( $cart_item_data[ self::CART_KEY ] ) ) {
+			return $cart_item_data[ self::CART_KEY ];
+		}
+		if ( isset( $_REQUEST['fn_selection'] ) ) {
+			$raw = is_string( $_REQUEST['fn_selection'] )
+				? json_decode( wp_unslash( (string) $_REQUEST['fn_selection'] ), true )
+				: (array) wp_unslash( $_REQUEST['fn_selection'] );
+			return is_array( $raw ) ? $raw : [];
+		}
+		return [];
 	}
 
 	public function display_selection( array $item_data, array $cart_item ): array {

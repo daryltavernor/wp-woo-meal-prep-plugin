@@ -236,6 +236,7 @@ class ComposerStaticInita137623878dc30cbd11bee5e0cb9930d
         'FastNutrition\\MealPrep\\Cart\\BundlePricer' => __DIR__ . '/../..' . '/src/Cart/BundlePricer.php',
         'FastNutrition\\MealPrep\\Cart\\MealPricing' => __DIR__ . '/../..' . '/src/Cart/MealPricing.php',
         'FastNutrition\\MealPrep\\Cart\\OrderItemMeta' => __DIR__ . '/../..' . '/src/Cart/OrderItemMeta.php',
+        'FastNutrition\\MealPrep\\Cart\\Reorder' => __DIR__ . '/../..' . '/src/Cart/Reorder.php',
         'FastNutrition\\MealPrep\\Cart\\Selection' => __DIR__ . '/../..' . '/src/Cart/Selection.php',
         'FastNutrition\\MealPrep\\Cart\\Selections' => __DIR__ . '/../..' . '/src/Cart/Selections.php',
         'FastNutrition\\MealPrep\\Cart\\Surcharge' => __DIR__ . '/../..' . '/src/Cart/Surcharge.php',

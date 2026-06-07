@@ -101,6 +101,7 @@ return array(
     'FastNutrition\\MealPrep\\Cart\\BundlePricer' => $baseDir . '/src/Cart/BundlePricer.php',
     'FastNutrition\\MealPrep\\Cart\\MealPricing' => $baseDir . '/src/Cart/MealPricing.php',
     'FastNutrition\\MealPrep\\Cart\\OrderItemMeta' => $baseDir . '/src/Cart/OrderItemMeta.php',
+    'FastNutrition\\MealPrep\\Cart\\Reorder' => $baseDir . '/src/Cart/Reorder.php',
     'FastNutrition\\MealPrep\\Cart\\Selection' => $baseDir . '/src/Cart/Selection.php',
     'FastNutrition\\MealPrep\\Cart\\Selections' => $baseDir . '/src/Cart/Selections.php',
     'FastNutrition\\MealPrep\\Cart\\Surcharge' => $baseDir . '/src/Cart/Surcharge.php',
