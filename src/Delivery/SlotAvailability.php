@@ -110,15 +110,18 @@ final class SlotAvailability {
 	}
 
 	/**
-	 * Booked-slot counts for every active order, as a nested map:
+	 * Booked-slot counts for upcoming orders, as a nested map:
 	 *   [ profile_id ][ 'Y-m-d' ][ 'start|end' ] => count.
 	 *
-	 * Built in ONE pass and cached until an order is created or changes status
-	 * (see flush_bookings_cache()). This replaces the previous design, where the
-	 * count was recomputed for every (day × profile × slot) combination and each
-	 * recomputation loaded every fulfilment order — so a single /slots request
-	 * scanned the whole order table dozens of times. Now it scans once, then
-	 * serves from cache until the underlying bookings actually change.
+	 * Cached until an order is created or changes status (see
+	 * flush_bookings_cache()) and — crucially — built from only the RECENT orders
+	 * that can still affect upcoming slot capacity, never the full order history.
+	 * A customer can only book within [lead time, WINDOW_DAYS], so any order whose
+	 * fulfilment date is still in the future was necessarily created within that
+	 * same window; a date_created lower bound therefore captures all of them. This
+	 * keeps the scan constant-time regardless of total order count (15k+ and
+	 * growing), with no flat date column, no backfill migration, and no object
+	 * cache required.
 	 *
 	 * @return array<int,array<string,array<string,int>>>
 	 */
@@ -130,17 +133,21 @@ final class SlotAvailability {
 			return $cached;
 		}
 
-		// Past bookings never affect remaining capacity (options() only looks up
-		// dates from tomorrow onward), so drop them. This keeps the cached map
-		// small — important with transients stored in the DB (no object cache).
-		$today  = ( new DateTimeImmutable( 'now', wp_timezone() ) )->format( 'Y-m-d' );
+		$today = ( new DateTimeImmutable( 'now', wp_timezone() ) )->format( 'Y-m-d' );
+
+		// Only orders created within the booking window can still carry a future
+		// fulfilment date; anything older is necessarily in the past. The margin
+		// keeps us safe against cut-off offsets and timezone slop.
+		$lookback = ( self::WINDOW_DAYS + 21 ) * DAY_IN_SECONDS;
+
 		$map    = [];
 		$orders = wc_get_orders(
 			[
-				'status'   => PrepOrderStatus::active_statuses(),
-				'limit'    => -1,
-				'meta_key' => '_fn_fulfilment',
-				'return'   => 'ids',
+				'status'       => PrepOrderStatus::active_statuses(),
+				'limit'        => -1,
+				'meta_key'     => '_fn_fulfilment',
+				'date_created' => '>=' . ( time() - $lookback ),
+				'return'       => 'ids',
 			]
 		);
 		foreach ( $orders as $oid ) {
