@@ -12,7 +12,11 @@ final class SlotAvailability {
 	public const WINDOW_DAYS = 14;
 
 	public function register(): void {
-		// Data class only.
+		// Booking counts are cached (see bookings_map()); bust that cache whenever
+		// an order is created or changes status so slot capacity stays exact
+		// without re-scanning every order on each slot-picker request.
+		add_action( 'woocommerce_new_order', [ __CLASS__, 'flush_bookings_cache' ] );
+		add_action( 'woocommerce_order_status_changed', [ __CLASS__, 'flush_bookings_cache' ] );
 	}
 
 	/**
@@ -60,8 +64,9 @@ final class SlotAvailability {
 			return [];
 		}
 
-		$start = new DateTimeImmutable( self::earliest_allowed_date( $cutoff_override ), wp_timezone() );
-		$out   = [];
+		$start  = new DateTimeImmutable( self::earliest_allowed_date( $cutoff_override ), wp_timezone() );
+		$booked = self::bookings_map();
+		$out    = [];
 
 		for ( $i = 0; $i <= self::WINDOW_DAYS; $i++ ) {
 			$day     = $start->modify( "+{$i} days" );
@@ -78,7 +83,7 @@ final class SlotAvailability {
 				$slots = [];
 				foreach ( $profile['slots'] as $slot ) {
 					$capacity  = isset( $slot['capacity'] ) ? (int) $slot['capacity'] : null;
-					$remaining = null === $capacity ? null : max( 0, $capacity - self::count_booked( $profile['id'], $date, (string) $slot['start'], (string) $slot['end'] ) );
+					$remaining = null === $capacity ? null : max( 0, $capacity - ( $booked[ (int) $profile['id'] ][ $date ][ (string) $slot['start'] . '|' . (string) $slot['end'] ] ?? 0 ) );
 					if ( null !== $remaining && $remaining <= 0 ) {
 						continue;
 					}
@@ -104,7 +109,28 @@ final class SlotAvailability {
 		return $out;
 	}
 
-	private static function count_booked( int $profile_id, string $date, string $start, string $end ): int {
+	/**
+	 * Booked-slot counts for every active order, as a nested map:
+	 *   [ profile_id ][ 'Y-m-d' ][ 'start|end' ] => count.
+	 *
+	 * Built in ONE pass and cached until an order is created or changes status
+	 * (see flush_bookings_cache()). This replaces the previous design, where the
+	 * count was recomputed for every (day × profile × slot) combination and each
+	 * recomputation loaded every fulfilment order — so a single /slots request
+	 * scanned the whole order table dozens of times. Now it scans once, then
+	 * serves from cache until the underlying bookings actually change.
+	 *
+	 * @return array<int,array<string,array<string,int>>>
+	 */
+	private static function bookings_map(): array {
+		$version = \WC_Cache_Helper::get_transient_version( 'fn_slot_bookings' );
+		$key     = 'fn_slot_bookings_' . $version;
+		$cached  = get_transient( $key );
+		if ( is_array( $cached ) ) {
+			return $cached;
+		}
+
+		$map    = [];
 		$orders = wc_get_orders(
 			[
 				'status'   => PrepOrderStatus::active_statuses(),
@@ -113,7 +139,6 @@ final class SlotAvailability {
 				'return'   => 'ids',
 			]
 		);
-		$count = 0;
 		foreach ( $orders as $oid ) {
 			$o = wc_get_order( $oid );
 			if ( ! $o ) {
@@ -123,17 +148,24 @@ final class SlotAvailability {
 			if ( ! is_array( $ff ) ) {
 				continue;
 			}
-			if ( (int) ( $ff['profile_id'] ?? 0 ) !== $profile_id ) {
+			$pid  = (int) ( $ff['profile_id'] ?? 0 );
+			$date = (string) ( $ff['date'] ?? '' );
+			$slot = is_array( $ff['slot'] ?? null ) ? $ff['slot'] : [];
+			$skey = (string) ( $slot['start'] ?? '' ) . '|' . (string) ( $slot['end'] ?? '' );
+			if ( 0 === $pid || '' === $date || '|' === $skey ) {
 				continue;
 			}
-			if ( ( $ff['date'] ?? '' ) !== $date ) {
-				continue;
-			}
-			$slot = $ff['slot'] ?? [];
-			if ( ( $slot['start'] ?? '' ) === $start && ( $slot['end'] ?? '' ) === $end ) {
-				$count++;
-			}
+			$map[ $pid ][ $date ][ $skey ] = ( $map[ $pid ][ $date ][ $skey ] ?? 0 ) + 1;
 		}
-		return $count;
+
+		// Correctness comes from the version bump on order changes; the TTL is a
+		// safety backstop in case a bump is ever missed.
+		set_transient( $key, $map, HOUR_IN_SECONDS );
+		return $map;
+	}
+
+	/** Invalidate the cached booking counts (see bookings_map()). */
+	public static function flush_bookings_cache(): void {
+		\WC_Cache_Helper::get_transient_version( 'fn_slot_bookings', true );
 	}
 }
