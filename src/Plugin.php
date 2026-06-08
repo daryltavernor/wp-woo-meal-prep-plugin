@@ -36,6 +36,7 @@ use FastNutrition\MealPrep\Macros\Calculator;
 use FastNutrition\MealPrep\Macros\CustomIngredientStore;
 use FastNutrition\MealPrep\Macros\ShortcodeCalculator;
 use FastNutrition\MealPrep\PostTypes\Ingredient;
+use FastNutrition\MealPrep\PostTypes\IngredientCatalog;
 use FastNutrition\MealPrep\Products\AddOnMeta;
 use FastNutrition\MealPrep\Products\BundleMeta;
 use FastNutrition\MealPrep\Products\MealProduct;
@@ -62,6 +63,7 @@ final class Plugin {
 		( new IngredientType() )->register();
 		( new Allergen() )->register();
 		( new Ingredient() )->register();
+		( new IngredientCatalog() )->register();
 
 		( new MealProduct() )->register();
 		( new StandaloneProduct() )->register();

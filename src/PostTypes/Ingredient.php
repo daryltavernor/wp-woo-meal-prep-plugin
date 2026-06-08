@@ -347,6 +347,12 @@ final class Ingredient {
 	}
 
 	public static function get_macros( int $ingredient_id ): array {
+		// Served from the cached catalogue on the hot path (cart/checkout/emails);
+		// falls back to a direct read for ids not in the published catalogue.
+		$cached = IngredientCatalog::macros( $ingredient_id );
+		if ( null !== $cached ) {
+			return $cached;
+		}
 		$macros = get_post_meta( $ingredient_id, '_fn_macros', true );
 		$macros = is_array( $macros ) ? $macros : [];
 		return [

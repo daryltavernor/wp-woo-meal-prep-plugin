@@ -127,6 +127,7 @@ return array(
     'FastNutrition\\MealPrep\\Macros\\ShortcodeCalculator' => $baseDir . '/src/Macros/ShortcodeCalculator.php',
     'FastNutrition\\MealPrep\\Plugin' => $baseDir . '/src/Plugin.php',
     'FastNutrition\\MealPrep\\PostTypes\\Ingredient' => $baseDir . '/src/PostTypes/Ingredient.php',
+    'FastNutrition\\MealPrep\\PostTypes\\IngredientCatalog' => $baseDir . '/src/PostTypes/IngredientCatalog.php',
     'FastNutrition\\MealPrep\\Products\\AddOnMeta' => $baseDir . '/src/Products/AddOnMeta.php',
     'FastNutrition\\MealPrep\\Products\\BundleMeta' => $baseDir . '/src/Products/BundleMeta.php',
     'FastNutrition\\MealPrep\\Products\\MealProduct' => $baseDir . '/src/Products/MealProduct.php',

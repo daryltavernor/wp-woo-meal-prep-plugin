@@ -3,6 +3,8 @@ declare( strict_types=1 );
 
 namespace FastNutrition\MealPrep\Cart;
 
+use FastNutrition\MealPrep\PostTypes\IngredientCatalog;
+
 /**
  * Central interpreter for a normalised `_fn_selection` array.
  *
@@ -166,7 +168,9 @@ final class Selection {
 	public static function price_delta( array $sel ): float {
 		$delta = 0.0;
 		foreach ( self::ingredient_ids( $sel ) as $id ) {
-			$delta += (float) get_post_meta( $id, '_fn_price_delta', true );
+			// Cached catalogue on the hot path; direct read for ids not published.
+			$cached = IngredientCatalog::price_delta( $id );
+			$delta += null !== $cached ? $cached : (float) get_post_meta( $id, '_fn_price_delta', true );
 		}
 		foreach ( (array) ( $sel['addons'] ?? [] ) as $addon ) {
 			$delta += (float) ( $addon['price'] ?? 0 );

@@ -262,6 +262,7 @@ class ComposerStaticInita137623878dc30cbd11bee5e0cb9930d
         'FastNutrition\\MealPrep\\Macros\\ShortcodeCalculator' => __DIR__ . '/../..' . '/src/Macros/ShortcodeCalculator.php',
         'FastNutrition\\MealPrep\\Plugin' => __DIR__ . '/../..' . '/src/Plugin.php',
         'FastNutrition\\MealPrep\\PostTypes\\Ingredient' => __DIR__ . '/../..' . '/src/PostTypes/Ingredient.php',
+        'FastNutrition\\MealPrep\\PostTypes\\IngredientCatalog' => __DIR__ . '/../..' . '/src/PostTypes/IngredientCatalog.php',
         'FastNutrition\\MealPrep\\Products\\AddOnMeta' => __DIR__ . '/../..' . '/src/Products/AddOnMeta.php',
         'FastNutrition\\MealPrep\\Products\\BundleMeta' => __DIR__ . '/../..' . '/src/Products/BundleMeta.php',
         'FastNutrition\\MealPrep\\Products\\MealProduct' => __DIR__ . '/../..' . '/src/Products/MealProduct.php',
