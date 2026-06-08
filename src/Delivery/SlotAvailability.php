@@ -130,6 +130,10 @@ final class SlotAvailability {
 			return $cached;
 		}
 
+		// Past bookings never affect remaining capacity (options() only looks up
+		// dates from tomorrow onward), so drop them. This keeps the cached map
+		// small — important with transients stored in the DB (no object cache).
+		$today  = ( new DateTimeImmutable( 'now', wp_timezone() ) )->format( 'Y-m-d' );
 		$map    = [];
 		$orders = wc_get_orders(
 			[
@@ -152,7 +156,7 @@ final class SlotAvailability {
 			$date = (string) ( $ff['date'] ?? '' );
 			$slot = is_array( $ff['slot'] ?? null ) ? $ff['slot'] : [];
 			$skey = (string) ( $slot['start'] ?? '' ) . '|' . (string) ( $slot['end'] ?? '' );
-			if ( 0 === $pid || '' === $date || '|' === $skey ) {
+			if ( 0 === $pid || '' === $date || '|' === $skey || $date < $today ) {
 				continue;
 			}
 			$map[ $pid ][ $date ][ $skey ] = ( $map[ $pid ][ $date ][ $skey ] ?? 0 ) + 1;
