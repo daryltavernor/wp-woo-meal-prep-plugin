@@ -59,10 +59,12 @@ final class AssetManager {
 	}
 
 	public function register_blocks(): void {
+		// 'multi-step-checkout' is intentionally NOT listed here: Checkout\MultiStep
+		// is its sole registrant (it also enqueues/localises that block). Listing it
+		// here too re-registers it on init → "block already registered" notice.
 		$blocks = [
 			'meal-builder',
 			'macro-calculator',
-			'multi-step-checkout',
 			'slot-picker',
 			'cart-totals-extras',
 		];
