@@ -1071,20 +1071,22 @@ function App() {
 		setConfig( cfg );
 		setSendEmail( !! cfg.send_email );
 		setSetKey( Object.keys( cfg.sets || {} )[ 0 ] || '' );
-		const [ p, c, g, s, sw ] = await Promise.all( [
-			apiV1( 'ingredients?type=protein' ),
-			apiV1( 'ingredients?type=carb' ),
-			apiV1( 'ingredients?type=greens' ),
-			apiV1( 'ingredients?type=set_meal' ),
-			apiV1( 'ingredients?type=sweet' ),
-		] );
-		setIngredients( {
-			protein: p,
-			carb: c,
-			greens: g,
-			set_meal: s,
-			sweet: sw,
+		// One request for the whole catalogue, grouped client-side by type,
+		// instead of five type-filtered round-trips.
+		const all = await apiV1( 'ingredients' );
+		const grouped = {
+			protein: [],
+			carb: [],
+			greens: [],
+			set_meal: [],
+			sweet: [],
+		};
+		( Array.isArray( all ) ? all : [] ).forEach( ( ing ) => {
+			if ( grouped[ ing.type ] ) {
+				grouped[ ing.type ].push( ing );
+			}
 		} );
+		setIngredients( grouped );
 		setPhase( 'ready' );
 	};
 
