@@ -151,20 +151,52 @@ final class RestController {
 			];
 		}
 		$posts = get_posts( $args );
-		$out   = [];
+
+		// get_posts() has already primed the object-term cache for this post
+		// type's taxonomies (IngredientType + Allergen) and the ingredient meta,
+		// so the term/meta reads below are cache-backed — no per-ingredient query.
+		// Featured images aren't primed, so bulk-prime the thumbnail attachments
+		// to stop get_the_post_thumbnail_url() loading each one on its own.
+		$thumb_ids = [];
 		foreach ( $posts as $p ) {
+			$tid = (int) get_post_thumbnail_id( (int) $p->ID );
+			if ( $tid > 0 ) {
+				$thumb_ids[] = $tid;
+			}
+		}
+		if ( ! empty( $thumb_ids ) ) {
+			_prime_post_caches( $thumb_ids, false, true );
+		}
+
+		$out = [];
+		foreach ( $posts as $p ) {
+			$id    = (int) $p->ID;
 			$out[] = [
-				'id'          => (int) $p->ID,
+				'id'          => $id,
 				'name'        => (string) $p->post_title,
-				'type'        => Ingredient::get_type_slug( (int) $p->ID ),
-				'tier'        => (string) ( get_post_meta( $p->ID, '_fn_tier', true ) ?: 'standard' ),
-				'macros'      => Ingredient::get_macros( (int) $p->ID ),
-				'price_delta' => (float) get_post_meta( $p->ID, '_fn_price_delta', true ),
-				'allergens'   => wp_get_post_terms( (int) $p->ID, Allergen::TAXONOMY, [ 'fields' => 'slugs' ] ),
-				'thumbnail'   => (string) get_the_post_thumbnail_url( (int) $p->ID, 'thumbnail' ),
+				'type'        => self::first_term_slug( $id, IngredientType::TAXONOMY ),
+				'tier'        => (string) ( get_post_meta( $id, '_fn_tier', true ) ?: 'standard' ),
+				'macros'      => Ingredient::get_macros( $id ),
+				'price_delta' => (float) get_post_meta( $id, '_fn_price_delta', true ),
+				'allergens'   => self::term_slugs( $id, Allergen::TAXONOMY ),
+				'thumbnail'   => (string) get_the_post_thumbnail_url( $id, 'thumbnail' ),
 			];
 		}
 		return $out;
+	}
+
+	/** Term slugs for a post in a taxonomy, read from the (get_posts-primed) object cache. */
+	private static function term_slugs( int $post_id, string $taxonomy ): array {
+		$terms = get_the_terms( $post_id, $taxonomy );
+		if ( ! is_array( $terms ) ) {
+			return [];
+		}
+		return array_values( array_map( static fn( $t ) => (string) $t->slug, $terms ) );
+	}
+
+	/** First term slug (an ingredient carries exactly one type), or '' when none. */
+	private static function first_term_slug( int $post_id, string $taxonomy ): string {
+		return self::term_slugs( $post_id, $taxonomy )[0] ?? '';
 	}
 
 	public function get_meal_config( WP_REST_Request $req ): array {
