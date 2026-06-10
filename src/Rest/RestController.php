@@ -11,6 +11,7 @@ use FastNutrition\MealPrep\PostTypes\Ingredient;
 use FastNutrition\MealPrep\Products\AddOnMeta;
 use FastNutrition\MealPrep\Products\BundleMeta;
 use FastNutrition\MealPrep\Products\MealProduct;
+use FastNutrition\MealPrep\Stats\PopularCombos;
 use FastNutrition\MealPrep\Taxonomies\Allergen;
 use FastNutrition\MealPrep\Taxonomies\IngredientType;
 use WP_Error;
@@ -201,11 +202,15 @@ final class RestController {
 
 	public function get_meal_config( WP_REST_Request $req ): array {
 		$product_id = (int) $req->get_param( 'product_id' );
+		$config     = MealProduct::get_config( $product_id );
 		return [
-			'config'  => MealProduct::get_config( $product_id ),
-			'addons'  => AddOnMeta::get_addons( $product_id ),
-			'bundles' => BundleMeta::get_bundles( $product_id ),
-			'price'   => (float) ( wc_get_product( $product_id ) ? wc_get_product( $product_id )->get_price() : 0 ),
+			'config'         => $config,
+			'addons'         => AddOnMeta::get_addons( $product_id ),
+			'bundles'        => BundleMeta::get_bundles( $product_id ),
+			'price'          => (float) ( wc_get_product( $product_id ) ? wc_get_product( $product_id )->get_price() : 0 ),
+			// Ranked top combos for the Popular Combinations picker (front end
+			// filters to this product's allowed + available ingredients).
+			'popular_combos' => ! empty( $config['popular_combos_enabled'] ) ? PopularCombos::ranked_combos() : [],
 		];
 	}
 
