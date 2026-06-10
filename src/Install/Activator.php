@@ -3,12 +3,13 @@ declare( strict_types=1 );
 
 namespace FastNutrition\MealPrep\Install;
 
+use FastNutrition\MealPrep\Stats\PopularCombos;
 use FastNutrition\MealPrep\Taxonomies\Allergen;
 use FastNutrition\MealPrep\Taxonomies\IngredientType;
 
 final class Activator {
 
-	public const DB_VERSION = '1.1.0';
+	public const DB_VERSION = '1.2.0';
 
 	public static function activate(): void {
 		self::create_tables();
@@ -17,6 +18,8 @@ final class Activator {
 		self::seed_ingredient_types();
 		IngredientSeeder::seed();
 		update_option( 'fn_mealprep_db_version', self::DB_VERSION, false );
+		PopularCombos::ensure_scheduled();
+		PopularCombos::queue_recompute();
 		flush_rewrite_rules();
 	}
 
@@ -26,10 +29,13 @@ final class Activator {
 			return;
 		}
 		self::create_tables();
+		PopularCombos::ensure_scheduled();
+		PopularCombos::queue_recompute();
 		update_option( 'fn_mealprep_db_version', self::DB_VERSION, false );
 	}
 
 	public static function deactivate(): void {
+		PopularCombos::unschedule();
 		flush_rewrite_rules();
 	}
 

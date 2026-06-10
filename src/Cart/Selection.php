@@ -179,6 +179,39 @@ final class Selection {
 	}
 
 	/**
+	 * A canonical signature for a BUILD combination (protein + carb + greens),
+	 * with greens order-normalised and add-ons ignored — so {A,B} == {B,A} and the
+	 * same composition always hashes identically. Returns null for set-meal and
+	 * standalone selections (they aren't customer-built "combinations").
+	 */
+	public static function combo_signature( array $sel ): ?string {
+		if ( 'build' !== ( $sel['mode'] ?? '' ) ) {
+			return null;
+		}
+		if ( (int) ( $sel['protein_id'] ?? 0 ) <= 0 ) {
+			return null;
+		}
+		$comp = self::combo_composition( $sel );
+		return 'b:' . $comp['protein_id'] . ':' . $comp['carb_id'] . ':' . implode( ',', $comp['greens_ids'] );
+	}
+
+	/**
+	 * The order-normalised composition of a build selection:
+	 * { protein_id, carb_id, greens_ids[] } with greens sorted. Add-ons excluded.
+	 *
+	 * @return array{protein_id:int,carb_id:int,greens_ids:int[]}
+	 */
+	public static function combo_composition( array $sel ): array {
+		$greens = array_values( array_filter( array_map( 'intval', (array) ( $sel['greens_ids'] ?? [] ) ) ) );
+		sort( $greens );
+		return [
+			'protein_id' => (int) ( $sel['protein_id'] ?? 0 ),
+			'carb_id'    => (int) ( $sel['carb_id'] ?? 0 ),
+			'greens_ids' => $greens,
+		];
+	}
+
+	/**
 	 * Map an IngredientType slug to its human label. Used to title a standalone
 	 * item on the cart line and order meta ("Set Meal", "Sweet", …).
 	 */

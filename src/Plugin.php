@@ -9,6 +9,7 @@ use FastNutrition\MealPrep\Admin\BundleAdmin;
 use FastNutrition\MealPrep\Admin\ConflictsNotice;
 use FastNutrition\MealPrep\Admin\LabelsAdmin;
 use FastNutrition\MealPrep\Admin\MenuRegistry;
+use FastNutrition\MealPrep\Admin\PopularCombosAdmin;
 use FastNutrition\MealPrep\Admin\OrdersListBulkActions;
 use FastNutrition\MealPrep\Admin\PrepDashboard;
 use FastNutrition\MealPrep\Admin\PrepSheet;
@@ -40,8 +41,10 @@ use FastNutrition\MealPrep\PostTypes\IngredientCatalog;
 use FastNutrition\MealPrep\Products\AddOnMeta;
 use FastNutrition\MealPrep\Products\BundleMeta;
 use FastNutrition\MealPrep\Products\MealProduct;
+use FastNutrition\MealPrep\Products\PopularCombosProduct;
 use FastNutrition\MealPrep\Products\StandaloneProduct;
 use FastNutrition\MealPrep\Rest\RestController;
+use FastNutrition\MealPrep\Stats\PopularCombos;
 use FastNutrition\MealPrep\Support\AssetManager;
 use FastNutrition\MealPrep\Taxonomies\Allergen;
 use FastNutrition\MealPrep\Taxonomies\IngredientType;
@@ -67,6 +70,7 @@ final class Plugin {
 
 		( new MealProduct() )->register();
 		( new StandaloneProduct() )->register();
+		( new PopularCombosProduct() )->register();
 		( new AddOnMeta() )->register();
 		( new BundleMeta() )->register();
 
@@ -98,11 +102,13 @@ final class Plugin {
 		( new BlockedDatesAdmin() )->register();
 		( new BundleAdmin() )->register();
 		( new ConflictsNotice() )->register();
+		( new PopularCombosAdmin() )->register();
 		( new LabelsAdmin() )->register();
 		( new OrdersListBulkActions() )->register();
 
 		( new Favourites() )->register();
 		( new RestController() )->register();
+		( new PopularCombos() )->register();
 		( new AssetManager() )->register();
 
 		// In-Store Quick Order (offline / phone order entry).
