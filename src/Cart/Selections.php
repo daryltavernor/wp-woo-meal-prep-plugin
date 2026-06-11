@@ -151,7 +151,11 @@ final class Selections {
 		}
 
 		$config = MealProduct::get_config( $product_id );
-		if ( ! $config['is_meal'] ) {
+		// Popular Combinations products reuse the `build` selection but are not
+		// flagged as meal products (Meal Builder is left off), so admit them here
+		// too — without this every chosen combo normalises to empty and is
+		// rejected with "Please choose your meal ingredients".
+		if ( ! $config['is_meal'] && empty( $config['popular_combos_enabled'] ) ) {
 			return [];
 		}
 
