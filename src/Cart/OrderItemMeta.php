@@ -3,6 +3,7 @@ declare( strict_types=1 );
 
 namespace FastNutrition\MealPrep\Cart;
 
+use FastNutrition\MealPrep\Delivery\SlotAvailability;
 use FastNutrition\MealPrep\InStore\PrepOrderStatus;
 use FastNutrition\MealPrep\Macros\Calculator;
 use WC_Order_Item_Product;
@@ -85,12 +86,22 @@ final class OrderItemMeta {
 		// Re-aggregate all orders for that date in a single pass.
 		$wpdb->delete( $table, [ 'fulfilment_date' => $date ], [ '%s' ] );
 
+		// Only orders created within the booking window before $date can carry
+		// that fulfilment date — a customer can book at most WINDOW_DAYS ahead and
+		// never in the past, so any contributing order was created in
+		// [$date - WINDOW_DAYS, $date]. A date_created lower bound (with the same
+		// margin SlotAvailability::bookings_map() uses) therefore captures all of
+		// them while keeping the scan constant-time regardless of total order
+		// count, instead of hydrating the entire order history on every checkout.
+		$lookback_start = strtotime( $date ) - ( SlotAvailability::WINDOW_DAYS + 21 ) * DAY_IN_SECONDS;
+
 		$orders = wc_get_orders(
 			[
-				'status'     => [ 'processing', 'completed', PrepOrderStatus::STATUS ],
-				'limit'      => -1,
-				'meta_key'   => '_fn_fulfilment',
-				'return'     => 'ids',
+				'status'       => [ 'processing', 'completed', PrepOrderStatus::STATUS ],
+				'limit'        => -1,
+				'meta_key'     => '_fn_fulfilment',
+				'date_created' => '>=' . $lookback_start,
+				'return'       => 'ids',
 			]
 		);
 
