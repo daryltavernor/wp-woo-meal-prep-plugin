@@ -654,7 +654,196 @@ function MealBuilder( { config, ingredients } ) {
 	);
 }
 
-// Loads the product config, then renders the standalone picker or meal builder.
+/*
+ * Popular Combinations: a dropdown of the shop's most-ordered build combos
+ * (protein + carb + greens), produced weekly by Stats\PopularCombos. We resolve
+ * each ranked combo against the ingredients this product actually offers (and
+ * that are still available), then show the top 7 plus a few rotating picks from
+ * ranks 8+ for discovery. A chosen combo is a normal `build` selection, so the
+ * cart/pricing/labels pipeline is unchanged.
+ */
+const COMBO_TOP = 7;
+const COMBO_EXTRA = 3;
+
+function PopularCombosPicker( { config, ingredients } ) {
+	const cfg = config.config;
+	const addonsList = config.addons || [];
+
+	// Resolve + filter the ranked combos to those valid for this product.
+	const resolved = useMemo( () => {
+		const inAllow = ( id, allow ) =>
+			! allow || ! allow.length || allow.includes( id );
+		const out = [];
+		( config.popular_combos || [] ).forEach( ( c ) => {
+			const protein = findById( c.protein_id, ingredients.protein );
+			if ( ! protein || ! inAllow( c.protein_id, cfg.allowed_proteins ) ) {
+				return;
+			}
+			let carb = null;
+			if ( c.carb_id ) {
+				carb = findById( c.carb_id, ingredients.carb );
+				if ( ! carb || ! inAllow( c.carb_id, cfg.allowed_carbs ) ) {
+					return;
+				}
+			}
+			const greens = [];
+			let ok = true;
+			( c.greens_ids || [] ).forEach( ( gid ) => {
+				const g = findById( gid, ingredients.greens );
+				if ( ! g || ! inAllow( gid, cfg.allowed_greens ) ) {
+					ok = false;
+					return;
+				}
+				greens.push( g );
+			} );
+			if ( ! ok || greens.length === 0 ) {
+				return;
+			}
+
+			let macros = addMacros( { ...ZERO }, protein.macros );
+			if ( carb ) {
+				macros = addMacros( macros, carb.macros );
+			}
+			greens.forEach( ( g ) => ( macros = addMacros( macros, g.macros ) ) );
+
+			const delta =
+				( protein.price_delta || 0 ) +
+				( carb ? carb.price_delta || 0 : 0 ) +
+				greens.reduce( ( s, g ) => s + ( g.price_delta || 0 ), 0 );
+
+			out.push( {
+				key:
+					c.protein_id +
+					':' +
+					( c.carb_id || 0 ) +
+					':' +
+					( c.greens_ids || [] ).join( ',' ),
+				label: [
+					protein.name,
+					carb ? carb.name : null,
+					greens.map( ( g ) => g.name ).join( ' & ' ),
+				]
+					.filter( Boolean )
+					.join( ' + ' ),
+				delta,
+				macros,
+				payload: {
+					protein_id: c.protein_id,
+					carb_id: c.carb_id || 0,
+					greens_ids: c.greens_ids || [],
+				},
+			} );
+		} );
+		return out;
+	}, [ config, ingredients, cfg ] );
+
+	// Top 7 always, plus a few rotating picks from ranks 8+ (per page load).
+	const display = useMemo( () => {
+		if ( resolved.length <= COMBO_TOP + COMBO_EXTRA ) {
+			return resolved;
+		}
+		const top = resolved.slice( 0, COMBO_TOP );
+		const pool = resolved.slice( COMBO_TOP );
+		for ( let n = 0; n < COMBO_EXTRA && pool.length; n++ ) {
+			const r = Math.floor( Math.random() * pool.length );
+			top.push( pool.splice( r, 1 )[ 0 ] );
+		}
+		return top;
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [ resolved ] );
+
+	const [ idx, setIdx ] = useState( -1 );
+	const [ addons, setAddons ] = useState( [] );
+	const chosen = idx >= 0 ? display[ idx ] : null;
+	const isValid = !! chosen;
+
+	const totals = useMemo( () => {
+		let t = chosen ? { ...chosen.macros } : { ...ZERO };
+		addons.forEach( ( a ) => ( t = addMacros( t, a ) ) );
+		return t;
+	}, [ chosen, addons ] );
+
+	const payload = useMemo(
+		() => ( {
+			mode: 'build',
+			protein_id: chosen?.payload.protein_id || 0,
+			carb_id: chosen?.payload.carb_id || 0,
+			greens_ids: chosen?.payload.greens_ids || [],
+			addons,
+		} ),
+		[ chosen, addons ]
+	);
+
+	useCartSync( payload, isValid, totals );
+
+	const toggleAddon = ( addon ) => {
+		const on = addons.some( ( a ) => a.id === addon.id );
+		setAddons(
+			on ? addons.filter( ( a ) => a.id !== addon.id ) : [ ...addons, addon ]
+		);
+	};
+
+	if ( display.length === 0 ) {
+		return (
+			<div className="fn-meal-builder">
+				{ __(
+					'No popular combinations are available yet — please check back soon.',
+					'fastnutrition-mealprep'
+				) }
+			</div>
+		);
+	}
+
+	return (
+		<div className="fn-meal-builder fn-standalone">
+			<Row
+				label={ __( 'Popular combinations', 'fastnutrition-mealprep' ) }
+				required
+				price={ chosen?.delta || 0 }
+			>
+				<select
+					value={ idx >= 0 ? idx : '' }
+					onChange={ ( e ) =>
+						setIdx(
+							e.target.value === ''
+								? -1
+								: parseInt( e.target.value, 10 )
+						)
+					}
+				>
+					<option value="">
+						{ __( 'Choose a combination…', 'fastnutrition-mealprep' ) }
+					</option>
+					{ display.map( ( combo, i ) => (
+						<option key={ combo.key } value={ i }>
+							{ combo.label }
+						</option>
+					) ) }
+				</select>
+			</Row>
+
+			<Addons
+				addons={ addonsList }
+				selected={ addons }
+				onToggle={ toggleAddon }
+			/>
+
+			{ ! isValid && (
+				<p
+					className="fn-row-help"
+					style={ { paddingLeft: 0, marginTop: '0.6rem' } }
+				>
+					{ __(
+						'Choose a combination to enable Add to Basket.',
+						'fastnutrition-mealprep'
+					) }
+				</p>
+			) }
+		</div>
+	);
+}
+
+// Loads the product config, then renders the right configurator for the product.
 function Configurator( { productId } ) {
 	const [ config, setConfig ] = useState( null );
 	const [ ingredients, setIngredients ] = useState( {
@@ -694,6 +883,14 @@ function Configurator( { productId } ) {
 		);
 	}
 
+	if ( config.config && config.config.popular_combos_enabled ) {
+		return (
+			<PopularCombosPicker
+				config={ config }
+				ingredients={ ingredients }
+			/>
+		);
+	}
 	const standalone = config.config && config.config.standalone;
 	if ( standalone && standalone.enabled ) {
 		return (

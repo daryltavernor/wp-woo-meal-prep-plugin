@@ -313,20 +313,26 @@ final class MealProduct {
 	 * for placement, the cart-selection pipeline and the offline order builder.
 	 */
 	public static function is_configurable( int $product_id ): bool {
-		return self::is_meal( $product_id ) || StandaloneProduct::is_enabled( $product_id );
+		return self::is_meal( $product_id )
+			|| StandaloneProduct::is_enabled( $product_id )
+			|| PopularCombosProduct::is_enabled( $product_id );
 	}
 
 	public static function get_config( int $product_id ): array {
+		$popular_combos = PopularCombosProduct::is_enabled( $product_id );
 		return [
-			'is_meal'              => self::is_meal( $product_id ),
-			'tier'                 => get_post_meta( $product_id, '_fn_meal_tier', true ) ?: 'standard',
-			'allow_double_greens'  => (bool) get_post_meta( $product_id, '_fn_allow_double_greens', true ),
-			'allow_set_meal_mode'  => (bool) get_post_meta( $product_id, '_fn_allow_set_meal_mode', true ),
-			'allowed_proteins'     => array_map( 'intval', (array) get_post_meta( $product_id, '_fn_allowed_protein_ids', true ) ),
-			'allowed_carbs'        => array_map( 'intval', (array) get_post_meta( $product_id, '_fn_allowed_carb_ids', true ) ),
-			'allowed_greens'       => array_map( 'intval', (array) get_post_meta( $product_id, '_fn_allowed_greens_ids', true ) ),
-			'allowed_set_meals'    => array_map( 'intval', (array) get_post_meta( $product_id, '_fn_allowed_set_meal_ids', true ) ),
-			'standalone'           => StandaloneProduct::get_config( $product_id ),
+			'is_meal'                => self::is_meal( $product_id ),
+			'tier'                   => get_post_meta( $product_id, '_fn_meal_tier', true ) ?: 'standard',
+			// Popular-combo products allow double greens implicitly so every popular
+			// combination (some are protein + 2 greens) re-adds without a config tweak.
+			'allow_double_greens'    => $popular_combos ? true : (bool) get_post_meta( $product_id, '_fn_allow_double_greens', true ),
+			'allow_set_meal_mode'    => (bool) get_post_meta( $product_id, '_fn_allow_set_meal_mode', true ),
+			'allowed_proteins'       => array_map( 'intval', (array) get_post_meta( $product_id, '_fn_allowed_protein_ids', true ) ),
+			'allowed_carbs'          => array_map( 'intval', (array) get_post_meta( $product_id, '_fn_allowed_carb_ids', true ) ),
+			'allowed_greens'         => array_map( 'intval', (array) get_post_meta( $product_id, '_fn_allowed_greens_ids', true ) ),
+			'allowed_set_meals'      => array_map( 'intval', (array) get_post_meta( $product_id, '_fn_allowed_set_meal_ids', true ) ),
+			'standalone'             => StandaloneProduct::get_config( $product_id ),
+			'popular_combos_enabled' => $popular_combos,
 		];
 	}
 }

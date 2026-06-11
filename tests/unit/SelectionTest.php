@@ -83,4 +83,26 @@ final class SelectionTest extends TestCase {
 		];
 		$this->assertSame( [ 5, 6 ], Selection::ingredient_ids( $sel ) );
 	}
+
+	public function test_combo_signature_is_order_independent_for_greens(): void {
+		$a = [ 'mode' => 'build', 'protein_id' => 5, 'carb_id' => 8, 'greens_ids' => [ 12, 9 ] ];
+		$b = [ 'mode' => 'build', 'protein_id' => 5, 'carb_id' => 8, 'greens_ids' => [ 9, 12 ] ];
+		$this->assertSame( 'b:5:8:9,12', Selection::combo_signature( $a ) );
+		$this->assertSame( Selection::combo_signature( $a ), Selection::combo_signature( $b ) );
+	}
+
+	public function test_combo_signature_ignores_addons_and_distinguishes_carb_choice(): void {
+		$with_addon = [ 'mode' => 'build', 'protein_id' => 5, 'carb_id' => 8, 'greens_ids' => [ 9 ], 'addons' => [ [ 'id' => 1, 'price' => 1.0 ] ] ];
+		$no_addon   = [ 'mode' => 'build', 'protein_id' => 5, 'carb_id' => 8, 'greens_ids' => [ 9 ] ];
+		$this->assertSame( Selection::combo_signature( $no_addon ), Selection::combo_signature( $with_addon ) );
+		// Single-greens + carb is a different combo from double-greens (no carb).
+		$double = [ 'mode' => 'build', 'protein_id' => 5, 'carb_id' => 0, 'greens_ids' => [ 9, 14 ] ];
+		$this->assertNotSame( Selection::combo_signature( $no_addon ), Selection::combo_signature( $double ) );
+	}
+
+	public function test_combo_signature_null_for_non_build_or_missing_protein(): void {
+		$this->assertNull( Selection::combo_signature( [ 'mode' => 'set', 'set_meal_id' => 7 ] ) );
+		$this->assertNull( Selection::combo_signature( [ 'mode' => 'standalone', 'item_id' => 3 ] ) );
+		$this->assertNull( Selection::combo_signature( [ 'mode' => 'build', 'protein_id' => 0, 'greens_ids' => [ 9 ] ] ) );
+	}
 }

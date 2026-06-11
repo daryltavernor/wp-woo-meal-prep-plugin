@@ -102,6 +102,11 @@ When a simple product has "Enable meal builder" ticked, the default Add-to-Cart 
 ### Standalone products (on product pages)
 When a product has the **Standalone Product** tab enabled, the page sells the chosen item directly instead of showing the builder: a single configured item adds straight to the basket, while two or more render a dropdown (same styling as the builder). Sweets, individual set meals and special offers are sold this way, and still carry full macros, prep and label data.
 
+### Popular Combinations (on product pages)
+Enable the **Popular Combinations** tab on a product (use it on its own — leave Meal Builder and Standalone disabled) to turn the page into a dropdown of the shop's most-ordered build combinations (protein + carb + greens), styled like the standalone picker. A chosen combination becomes an ordinary build selection, so pricing, macros, prep and labels all work as normal.
+
+The list is built automatically from sales — **no real-time tracking**. A weekly background job (Action Scheduler) aggregates the last **90 days** of paid orders (processing + completed, in-store included, prep/label-only excluded) by reading each line's stored composition, ranks combinations by **quantity sold**, and stores the top 20. The page shows the top 7 plus a few rotating picks from ranks 8–20 (for discovery), filtered to the ingredients the product offers and that are still available. View the current list and force a rebuild under **Meal Prep → Popular Combinations**. (Add-ons are ignored when judging popularity; greens order doesn't matter, so *protein + rice + broccoli & spinach* counts the same regardless of pick order.)
+
 ### Bundle pricing
 Per-product quantity tiers (e.g. `10 for £35`). Applies only to matching product IDs so desserts and other non-bundle products are untouched. The largest tier that fits is chosen; remaining qty is priced at base. Each cart line shows an effective per-meal price (e.g. *10 for £35 (~£3.50 each)*).
 
