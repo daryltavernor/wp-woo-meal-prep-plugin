@@ -90,13 +90,24 @@ final class RestController {
 		}
 		$raw = is_array( $raw ) ? $raw : [];
 
-		// The existing Selections filter reads $_REQUEST['fn_selection'], so route the data through it.
+		// The Selections filters read the raw build from $_REQUEST['fn_selection']
+		// (the channel shared with the product-page form). Scope that mutation to
+		// just this add_to_cart() call and restore the prior state afterwards, so
+		// it never leaks into other hooks firing later in the same request.
+		$had_prev                 = array_key_exists( 'fn_selection', $_REQUEST );
+		$prev                     = $had_prev ? $_REQUEST['fn_selection'] : null;
 		$_REQUEST['fn_selection'] = $raw;
 
 		try {
 			$added_key = WC()->cart->add_to_cart( $product_id, $quantity );
 		} catch ( \Throwable $e ) {
 			$added_key = false;
+		} finally {
+			if ( $had_prev ) {
+				$_REQUEST['fn_selection'] = $prev;
+			} else {
+				unset( $_REQUEST['fn_selection'] );
+			}
 		}
 
 		if ( ! $added_key ) {

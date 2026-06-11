@@ -75,18 +75,22 @@ final class LabelPrinter {
 		$html   = self::build_html( $orders, $mode, $limit_meals_per_order, $is_test );
 		$dompdf = new \Dompdf\Dompdf(
 			[
-				'isRemoteEnabled'      => true,
+				// Remote fetching stays OFF: the brand logo is inlined as a base64
+				// data URI (see logo_data_uri()) and labels carry no other external
+				// resources. Leaving it on would let any unescaped order field that
+				// reached the markup (e.g. an <img> in a customer-supplied value)
+				// make the server fetch an attacker URL when staff print labels —
+				// an SSRF vector — for zero functional benefit.
+				'isRemoteEnabled'      => false,
 				'isPhpEnabled'         => false,
 				'defaultMediaType'     => 'print',
 				'isHtml5ParserEnabled' => true,
-				// Match the print head so embedded images (the brand logo) are
-				// sampled at the device resolution rather than Dompdf's 96 dpi
-				// screen default. Without this the logo prints soft.
+				// Match the print head so the inlined logo is sampled at the device
+				// resolution rather than Dompdf's 96 dpi screen default, so it
+				// doesn't print soft.
 				'dpi'                  => self::PRINTER_DPI,
-				// Allow Dompdf to read local files from the WP install (e.g. the
-				// uploaded brand logo in wp-content/uploads). Without this,
-				// Dompdf's default chroot is the vendor dir and the logo silently
-				// renders as the broken-image placeholder.
+				// Keep the chroot scoped to the WP install for any local file Dompdf
+				// may need to resolve, never the whole filesystem.
 				'chroot'               => [ ABSPATH, WP_CONTENT_DIR ],
 			]
 		);
