@@ -1061,7 +1061,8 @@ function App() {
 	} );
 	const [ sendEmail, setSendEmail ] = useState( false );
 	// Label mode only: also create a no-sale "prep / label only" order.
-	const [ addToPrep, setAddToPrep ] = useState( false );
+	// Checked by default so label runs land on the prep sheet unless opted out.
+	const [ addToPrep, setAddToPrep ] = useState( true );
 	const [ busy, setBusy ] = useState( false );
 	const [ err, setErr ] = useState( '' );
 	const [ done, setDone ] = useState( null );
@@ -1254,7 +1255,7 @@ function App() {
 		setStep( 'build' );
 		setSetKey( Object.keys( ( config && config.sets ) || {} )[ 0 ] || '' );
 		setSendEmail( config && config.send_email );
-		setAddToPrep( false );
+		setAddToPrep( true );
 	};
 
 	if ( phase === 'loading' ) {
