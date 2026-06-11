@@ -19,8 +19,33 @@ use WP_REST_Request;
 
 final class RestController {
 
+	/** Option holding the cache version for the public /ingredients responses. */
+	private const ING_CACHE_VER_OPT = 'fn_ingredients_rest_ver';
+
 	public function register(): void {
 		add_action( 'rest_api_init', [ $this, 'routes' ] );
+
+		// Bust the cached /ingredients responses whenever an ingredient changes —
+		// the same triggers IngredientCatalog uses — so the public catalogue stays
+		// fast on every meal-builder load but can never serve stale data.
+		add_action( 'save_post_' . Ingredient::POST_TYPE, [ self::class, 'flush_ingredients_cache' ] );
+		add_action( 'before_delete_post', [ self::class, 'flush_ingredients_cache' ] );
+		add_action( 'trashed_post', [ self::class, 'flush_ingredients_cache' ] );
+		add_action( 'untrashed_post', [ self::class, 'flush_ingredients_cache' ] );
+	}
+
+	/**
+	 * Bump the /ingredients cache version (invalidating every per-type variant at
+	 * once). Guarded by post type because the delete/trash hooks fire for all
+	 * post types.
+	 *
+	 * @param int|string $post_id The post being saved/trashed/deleted.
+	 */
+	public static function flush_ingredients_cache( $post_id ): void {
+		if ( Ingredient::POST_TYPE !== get_post_type( (int) $post_id ) ) {
+			return;
+		}
+		update_option( self::ING_CACHE_VER_OPT, (string) time(), false );
 	}
 
 	public function routes(): void {
@@ -141,6 +166,18 @@ final class RestController {
 
 	public function get_ingredients( WP_REST_Request $req ): array {
 		$type = sanitize_key( (string) $req->get_param( 'type' ) );
+
+		// The catalogue is identical for every (anonymous) caller and only changes
+		// when an ingredient is saved, so serve it from a per-type transient keyed
+		// by the cache version. On a hit this skips the unbounded posts_per_page
+		// => -1 query and all the term/meta/thumbnail priming below.
+		$ver       = (string) get_option( self::ING_CACHE_VER_OPT, '0' );
+		$cache_key = 'fn_ing_rest_' . md5( $ver . '|' . $type );
+		$cached    = get_transient( $cache_key );
+		if ( is_array( $cached ) ) {
+			return $cached;
+		}
+
 		$args = [
 			'post_type'      => Ingredient::POST_TYPE,
 			'posts_per_page' => -1,
@@ -194,6 +231,9 @@ final class RestController {
 				'thumbnail'   => (string) get_the_post_thumbnail_url( $id, 'thumbnail' ),
 			];
 		}
+
+		// Event-driven version bump keeps this exact; the TTL is only a backstop.
+		set_transient( $cache_key, $out, DAY_IN_SECONDS );
 		return $out;
 	}
 

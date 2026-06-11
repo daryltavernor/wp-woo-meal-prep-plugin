@@ -25,7 +25,30 @@ final class Profile {
 		return $wpdb->prefix . 'fn_delivery_profiles';
 	}
 
+	/** Per-request memo of the hydrated profile sets, keyed by active_only. */
+	private static array $all_memo = [];
+
+	/** Per-request memo of resolved zone postcode patterns, keyed by zone id. */
+	private static array $zone_pc_memo = [];
+
+	/**
+	 * All profiles (active by default), cached. Delivery slot lookups call this
+	 * on every public /slots request, so it is memoised per request and backed
+	 * by a transient that only rebuilds when a profile is saved or deleted —
+	 * profiles change rarely. The transient stores the raw rows (including
+	 * zone_ids), so shipping-zone edits are still reflected immediately because
+	 * zone_postcodes() resolves them fresh at request time.
+	 */
 	public static function all( ?bool $active_only = true ): array {
+		$key = $active_only ? '1' : '0';
+		if ( isset( self::$all_memo[ $key ] ) ) {
+			return self::$all_memo[ $key ];
+		}
+		$cached = get_transient( 'fn_delivery_profiles_' . $key );
+		if ( is_array( $cached ) ) {
+			return self::$all_memo[ $key ] = $cached;
+		}
+
 		global $wpdb;
 		$table = self::table();
 		$sql   = "SELECT * FROM {$table}";
@@ -33,8 +56,19 @@ final class Profile {
 			$sql .= ' WHERE active = 1';
 		}
 		$sql .= ' ORDER BY priority ASC, id ASC';
-		$rows = $wpdb->get_results( $sql, ARRAY_A );
-		return array_map( [ self::class, 'hydrate' ], is_array( $rows ) ? $rows : [] );
+		$rows     = $wpdb->get_results( $sql, ARRAY_A );
+		$profiles = array_map( [ self::class, 'hydrate' ], is_array( $rows ) ? $rows : [] );
+
+		set_transient( 'fn_delivery_profiles_' . $key, $profiles, DAY_IN_SECONDS );
+		return self::$all_memo[ $key ] = $profiles;
+	}
+
+	/** Drop the cached profile sets after any write. */
+	public static function flush_cache(): void {
+		self::$all_memo     = [];
+		self::$zone_pc_memo = [];
+		delete_transient( 'fn_delivery_profiles_1' );
+		delete_transient( 'fn_delivery_profiles_0' );
 	}
 
 	public static function get( int $id ): ?array {
@@ -63,16 +97,20 @@ final class Profile {
 
 		if ( ! empty( $data['id'] ) ) {
 			$wpdb->update( $table, $row, [ 'id' => (int) $data['id'] ], [ '%s', '%s', '%d', '%s', '%s', '%s', '%d', '%d' ], [ '%d' ] );
+			self::flush_cache();
 			return (int) $data['id'];
 		}
 		$row['created_at'] = current_time( 'mysql' );
 		$wpdb->insert( $table, $row, [ '%s', '%s', '%d', '%s', '%s', '%s', '%d', '%d', '%s' ] );
+		self::flush_cache();
 		return (int) $wpdb->insert_id;
 	}
 
 	public static function delete( int $id ): bool {
 		global $wpdb;
-		return (bool) $wpdb->delete( self::table(), [ 'id' => $id ], [ '%d' ] );
+		$deleted = (bool) $wpdb->delete( self::table(), [ 'id' => $id ], [ '%d' ] );
+		self::flush_cache();
+		return $deleted;
 	}
 
 	public static function hydrate( array $row ): array {
@@ -96,12 +134,15 @@ final class Profile {
 	 * @return array<int,string>
 	 */
 	public static function zone_postcodes( int $zone_id ): array {
+		if ( isset( self::$zone_pc_memo[ $zone_id ] ) ) {
+			return self::$zone_pc_memo[ $zone_id ];
+		}
 		if ( ! class_exists( \WC_Shipping_Zones::class ) ) {
 			return [];
 		}
 		$zone = \WC_Shipping_Zones::get_zone( $zone_id );
 		if ( ! $zone ) {
-			return [];
+			return self::$zone_pc_memo[ $zone_id ] = [];
 		}
 		$out = [];
 		foreach ( (array) $zone->get_zone_locations() as $location ) {
@@ -109,7 +150,10 @@ final class Profile {
 				$out[] = (string) $location->code;
 			}
 		}
-		return $out;
+		// Memoised per request so the same zone isn't re-fetched once per profile
+		// during postcode matching; not cached across requests, so shipping-zone
+		// edits in wp-admin take effect on the next request.
+		return self::$zone_pc_memo[ $zone_id ] = $out;
 	}
 
 	/**

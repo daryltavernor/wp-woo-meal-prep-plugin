@@ -164,13 +164,20 @@ final class PrepDashboard {
 			),
 			ARRAY_A
 		);
+		// Resolve every ingredient's type in one query rather than calling
+		// get_type_slug() (a wp_get_post_terms() DB hit) once per row.
+		$type_slugs = Ingredient::get_type_slugs_for(
+			array_map( static fn( $row ) => (int) $row['ingredient_id'], (array) $rows )
+		);
+
 		$out = [];
 		foreach ( (array) $rows as $row ) {
+			$iid   = (int) $row['ingredient_id'];
 			$out[] = [
-				'ingredient_id' => (int) $row['ingredient_id'],
+				'ingredient_id' => $iid,
 				'name'          => (string) $row['post_title'],
 				'portions'      => (int) $row['portion_count'],
-				'type_slug'     => Ingredient::get_type_slug( (int) $row['ingredient_id'] ),
+				'type_slug'     => $type_slugs[ $iid ] ?? '',
 			];
 		}
 		return $out;

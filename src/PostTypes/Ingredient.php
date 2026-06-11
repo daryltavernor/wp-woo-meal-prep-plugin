@@ -367,4 +367,31 @@ final class Ingredient {
 		$terms = wp_get_post_terms( $ingredient_id, IngredientType::TAXONOMY, [ 'fields' => 'slugs' ] );
 		return is_array( $terms ) && ! empty( $terms ) ? (string) $terms[0] : '';
 	}
+
+	/**
+	 * Type slug for many ingredients in a single query, so callers iterating a
+	 * result set don't run get_type_slug()'s wp_get_post_terms() once per row.
+	 *
+	 * @param int[] $ingredient_ids
+	 * @return array<int,string> ingredient_id => type slug ('' when none)
+	 */
+	public static function get_type_slugs_for( array $ingredient_ids ): array {
+		$ingredient_ids = array_values( array_unique( array_filter( array_map( 'intval', $ingredient_ids ) ) ) );
+		if ( empty( $ingredient_ids ) ) {
+			return [];
+		}
+		$terms = wp_get_object_terms( $ingredient_ids, IngredientType::TAXONOMY, [ 'fields' => 'all_with_object_id' ] );
+		if ( ! is_array( $terms ) ) {
+			return [];
+		}
+		$map = [];
+		foreach ( $terms as $term ) {
+			$oid = (int) ( $term->object_id ?? 0 );
+			// An ingredient carries exactly one type; first wins.
+			if ( $oid > 0 && ! isset( $map[ $oid ] ) ) {
+				$map[ $oid ] = (string) $term->slug;
+			}
+		}
+		return $map;
+	}
 }
