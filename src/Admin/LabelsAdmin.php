@@ -3,6 +3,7 @@ declare( strict_types=1 );
 
 namespace FastNutrition\MealPrep\Admin;
 
+use FastNutrition\MealPrep\Delivery\SlotAvailability;
 use FastNutrition\MealPrep\InStore\PrepOrderStatus;
 use FastNutrition\MealPrep\Labels\LabelPrinter;
 
@@ -244,15 +245,21 @@ final class LabelsAdmin {
 		if ( ! function_exists( 'wc_get_orders' ) ) {
 			return [];
 		}
-		$orders = wc_get_orders(
-			[
-				'status'   => PrepOrderStatus::active_statuses(),
-				'limit'    => -1,
-				'meta_key' => '_fn_fulfilment',
-				'orderby'  => 'date',
-				'order'    => 'ASC',
-			]
-		);
+		$args = [
+			'status'   => PrepOrderStatus::active_statuses(),
+			'limit'    => -1,
+			'meta_key' => '_fn_fulfilment',
+			'orderby'  => 'date',
+			'order'    => 'ASC',
+		];
+		// When the range has a lower bound, no order created before the booking
+		// window ahead of $start can fall inside it — so bound the scan by
+		// date_created and avoid walking the whole order history. An open-ended
+		// range (no $start) keeps the full scan.
+		if ( '' !== $start ) {
+			$args['date_created'] = '>=' . SlotAvailability::created_since_for_date( $start );
+		}
+		$orders = wc_get_orders( $args );
 		$matched = [];
 		foreach ( $orders as $order ) {
 			$ff = $order->get_meta( '_fn_fulfilment' );

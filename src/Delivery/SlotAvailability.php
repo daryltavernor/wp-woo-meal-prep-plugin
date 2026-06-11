@@ -11,6 +11,19 @@ final class SlotAvailability {
 
 	public const WINDOW_DAYS = 14;
 
+	/**
+	 * The earliest order-creation timestamp that could carry the given fulfilment
+	 * date. A customer books at most WINDOW_DAYS ahead and never in the past, so
+	 * any order whose fulfilment date is $date was necessarily created within
+	 * [$date - WINDOW_DAYS, $date]; the extra margin absorbs cut-off / timezone
+	 * slop. Use this as a wc_get_orders() 'date_created' => '>=' bound to keep
+	 * date-filtered order scans constant-time instead of walking the whole order
+	 * history (the in-PHP date check still makes the result exact).
+	 */
+	public static function created_since_for_date( string $date ): int {
+		return strtotime( $date ) - ( self::WINDOW_DAYS + 21 ) * DAY_IN_SECONDS;
+	}
+
 	public function register(): void {
 		// Booking counts are cached (see bookings_map()); bust that cache whenever
 		// an order is created or changes status so slot capacity stays exact

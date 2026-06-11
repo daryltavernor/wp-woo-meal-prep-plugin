@@ -4,6 +4,7 @@ declare( strict_types=1 );
 namespace FastNutrition\MealPrep\Admin;
 
 use FastNutrition\MealPrep\Cart\Selection;
+use FastNutrition\MealPrep\Delivery\SlotAvailability;
 use FastNutrition\MealPrep\InStore\PrepOrderStatus;
 use FastNutrition\MealPrep\PostTypes\Ingredient;
 
@@ -93,9 +94,10 @@ final class PrepDashboard {
 	private function render_order_view( string $date ): void {
 		$orders = wc_get_orders(
 			[
-				'status'   => PrepOrderStatus::active_statuses(),
-				'limit'    => -1,
-				'meta_key' => '_fn_fulfilment',
+				'status'       => PrepOrderStatus::active_statuses(),
+				'limit'        => -1,
+				'meta_key'     => '_fn_fulfilment',
+				'date_created' => '>=' . SlotAvailability::created_since_for_date( $date ),
 			]
 		);
 		$matched = [];
