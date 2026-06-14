@@ -18,7 +18,16 @@ final class Selections {
 		add_filter( 'woocommerce_add_to_cart_validation', [ $this, 'validate' ], 10, 6 );
 	}
 
-	public function attach_selection( array $cart_item_data, int $product_id, int $variation_id ): array {
+	/*
+	 * WooCommerce passes these filter args straight from the request, so the
+	 * scalar types are deliberately loose: for variable products $variation_id
+	 * arrives as an empty string '' (and $quantity can be a float), which would
+	 * fatal under strict_types against an `int` hint. We cast what we actually
+	 * use ($product_id) and ignore the rest.
+	 */
+	public function attach_selection( array $cart_item_data, $product_id = 0, $variation_id = 0 ): array {
+		unset( $variation_id );
+		$product_id = (int) $product_id;
 		if ( ! MealProduct::is_configurable( $product_id ) ) {
 			return $cart_item_data;
 		}
@@ -47,8 +56,14 @@ final class Selections {
 		return $cart_item_data;
 	}
 
-	public function validate( bool $passed, int $product_id, int $quantity, int $variation_id = 0, array $variations = [], array $cart_item_data = [] ): bool {
+	public function validate( bool $passed, $product_id = 0, $quantity = 0, $variation_id = 0, $variations = [], $cart_item_data = [] ): bool {
+		// As with attach_selection(): WooCommerce passes $variation_id as '' (and
+		// $quantity as a float) for variable products, so these stay loosely typed
+		// to avoid a strict_types TypeError on add-to-cart. Cast/normalise the two
+		// values we actually use.
 		unset( $quantity, $variation_id, $variations );
+		$product_id     = (int) $product_id;
+		$cart_item_data = is_array( $cart_item_data ) ? $cart_item_data : [];
 		if ( ! MealProduct::is_configurable( $product_id ) ) {
 			return $passed;
 		}
