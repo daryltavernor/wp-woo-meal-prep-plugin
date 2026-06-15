@@ -60,6 +60,32 @@ final class PrepDashboard {
 			echo '<p><em>' . esc_html__( 'No orders scheduled for this date yet.', 'fastnutrition-mealprep' ) . '</em></p>';
 			return;
 		}
+
+		// Items-to-make summary. Fetch the day's orders once and reuse for the
+		// add-on totals below; ingredient portions still come from the cache.
+		$matched = PrepSheet::collect_matched_by_date( $date, '' );
+		$f       = PrepSheet::fulfilment_totals( $matched );
+		echo '<div class="fn-day-summary" style="margin:12px 0;padding:12px 16px;background:#fff;border:1px solid #c3c4c7;border-left:4px solid #2271b1;">';
+		printf(
+			'<p style="margin:0 0 4px;"><strong>%s</strong> <span style="font-size:22px;font-weight:700;">%d</span></p>',
+			esc_html__( 'Total items to make:', 'fastnutrition-mealprep' ),
+			(int) $f['total']
+		);
+		printf(
+			'<p style="margin:0;color:#50575e;">%s %d &middot; %s %d &middot; %s %d &nbsp;|&nbsp; %s %d &middot; %s %d</p>',
+			esc_html__( 'Meals:', 'fastnutrition-mealprep' ),
+			(int) $f['meals'],
+			esc_html__( 'Sweets:', 'fastnutrition-mealprep' ),
+			(int) $f['sweets'],
+			esc_html__( 'Add-ons:', 'fastnutrition-mealprep' ),
+			(int) $f['addons'],
+			esc_html__( 'Delivery meals:', 'fastnutrition-mealprep' ),
+			(int) $f['delivery_meals'],
+			esc_html__( 'Collection meals:', 'fastnutrition-mealprep' ),
+			(int) $f['collection_meals']
+		);
+		echo '</div>';
+
 		$grouped = [];
 		foreach ( $rows as $row ) {
 			$grouped[ $row['type_slug'] ][] = $row;
@@ -92,8 +118,8 @@ final class PrepDashboard {
 
 		// Add-on totals for the day (any order route). The ingredient totals come
 		// from the prep cache, but add-ons aren't ingredients, so aggregate them
-		// from the day's orders via the shared (booking-window-bounded) helper.
-		$addon_totals = PrepSheet::addon_totals( PrepSheet::collect_matched_by_date( $date, '' ) );
+		// from the day's orders ($matched, already fetched for the summary above).
+		$addon_totals = PrepSheet::addon_totals( $matched );
 		if ( ! empty( $addon_totals ) ) {
 			echo '<h2>' . esc_html__( 'Add-ons', 'fastnutrition-mealprep' ) . '</h2>';
 			echo '<table class="widefat striped"><thead><tr>';

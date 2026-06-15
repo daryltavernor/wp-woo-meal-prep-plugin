@@ -254,6 +254,42 @@ final class PrepSheet {
 	}
 
 	/**
+	 * Headline "items to make" counts for a matched order set: meals, sweets and
+	 * add-ons (each weighted by line quantity), their grand total, and the meal
+	 * split by fulfilment method. Lets kitchen staff reconcile the day's output.
+	 *
+	 * @param array<int,array{order:\WC_Order,fulfilment:array}> $matched
+	 * @return array{meals:int,sweets:int,addons:int,total:int,delivery_meals:int,collection_meals:int}
+	 */
+	public static function fulfilment_totals( array $matched ): array {
+		$t = [ 'meals' => 0, 'sweets' => 0, 'addons' => 0, 'total' => 0, 'delivery_meals' => 0, 'collection_meals' => 0 ];
+		foreach ( $matched as $m ) {
+			$method = (string) ( $m['fulfilment']['type'] ?? '' );
+			foreach ( $m['order']->get_items() as $item ) {
+				$qty = (int) $item->get_quantity();
+				$sel = $item->get_meta( '_fn_selection', true );
+				if ( is_array( $sel ) && Selection::is_sweet( $sel ) ) {
+					$t['sweets'] += $qty;
+				} else {
+					$t['meals'] += $qty;
+					if ( 'delivery' === $method ) {
+						$t['delivery_meals'] += $qty;
+					} elseif ( 'collection' === $method ) {
+						$t['collection_meals'] += $qty;
+					}
+				}
+				if ( is_array( $sel ) ) {
+					foreach ( Selection::addon_counts( $sel ) as $n ) {
+						$t['addons'] += $n * $qty;
+					}
+				}
+			}
+		}
+		$t['total'] = $t['meals'] + $t['sweets'] + $t['addons'];
+		return $t;
+	}
+
+	/**
 	 * Render the three prep-sheet sections from a prepared order set + totals.
 	 *
 	 * @param array<int,array{order:\WC_Order,fulfilment:array}>                            $matched
@@ -266,6 +302,32 @@ final class PrepSheet {
 			echo '</head><body>';
 		}
 		echo '<h1 class="fn-sheet-title">' . esc_html( $title ) . '</h1>';
+
+		// Section 0 — Items-to-make summary (kitchen reconciliation count).
+		$f = self::fulfilment_totals( $matched );
+		echo '<section class="fn-sheet-section fn-sheet-summary">';
+		printf(
+			'<p class="fn-sheet-total"><strong>%s</strong> <span class="fn-sheet-bignum">%d</span></p>',
+			esc_html__( 'Total items to make:', 'fastnutrition-mealprep' ),
+			(int) $f['total']
+		);
+		printf(
+			'<p class="fn-sheet-breakdown">%s %d &middot; %s %d &middot; %s %d</p>',
+			esc_html__( 'Meals:', 'fastnutrition-mealprep' ),
+			(int) $f['meals'],
+			esc_html__( 'Sweets:', 'fastnutrition-mealprep' ),
+			(int) $f['sweets'],
+			esc_html__( 'Add-ons:', 'fastnutrition-mealprep' ),
+			(int) $f['addons']
+		);
+		printf(
+			'<p class="fn-sheet-breakdown">%s %d &middot; %s %d</p>',
+			esc_html__( 'Delivery meals:', 'fastnutrition-mealprep' ),
+			(int) $f['delivery_meals'],
+			esc_html__( 'Collection meals:', 'fastnutrition-mealprep' ),
+			(int) $f['collection_meals']
+		);
+		echo '</section>';
 
 		// Section 1 — Ingredient totals.
 		echo '<section class="fn-sheet-section"><h2>' . esc_html__( 'Ingredient totals', 'fastnutrition-mealprep' ) . '</h2>';
@@ -409,6 +471,10 @@ final class PrepSheet {
 		.fn-sheet-items { list-style: none; padding-left: 0; }
 		.fn-sheet-items li { padding: 4px 0; border-bottom: 1px dashed #ccc; }
 		.fn-sheet-title { font-size: 20px; margin: 10px 0; }
+		.fn-sheet-summary { border: 2px solid #000; padding: 8px 14px; }
+		.fn-sheet-total { margin: 0 0 4px; font-size: 16px; }
+		.fn-sheet-bignum { font-size: 26px; font-weight: 700; }
+		.fn-sheet-breakdown { margin: 2px 0; color: #333; }
 		</style>
 		<?php
 	}
