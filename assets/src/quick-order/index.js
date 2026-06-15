@@ -202,10 +202,19 @@ function BuildForm( { setKey, set, ingredients, onAdd } ) {
 		setB( { ...b, mode: 'standalone', item_id: id } );
 
 	const toggleGreen = ( id ) => {
-		let g = b.greens_ids.includes( id )
-			? b.greens_ids.filter( ( x ) => x !== id )
-			: [ ...b.greens_ids, id ];
-		g = g.slice( -2 );
+		const total = b.greens_ids.length;
+		const has = b.greens_ids.includes( id );
+		let g;
+		if ( ! has ) {
+			// New green: add it, or start over with it when already at two.
+			g = total < 2 ? [ ...b.greens_ids, id ] : [ id ];
+		} else if ( total < 2 ) {
+			// Already picked with room left → tap again to double it up (×2).
+			g = [ ...b.greens_ids, id ];
+		} else {
+			// Already picked and full → tap removes this green.
+			g = b.greens_ids.filter( ( x ) => x !== id );
+		}
 		setB( {
 			...b,
 			greens_ids: g,
@@ -419,19 +428,25 @@ function BuildForm( { setKey, set, ingredients, onAdd } ) {
 									</span>
 								</h3>
 								<PillRow>
-									{ allow.greens.map( ( i ) => (
-										<Pill
-											key={ i.id }
-											active={ b.greens_ids.includes(
-												i.id
-											) }
-											onClick={ () =>
-												toggleGreen( i.id )
-											}
-										>
-											{ i.name }
-										</Pill>
-									) ) }
+									{ allow.greens.map( ( i ) => {
+										const count = b.greens_ids.filter(
+											( x ) => x === i.id
+										).length;
+										return (
+											<Pill
+												key={ i.id }
+												active={ count > 0 }
+												onClick={ () =>
+													toggleGreen( i.id )
+												}
+												sub={
+													count === 2 ? '×2' : null
+												}
+											>
+												{ i.name }
+											</Pill>
+										);
+									} ) }
 								</PillRow>
 							</section>
 							{ b.greens_ids.length < 2 && (

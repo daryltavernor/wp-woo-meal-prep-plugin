@@ -376,12 +376,8 @@ function MealBuilder( { config, ingredients } ) {
 		if ( ! selection.greens_id ) {
 			return false;
 		}
-		if (
-			selection.slot2_kind === 'greens' &&
-			selection.slot2_id === selection.greens_id
-		) {
-			return false;
-		}
+		// Two of the same green is allowed (e.g. double green beans), so we
+		// don't reject slot2 === slot3 here.
 		return true;
 	}, [ selection, isSetMeal ] );
 
@@ -615,19 +611,13 @@ function MealBuilder( { config, ingredients } ) {
 									'fastnutrition-mealprep'
 								) }
 							</option>
-							{ allowed.greens
-								.filter(
-									( i ) =>
-										! (
-											selection.slot2_kind === 'greens' &&
-											selection.slot2_id === i.id
-										)
-								)
-								.map( ( i ) => (
-									<option key={ 'g3' + i.id } value={ i.id }>
-										{ i.name }
-									</option>
-								) ) }
+							{ /* Show every green here, including the one picked in
+								 slot 2 — two of the same green is allowed. */ }
+							{ allowed.greens.map( ( i ) => (
+								<option key={ 'g3' + i.id } value={ i.id }>
+									{ i.name }
+								</option>
+							) ) }
 						</select>
 					</Row>
 				</>

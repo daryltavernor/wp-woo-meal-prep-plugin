@@ -136,7 +136,7 @@ final class PrepSheet {
 	 *
 	 * @return array<int,array{order:\WC_Order,fulfilment:array}>
 	 */
-	private static function collect_matched_by_date( string $date, string $method ): array {
+	public static function collect_matched_by_date( string $date, string $method ): array {
 		$orders = wc_get_orders(
 			[
 				'status'       => PrepOrderStatus::active_statuses(),
@@ -227,6 +227,33 @@ final class PrepSheet {
 	}
 
 	/**
+	 * Add-on label => total quantity across a matched order set (each line's
+	 * add-ons multiplied by its quantity). Add-ons are stored uniformly on the
+	 * line selection meta by every order route, so this captures builder,
+	 * standalone, sweet and quick-order orders alike.
+	 *
+	 * @param array<int,array{order:\WC_Order,fulfilment:array}> $matched
+	 * @return array<string,int>
+	 */
+	public static function addon_totals( array $matched ): array {
+		$totals = [];
+		foreach ( $matched as $m ) {
+			foreach ( $m['order']->get_items() as $item ) {
+				$sel = $item->get_meta( '_fn_selection', true );
+				if ( ! is_array( $sel ) ) {
+					continue;
+				}
+				$qty = (int) $item->get_quantity();
+				foreach ( Selection::addon_counts( $sel ) as $label => $n ) {
+					$totals[ $label ] = ( $totals[ $label ] ?? 0 ) + ( $n * $qty );
+				}
+			}
+		}
+		arsort( $totals );
+		return $totals;
+	}
+
+	/**
 	 * Render the three prep-sheet sections from a prepared order set + totals.
 	 *
 	 * @param array<int,array{order:\WC_Order,fulfilment:array}>                            $matched
@@ -265,6 +292,17 @@ final class PrepSheet {
 			echo '</tbody></table>';
 		}
 		echo '</section>';
+
+		// Section 1b — Add-on totals (any route: builder, standalone, sweet, quick order).
+		$addon_totals = self::addon_totals( $matched );
+		if ( ! empty( $addon_totals ) ) {
+			echo '<section class="fn-sheet-section"><h2>' . esc_html__( 'Add-ons', 'fastnutrition-mealprep' ) . '</h2>';
+			echo '<table class="fn-sheet-table"><thead><tr><th>' . esc_html__( 'Add-on', 'fastnutrition-mealprep' ) . '</th><th>' . esc_html__( 'Quantity', 'fastnutrition-mealprep' ) . '</th></tr></thead><tbody>';
+			foreach ( $addon_totals as $label => $count ) {
+				echo '<tr><td>' . esc_html( (string) $label ) . '</td><td>' . (int) $count . '</td></tr>';
+			}
+			echo '</tbody></table></section>';
+		}
 
 		// Section 2 — Per-order pick list.
 		echo '<section class="fn-sheet-section"><h2>' . esc_html__( 'Per-order pick list', 'fastnutrition-mealprep' ) . '</h2>';

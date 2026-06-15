@@ -198,7 +198,10 @@ final class Selections {
 		$greens_ids = isset( $raw['greens_ids'] ) && is_array( $raw['greens_ids'] )
 			? array_values( array_filter( array_map( 'intval', $raw['greens_ids'] ) ) )
 			: [];
-		$greens_ids = array_slice( array_unique( $greens_ids ), 0, 2 );
+		// Cap at two greens but allow the same green twice (e.g. double green
+		// beans): array_unique would collapse a deliberate duplicate. The type
+		// checks and allowed-greens intersect below both preserve duplicates.
+		$greens_ids = array_slice( $greens_ids, 0, 2 );
 
 		if ( $protein_id && 'protein' !== Ingredient::get_type_slug( $protein_id ) ) {
 			$protein_id = 0;

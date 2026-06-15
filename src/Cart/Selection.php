@@ -161,6 +161,29 @@ final class Selection {
 	}
 
 	/**
+	 * Add-on label => count for a single selection, e.g. [ '2 Boiled Eggs' => 1 ].
+	 * Keyed by the human label (not the product-scoped add-on id) so the same
+	 * add-on aggregates across different products on the prep sheet, regardless
+	 * of which route (builder, standalone, sweet, quick order) the order took.
+	 *
+	 * @return array<string,int>
+	 */
+	public static function addon_counts( array $sel ): array {
+		if ( empty( $sel['addons'] ) || ! is_array( $sel['addons'] ) ) {
+			return [];
+		}
+		$counts = [];
+		foreach ( $sel['addons'] as $addon ) {
+			$label = isset( $addon['label'] ) ? trim( (string) $addon['label'] ) : '';
+			if ( '' === $label ) {
+				continue;
+			}
+			$counts[ $label ] = ( $counts[ $label ] ?? 0 ) + 1;
+		}
+		return $counts;
+	}
+
+	/**
 	 * Total price delta for a selection: the sum of every composition
 	 * ingredient's `_fn_price_delta` plus every chosen add-on's price. This is
 	 * added to the product's catalog/bundle base in MealPricing.

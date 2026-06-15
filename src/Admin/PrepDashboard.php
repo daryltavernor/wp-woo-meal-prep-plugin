@@ -89,6 +89,26 @@ final class PrepDashboard {
 			}
 			echo '</tbody></table>';
 		}
+
+		// Add-on totals for the day (any order route). The ingredient totals come
+		// from the prep cache, but add-ons aren't ingredients, so aggregate them
+		// from the day's orders via the shared (booking-window-bounded) helper.
+		$addon_totals = PrepSheet::addon_totals( PrepSheet::collect_matched_by_date( $date, '' ) );
+		if ( ! empty( $addon_totals ) ) {
+			echo '<h2>' . esc_html__( 'Add-ons', 'fastnutrition-mealprep' ) . '</h2>';
+			echo '<table class="widefat striped"><thead><tr>';
+			echo '<th>' . esc_html__( 'Add-on', 'fastnutrition-mealprep' ) . '</th>';
+			echo '<th>' . esc_html__( 'Quantity needed', 'fastnutrition-mealprep' ) . '</th>';
+			echo '</tr></thead><tbody>';
+			foreach ( $addon_totals as $label => $count ) {
+				printf(
+					'<tr><td>%s</td><td>%d</td></tr>',
+					esc_html( (string) $label ),
+					(int) $count
+				);
+			}
+			echo '</tbody></table>';
+		}
 	}
 
 	private function render_order_view( string $date ): void {

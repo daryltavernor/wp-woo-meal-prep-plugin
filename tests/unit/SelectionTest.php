@@ -105,4 +105,38 @@ final class SelectionTest extends TestCase {
 		$this->assertNull( Selection::combo_signature( [ 'mode' => 'standalone', 'item_id' => 3 ] ) );
 		$this->assertNull( Selection::combo_signature( [ 'mode' => 'build', 'protein_id' => 0, 'greens_ids' => [ 9 ] ] ) );
 	}
+
+	public function test_two_of_the_same_green_resolve_to_two_portions(): void {
+		// A deliberate double of the same green must count twice (prep portions,
+		// pricing, macros all key off ingredient_ids).
+		$sel = [
+			'mode'       => 'build',
+			'protein_id' => 1,
+			'carb_id'    => 0,
+			'greens_ids' => [ 7, 7 ],
+		];
+		$this->assertSame( [ 1, 7, 7 ], Selection::ingredient_ids( $sel ) );
+	}
+
+	public function test_addon_counts_tallies_by_label(): void {
+		$sel = [
+			'mode'   => 'build',
+			'addons' => [
+				[ 'id' => 'a1', 'label' => '2 Boiled Eggs', 'price' => 1.0 ],
+				[ 'id' => 'a2', 'label' => 'Sauce', 'price' => 0.0 ],
+				[ 'id' => 'a1', 'label' => '2 Boiled Eggs', 'price' => 1.0 ],
+			],
+		];
+		$this->assertSame(
+			[ '2 Boiled Eggs' => 2, 'Sauce' => 1 ],
+			Selection::addon_counts( $sel )
+		);
+	}
+
+	public function test_addon_counts_empty_when_no_addons(): void {
+		$this->assertSame( [], Selection::addon_counts( [ 'mode' => 'build' ] ) );
+		$this->assertSame( [], Selection::addon_counts( [ 'mode' => 'build', 'addons' => [] ] ) );
+		// Blank labels are ignored.
+		$this->assertSame( [], Selection::addon_counts( [ 'addons' => [ [ 'label' => '' ], [ 'price' => 1 ] ] ] ) );
+	}
 }
