@@ -20,6 +20,21 @@ final class Reports {
 
 	public function register(): void {
 		add_action( 'admin_init', [ __CLASS__, 'maybe_handle_actions' ] );
+		add_action( 'admin_enqueue_scripts', [ __CLASS__, 'enqueue_assets' ] );
+	}
+
+	/** Load the (dependency-free) chart script only on the Reports page. */
+	public static function enqueue_assets(): void {
+		if ( ! isset( $_GET['page'] ) || self::PAGE_SLUG !== $_GET['page'] ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			return;
+		}
+		wp_enqueue_script(
+			'fn-reports-chart',
+			FN_MEALPREP_URL . 'assets/admin/reports-chart.js',
+			[],
+			FN_MEALPREP_VERSION,
+			true
+		);
 	}
 
 	/** CSV export + manual rebuild, handled before any page output. */
@@ -80,7 +95,8 @@ final class Reports {
 		// Delivery vs collection split.
 		self::render_methods( $methods );
 
-		// Time series.
+		// Time series — chart then table.
+		self::render_chart( $series );
 		self::render_series( $series, $gran, $from, $to );
 
 		// Popularity.
@@ -192,6 +208,45 @@ final class Reports {
 			echo '<td>' . wp_kses_post( wc_price( (float) $row['revenue'] ) ) . '</td></tr>';
 		}
 		echo '</tbody></table>';
+	}
+
+	private static function render_chart( array $series ): void {
+		echo '<h2>' . esc_html__( 'Graph', 'fastnutrition-mealprep' ) . '</h2>';
+		if ( empty( $series ) ) {
+			echo '<p><em>' . esc_html__( 'No data in this range yet.', 'fastnutrition-mealprep' ) . '</em></p>';
+			return;
+		}
+
+		$metrics = self::chart_metrics();
+
+		// Currency hints so the JS can format the revenue axis/tooltips.
+		$payload = [
+			'points'   => $series,
+			'metrics'  => $metrics,
+			'currency' => [
+				'symbol'   => function_exists( 'get_woocommerce_currency_symbol' ) ? html_entity_decode( get_woocommerce_currency_symbol() ) : '£',
+				'position' => function_exists( 'get_option' ) ? (string) get_option( 'woocommerce_currency_pos', 'left' ) : 'left',
+			],
+		];
+
+		$select = static function ( string $id, array $metrics, string $selected, bool $allow_none ): string {
+			$html = '<select id="' . esc_attr( $id ) . '" class="fn-chart-metric">';
+			if ( $allow_none ) {
+				$html .= '<option value="">' . esc_html__( 'None', 'fastnutrition-mealprep' ) . '</option>';
+			}
+			foreach ( $metrics as $key => $meta ) {
+				$html .= '<option value="' . esc_attr( $key ) . '"' . selected( $selected, $key, false ) . '>' . esc_html( $meta['label'] ) . '</option>';
+			}
+			return $html . '</select>';
+		};
+
+		echo '<div class="fn-chart-controls" style="margin:8px 0;">';
+		echo '<label>' . esc_html__( 'Plot', 'fastnutrition-mealprep' ) . ' ' . $select( 'fn-chart-m1', $metrics, 'meals', false ) . '</label> '; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+		echo '<label>' . esc_html__( 'and (optional)', 'fastnutrition-mealprep' ) . ' ' . $select( 'fn-chart-m2', $metrics, 'revenue', true ) . '</label>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+		echo '</div>';
+
+		echo '<div id="fn-chart" style="background:#fff;border:1px solid #c3c4c7;padding:8px;max-width:980px;"></div>';
+		echo '<script type="application/json" id="fn-reports-data">' . wp_json_encode( $payload, JSON_HEX_TAG | JSON_HEX_AMP ) . '</script>';
 	}
 
 	private static function render_series( array $series, string $gran, string $from, string $to ): void {
@@ -324,7 +379,7 @@ final class Reports {
 		return $out;
 	}
 
-	/** @return array<int,array{bucket:string,meals:int,deliveries:int,collections:int,revenue:float}> */
+	/** @return array<int,array{bucket:string,meals:int,orders:int,deliveries:int,collections:int,items:int,sweets:int,addons:int,revenue:float}> */
 	private static function series( string $from, string $to, string $gran ): array {
 		global $wpdb;
 		$table  = StatsRollup::stats_table();
@@ -333,8 +388,12 @@ final class Reports {
 			$wpdb->prepare(
 				"SELECT {$bucket} AS bucket,
 					SUM(meals) meals,
+					SUM(orders) orders,
 					SUM(CASE WHEN method='delivery' THEN orders ELSE 0 END) deliveries,
 					SUM(CASE WHEN method='collection' THEN orders ELSE 0 END) collections,
+					SUM(items_total) items,
+					SUM(sweets) sweets,
+					SUM(addons) addons,
 					SUM(revenue) revenue
 				 FROM {$table} WHERE stat_date BETWEEN %s AND %s GROUP BY bucket ORDER BY bucket ASC", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 				$from,
@@ -347,12 +406,30 @@ final class Reports {
 			$out[] = [
 				'bucket'      => (string) $r['bucket'],
 				'meals'       => (int) $r['meals'],
+				'orders'      => (int) $r['orders'],
 				'deliveries'  => (int) $r['deliveries'],
 				'collections' => (int) $r['collections'],
+				'items'       => (int) $r['items'],
+				'sweets'      => (int) $r['sweets'],
+				'addons'      => (int) $r['addons'],
 				'revenue'     => (float) $r['revenue'],
 			];
 		}
 		return $out;
+	}
+
+	/** Metrics offered in the chart's plot selectors. */
+	private static function chart_metrics(): array {
+		return [
+			'meals'       => [ 'label' => __( 'Meals', 'fastnutrition-mealprep' ), 'money' => false ],
+			'orders'      => [ 'label' => __( 'Orders', 'fastnutrition-mealprep' ), 'money' => false ],
+			'revenue'     => [ 'label' => __( 'Revenue', 'fastnutrition-mealprep' ), 'money' => true ],
+			'items'       => [ 'label' => __( 'Items to make', 'fastnutrition-mealprep' ), 'money' => false ],
+			'deliveries'  => [ 'label' => __( 'Deliveries', 'fastnutrition-mealprep' ), 'money' => false ],
+			'collections' => [ 'label' => __( 'Collections', 'fastnutrition-mealprep' ), 'money' => false ],
+			'sweets'      => [ 'label' => __( 'Sweets', 'fastnutrition-mealprep' ), 'money' => false ],
+			'addons'      => [ 'label' => __( 'Add-ons', 'fastnutrition-mealprep' ), 'money' => false ],
+		];
 	}
 
 	/** @return array<int,array{ingredient_id:int,portions:int}> */
