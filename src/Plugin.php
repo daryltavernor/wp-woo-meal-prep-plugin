@@ -14,6 +14,7 @@ use FastNutrition\MealPrep\Admin\OrdersListBulkActions;
 use FastNutrition\MealPrep\Admin\PrepDashboard;
 use FastNutrition\MealPrep\Admin\PrepSheet;
 use FastNutrition\MealPrep\Admin\ProfileAdmin;
+use FastNutrition\MealPrep\Admin\Reports;
 use FastNutrition\MealPrep\Admin\SettingsPage;
 use FastNutrition\MealPrep\Cart\BundlePricer;
 use FastNutrition\MealPrep\Cart\OrderItemMeta;
@@ -104,6 +105,7 @@ final class Plugin {
 		( new BundleAdmin() )->register();
 		( new ConflictsNotice() )->register();
 		( new PopularCombosAdmin() )->register();
+		( new Reports() )->register();
 		( new LabelsAdmin() )->register();
 		( new OrdersListBulkActions() )->register();
 

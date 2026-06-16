@@ -53,6 +53,7 @@ final class MenuRegistry {
 		add_submenu_page( self::SLUG, __( 'Blocked Dates', 'fastnutrition-mealprep' ), __( 'Blocked Dates', 'fastnutrition-mealprep' ), 'manage_woocommerce', 'fn-blocked-dates', [ BlockedDatesAdmin::class, 'render_static' ] );
 
 		// Sales insight.
+		add_submenu_page( self::SLUG, __( 'Reports', 'fastnutrition-mealprep' ), __( 'Reports', 'fastnutrition-mealprep' ), 'manage_woocommerce', Reports::PAGE_SLUG, [ Reports::class, 'render_static' ] );
 		add_submenu_page( self::SLUG, __( 'Popular Combinations', 'fastnutrition-mealprep' ), __( 'Popular Combinations', 'fastnutrition-mealprep' ), 'manage_woocommerce', PopularCombosAdmin::PAGE_SLUG, [ PopularCombosAdmin::class, 'render_static' ] );
 
 		// Label printing.
