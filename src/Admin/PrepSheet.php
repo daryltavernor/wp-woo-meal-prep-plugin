@@ -136,10 +136,10 @@ final class PrepSheet {
 	 *
 	 * @return array<int,array{order:\WC_Order,fulfilment:array}>
 	 */
-	public static function collect_matched_by_date( string $date, string $method ): array {
+	public static function collect_matched_by_date( string $date, string $method, ?array $statuses = null ): array {
 		$orders = wc_get_orders(
 			[
-				'status'       => PrepOrderStatus::active_statuses(),
+				'status'       => $statuses ?? PrepOrderStatus::active_statuses(),
 				'limit'        => -1,
 				'meta_key'     => '_fn_fulfilment',
 				'date_created' => '>=' . SlotAvailability::created_since_for_date( $date ),

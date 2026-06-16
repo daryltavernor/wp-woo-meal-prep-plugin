@@ -45,6 +45,7 @@ use FastNutrition\MealPrep\Products\PopularCombosProduct;
 use FastNutrition\MealPrep\Products\StandaloneProduct;
 use FastNutrition\MealPrep\Rest\RestController;
 use FastNutrition\MealPrep\Stats\PopularCombos;
+use FastNutrition\MealPrep\Stats\StatsRollup;
 use FastNutrition\MealPrep\Support\AssetManager;
 use FastNutrition\MealPrep\Taxonomies\Allergen;
 use FastNutrition\MealPrep\Taxonomies\IngredientType;
@@ -109,6 +110,7 @@ final class Plugin {
 		( new Favourites() )->register();
 		( new RestController() )->register();
 		( new PopularCombos() )->register();
+		( new StatsRollup() )->register();
 		( new AssetManager() )->register();
 
 		// In-Store Quick Order (offline / phone order entry).
