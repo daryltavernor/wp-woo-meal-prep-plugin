@@ -70,10 +70,20 @@ final class PrepOrderStatus {
 	}
 
 	/**
-	 * @param string[] $statuses
-	 * @return string[]
+	 * Strip the prep-only statuses from WooCommerce's report status set.
+	 *
+	 * WooCommerce applies `woocommerce_reports_order_statuses` even when a report
+	 * query doesn't filter by status (it passes `false` — e.g. the Sales-by-date
+	 * refund query), so we must tolerate a non-array value and pass it through
+	 * unchanged rather than fataling on a strict type hint.
+	 *
+	 * @param mixed $statuses Array of status slugs, or false when unfiltered.
+	 * @return mixed
 	 */
-	public function exclude_from_reports( array $statuses ): array {
+	public function exclude_from_reports( $statuses ) {
+		if ( ! is_array( $statuses ) ) {
+			return $statuses;
+		}
 		return array_values( array_diff( $statuses, [ self::STATUS, self::SLUG ] ) );
 	}
 
