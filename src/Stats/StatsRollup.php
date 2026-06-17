@@ -77,6 +77,20 @@ final class StatsRollup {
 		self::queue_backfill();
 	}
 
+	/**
+	 * Re-roll the whole history once for a given token, used when an aggregation
+	 * rule changes (e.g. sweets now count as meals, delivery zones added). Runs
+	 * at most once per token, even across later upgrades.
+	 */
+	public static function ensure_reaggregated( string $token ): void {
+		$key = 'fn_stats_reagg_' . $token;
+		if ( get_option( $key ) ) {
+			return;
+		}
+		update_option( $key, 1, false );
+		self::queue_backfill();
+	}
+
 	// ---------------------------------------------------------------- tables
 
 	public static function stats_table(): string {
@@ -92,6 +106,11 @@ final class StatsRollup {
 	public static function meal_table(): string {
 		global $wpdb;
 		return $wpdb->prefix . 'fn_daily_meal_stats';
+	}
+
+	public static function zone_table(): string {
+		global $wpdb;
+		return $wpdb->prefix . 'fn_daily_zone_stats';
 	}
 
 	// ------------------------------------------------------------- nightly job
@@ -123,6 +142,7 @@ final class StatsRollup {
 		$by_method   = []; // method => aggregate row
 		$ingredients = []; // ingredient_id => portions
 		$meals       = []; // meal_key => [ qty, mode ]
+		$zones       = []; // zone_key (outward postcode) => [ orders, meals ] — deliveries only.
 
 		foreach ( $matched as $m ) {
 			$order  = $m['order'];
@@ -145,33 +165,44 @@ final class StatsRollup {
 			$by_method[ $method ]['orders']  += 1;
 			$by_method[ $method ]['revenue'] += (float) $order->get_total(); // gross order total.
 
+			$order_meals = 0; // meals on this order, for the per-zone tally.
+
 			foreach ( $order->get_items() as $item ) {
 				$qty = (int) $item->get_quantity();
 				$sel = $item->get_meta( '_fn_selection', true );
+
+				// A "meal" is any built / set / standalone meal OR a sweet — every
+				// plated item counts. Add-ons are extras, tallied on the side.
 				if ( ! is_array( $sel ) ) {
 					$by_method[ $method ]['meals'] += $qty;
+					$order_meals                   += $qty;
 					continue;
 				}
-				$mode = (string) ( $sel['mode'] ?? '' );
 
-				if ( Selection::is_sweet( $sel ) ) {
+				$mode     = (string) ( $sel['mode'] ?? '' );
+				$is_sweet = Selection::is_sweet( $sel );
+
+				$by_method[ $method ]['meals'] += $qty;
+				$order_meals                   += $qty;
+				if ( $is_sweet ) {
 					$by_method[ $method ]['sweets'] += $qty;
+				} elseif ( 'build' === $mode ) {
+					$by_method[ $method ]['build'] += $qty;
+				} elseif ( 'set' === $mode ) {
+					$by_method[ $method ]['set'] += $qty;
 				} else {
-					$by_method[ $method ]['meals'] += $qty;
-					if ( 'build' === $mode ) {
-						$by_method[ $method ]['build'] += $qty;
-					} elseif ( 'set' === $mode ) {
-						$by_method[ $method ]['set'] += $qty;
-					} else {
-						$by_method[ $method ]['standalone'] += $qty;
-					}
-					$sig = ( 'build' === $mode ) ? Selection::combo_signature( $sel ) : null;
-					$key = $sig ?? ( 'p:' . (int) $item->get_product_id() );
-					if ( ! isset( $meals[ $key ] ) ) {
-						$meals[ $key ] = [ 'qty' => 0, 'mode' => $mode ];
-					}
-					$meals[ $key ]['qty'] += $qty;
+					$by_method[ $method ]['standalone'] += $qty;
 				}
+
+				// Popularity for every meal: build combos keyed by signature; set,
+				// standalone and sweets keyed by product.
+				$row_mode = $is_sweet ? 'sweet' : $mode;
+				$sig      = ( 'build' === $mode && ! $is_sweet ) ? Selection::combo_signature( $sel ) : null;
+				$key      = $sig ?? ( 'p:' . (int) $item->get_product_id() );
+				if ( ! isset( $meals[ $key ] ) ) {
+					$meals[ $key ] = [ 'qty' => 0, 'mode' => $row_mode ];
+				}
+				$meals[ $key ]['qty'] += $qty;
 
 				foreach ( Selection::addon_counts( $sel ) as $n ) {
 					$by_method[ $method ]['addons'] += $n * $qty;
@@ -180,16 +211,29 @@ final class StatsRollup {
 					$ingredients[ (int) $ing ] = ( $ingredients[ (int) $ing ] ?? 0 ) + $qty;
 				}
 			}
+
+			// Per-zone delivery tally (deliveries only — collections are excluded).
+			if ( 'delivery' === $method ) {
+				$zk = self::outward_code( (string) ( $order->get_shipping_postcode() ?: $order->get_billing_postcode() ) );
+				if ( '' !== $zk ) {
+					if ( ! isset( $zones[ $zk ] ) ) {
+						$zones[ $zk ] = [ 'orders' => 0, 'meals' => 0 ];
+					}
+					$zones[ $zk ]['orders'] += 1;
+					$zones[ $zk ]['meals']  += $order_meals;
+				}
+			}
 		}
 
-		self::write_date( $date, $by_method, $ingredients, $meals );
+		self::write_date( $date, $by_method, $ingredients, $meals, $zones );
 	}
 
-	private static function write_date( string $date, array $by_method, array $ingredients, array $meals ): void {
+	private static function write_date( string $date, array $by_method, array $ingredients, array $meals, array $zones ): void {
 		global $wpdb;
 		$stats = self::stats_table();
 		$ing   = self::ingredient_table();
 		$mealt = self::meal_table();
+		$zonet = self::zone_table();
 		$now   = current_time( 'mysql' );
 
 		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
@@ -197,9 +241,11 @@ final class StatsRollup {
 		$wpdb->delete( $stats, [ 'stat_date' => $date ], [ '%s' ] );
 		$wpdb->delete( $ing, [ 'stat_date' => $date ], [ '%s' ] );
 		$wpdb->delete( $mealt, [ 'stat_date' => $date ], [ '%s' ] );
+		$wpdb->delete( $zonet, [ 'stat_date' => $date ], [ '%s' ] );
 
 		foreach ( $by_method as $method => $a ) {
-			$items = (int) $a['meals'] + (int) $a['sweets'] + (int) $a['addons'];
+			// meals already includes sweets, so items = meals + add-ons (no double count).
+			$items = (int) $a['meals'] + (int) $a['addons'];
 			$wpdb->insert(
 				$stats,
 				[
@@ -244,7 +290,35 @@ final class StatsRollup {
 				]
 			);
 		}
+		foreach ( $zones as $zk => $z ) {
+			$wpdb->insert(
+				$zonet,
+				[
+					'stat_date'  => $date,
+					'zone_key'   => (string) $zk,
+					'orders'     => (int) $z['orders'],
+					'meals'      => (int) $z['meals'],
+					'updated_at' => $now,
+				]
+			);
+		}
 		// phpcs:enable
+	}
+
+	/**
+	 * UK outward postcode (the part before the space, e.g. "ST5 1AB" -> "ST5"),
+	 * used as the delivery-zone key. Returns '' when no usable postcode.
+	 */
+	public static function outward_code( string $postcode ): string {
+		$pc = strtoupper( trim( $postcode ) );
+		if ( '' === $pc ) {
+			return '';
+		}
+		if ( false !== strpos( $pc, ' ' ) ) {
+			return trim( substr( $pc, 0, strpos( $pc, ' ' ) ) );
+		}
+		// No space: the inward code is always the last 3 chars (e.g. "ST51AB").
+		return strlen( $pc ) > 3 ? substr( $pc, 0, -3 ) : $pc;
 	}
 
 	// -------------------------------------------------------- status-change hook

@@ -102,6 +102,7 @@ final class Reports {
 		// Popularity.
 		self::render_top_ingredients( self::top_ingredients( $from, $to, 25 ) );
 		self::render_top_meals( self::top_meals( $from, $to, 25 ) );
+		self::render_top_zones( self::top_zones( $from, $to, 25 ) );
 
 		echo '</div>';
 	}
@@ -324,6 +325,26 @@ final class Reports {
 		echo '</tbody></table>';
 	}
 
+	private static function render_top_zones( array $rows ): void {
+		echo '<h2>' . esc_html__( 'Most popular delivery zones', 'fastnutrition-mealprep' ) . '</h2>';
+		echo '<p class="description">' . esc_html__( 'Delivery orders only, grouped by postcode area — collections are excluded.', 'fastnutrition-mealprep' ) . '</p>';
+		if ( empty( $rows ) ) {
+			echo '<p><em>' . esc_html__( 'No delivery data in this range yet.', 'fastnutrition-mealprep' ) . '</em></p>';
+			return;
+		}
+		echo '<table class="widefat striped" style="max-width:640px;"><thead><tr>';
+		echo '<th>' . esc_html__( 'Postcode area', 'fastnutrition-mealprep' ) . '</th>';
+		echo '<th>' . esc_html__( 'Deliveries', 'fastnutrition-mealprep' ) . '</th>';
+		echo '<th>' . esc_html__( 'Meals', 'fastnutrition-mealprep' ) . '</th>';
+		echo '</tr></thead><tbody>';
+		foreach ( $rows as $r ) {
+			echo '<tr><td>' . esc_html( (string) $r['zone_key'] ) . '</td>';
+			echo '<td>' . (int) $r['orders'] . '</td>';
+			echo '<td>' . (int) $r['meals'] . '</td></tr>';
+		}
+		echo '</tbody></table>';
+	}
+
 	private static function delta_html( float $now, float $prev ): string {
 		if ( $prev <= 0.0 ) {
 			return '<div style="font-size:12px;color:#787c82;">' . esc_html__( 'no prior data', 'fastnutrition-mealprep' ) . '</div>';
@@ -464,6 +485,22 @@ final class Reports {
 		return array_map( static fn( $r ) => [ 'meal_key' => (string) $r['meal_key'], 'mode' => (string) $r['mode'], 'qty' => (int) $r['qty'] ], (array) $rows );
 	}
 
+	/** @return array<int,array{zone_key:string,orders:int,meals:int}> */
+	private static function top_zones( string $from, string $to, int $limit ): array {
+		global $wpdb;
+		$table = StatsRollup::zone_table();
+		$rows  = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT zone_key, SUM(orders) orders, SUM(meals) meals FROM {$table} WHERE stat_date BETWEEN %s AND %s GROUP BY zone_key ORDER BY orders DESC LIMIT %d", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				$from,
+				$to,
+				$limit
+			),
+			ARRAY_A
+		);
+		return array_map( static fn( $r ) => [ 'zone_key' => (string) $r['zone_key'], 'orders' => (int) $r['orders'], 'meals' => (int) $r['meals'] ], (array) $rows );
+	}
+
 	private static function bucket_expr( string $gran ): string {
 		switch ( $gran ) {
 			case 'month':
@@ -507,6 +544,7 @@ final class Reports {
 			'build'      => __( 'Build', 'fastnutrition-mealprep' ),
 			'set'        => __( 'Set meal', 'fastnutrition-mealprep' ),
 			'standalone' => __( 'Standalone', 'fastnutrition-mealprep' ),
+			'sweet'      => __( 'Sweet', 'fastnutrition-mealprep' ),
 		];
 		return $labels[ $mode ] ?? $mode;
 	}

@@ -10,7 +10,10 @@ use FastNutrition\MealPrep\Taxonomies\IngredientType;
 
 final class Activator {
 
-	public const DB_VERSION = '1.3.0';
+	public const DB_VERSION = '1.4.0';
+
+	/** Token for the one-off re-roll when the stats aggregation rules changed. */
+	private const STATS_REAGG_TOKEN = 'meals_zones_v2';
 
 	public static function activate(): void {
 		self::create_tables();
@@ -23,6 +26,9 @@ final class Activator {
 		PopularCombos::queue_recompute();
 		StatsRollup::ensure_scheduled();
 		StatsRollup::ensure_backfilled();
+		// Fresh install already builds with the current rules — mark the re-roll
+		// token done so a later upgrade doesn't pointlessly re-aggregate.
+		update_option( 'fn_stats_reagg_' . self::STATS_REAGG_TOKEN, 1, false );
 		flush_rewrite_rules();
 	}
 
@@ -36,6 +42,9 @@ final class Activator {
 		PopularCombos::queue_recompute();
 		StatsRollup::ensure_scheduled();
 		StatsRollup::ensure_backfilled();
+		// Existing installs: re-roll history once so sweets count as meals and the
+		// delivery-zone figures populate.
+		StatsRollup::ensure_reaggregated( self::STATS_REAGG_TOKEN );
 		update_option( 'fn_mealprep_db_version', self::DB_VERSION, false );
 	}
 
@@ -55,6 +64,7 @@ final class Activator {
 		$daily_stats     = $wpdb->prefix . 'fn_daily_stats';
 		$daily_ing       = $wpdb->prefix . 'fn_daily_ingredient_stats';
 		$daily_meal      = $wpdb->prefix . 'fn_daily_meal_stats';
+		$daily_zone      = $wpdb->prefix . 'fn_daily_zone_stats';
 
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 
@@ -148,6 +158,21 @@ final class Activator {
 				PRIMARY KEY  (id),
 				UNIQUE KEY date_meal (stat_date, meal_key),
 				KEY meal_key (meal_key),
+				KEY stat_date (stat_date)
+			) {$charset_collate};"
+		);
+
+		dbDelta(
+			"CREATE TABLE {$daily_zone} (
+				id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+				stat_date date NOT NULL,
+				zone_key varchar(20) NOT NULL DEFAULT '',
+				orders int(11) NOT NULL DEFAULT 0,
+				meals int(11) NOT NULL DEFAULT 0,
+				updated_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				PRIMARY KEY  (id),
+				UNIQUE KEY date_zone (stat_date, zone_key),
+				KEY zone_key (zone_key),
 				KEY stat_date (stat_date)
 			) {$charset_collate};"
 		);
