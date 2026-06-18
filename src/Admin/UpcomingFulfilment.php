@@ -3,6 +3,7 @@ declare( strict_types=1 );
 
 namespace FastNutrition\MealPrep\Admin;
 
+use FastNutrition\MealPrep\Cart\Selection;
 use FastNutrition\MealPrep\Delivery\SlotAvailability;
 use FastNutrition\MealPrep\InStore\PrepOrderStatus;
 
@@ -19,7 +20,7 @@ use FastNutrition\MealPrep\InStore\PrepOrderStatus;
 final class UpcomingFulfilment {
 
 	private const DAYS      = 7;
-	private const CACHE_KEY = 'fn_upcoming_fulfilment';
+	private const CACHE_KEY = 'fn_upcoming_fulfilment_v2';
 
 	public function register(): void {
 		add_action( 'admin_notices', [ $this, 'maybe_render' ] );
@@ -47,7 +48,7 @@ final class UpcomingFulfilment {
 	/**
 	 * Per-day rows for the next 7 days.
 	 *
-	 * @return array<int,array{date:string,label:string,orders:int,meals:int,delivery:int,collection:int}>
+	 * @return array<int,array{date:string,label:string,orders:int,meals:int,addons:int,delivery:int,collection:int}>
 	 */
 	public static function data(): array {
 		$cached = get_transient( self::CACHE_KEY );
@@ -65,6 +66,7 @@ final class UpcomingFulfilment {
 				'label'      => $d->format( 'D j M' ),
 				'orders'     => 0,
 				'meals'      => 0,
+				'addons'     => 0,
 				'delivery'   => 0,
 				'collection' => 0,
 			];
@@ -98,10 +100,17 @@ final class UpcomingFulfilment {
 				} elseif ( 'collection' === $method ) {
 					$rows[ $d ]['collection'] += 1;
 				}
-				// Every line item is a plated meal/sweet (add-ons live inside the
-				// selection, not as separate lines), so quantities sum to meals.
+				// Every line item is a plated meal/sweet (quantities sum to meals);
+				// add-ons live inside each selection and are tallied separately.
 				foreach ( $order->get_items() as $item ) {
-					$rows[ $d ]['meals'] += (int) $item->get_quantity();
+					$qty                  = (int) $item->get_quantity();
+					$rows[ $d ]['meals'] += $qty;
+					$sel                  = $item->get_meta( '_fn_selection', true );
+					if ( is_array( $sel ) ) {
+						foreach ( Selection::addon_counts( $sel ) as $n ) {
+							$rows[ $d ]['addons'] += $n * $qty;
+						}
+					}
 				}
 			}
 		}
@@ -114,11 +123,13 @@ final class UpcomingFulfilment {
 	private function render( array $rows ): void {
 		$t_orders = 0;
 		$t_meals  = 0;
+		$t_addons = 0;
 		$t_del    = 0;
 		$t_col    = 0;
 		foreach ( $rows as $r ) {
 			$t_orders += (int) $r['orders'];
 			$t_meals  += (int) $r['meals'];
+			$t_addons += (int) ( $r['addons'] ?? 0 );
 			$t_del    += (int) $r['delivery'];
 			$t_col    += (int) $r['collection'];
 		}
@@ -129,6 +140,7 @@ final class UpcomingFulfilment {
 		echo '<th>' . esc_html__( 'Day', 'fastnutrition-mealprep' ) . '</th>';
 		echo '<th>' . esc_html__( 'Orders', 'fastnutrition-mealprep' ) . '</th>';
 		echo '<th>' . esc_html__( 'Meals', 'fastnutrition-mealprep' ) . '</th>';
+		echo '<th>' . esc_html__( 'Add-ons', 'fastnutrition-mealprep' ) . '</th>';
 		echo '<th>' . esc_html__( 'Deliveries', 'fastnutrition-mealprep' ) . '</th>';
 		echo '<th>' . esc_html__( 'Collections', 'fastnutrition-mealprep' ) . '</th>';
 		echo '</tr></thead><tbody>';
@@ -137,6 +149,7 @@ final class UpcomingFulfilment {
 			echo '<td>' . esc_html( (string) $r['label'] ) . '</td>';
 			echo '<td>' . (int) $r['orders'] . '</td>';
 			echo '<td>' . (int) $r['meals'] . '</td>';
+			echo '<td>' . (int) ( $r['addons'] ?? 0 ) . '</td>';
 			echo '<td>' . (int) $r['delivery'] . '</td>';
 			echo '<td>' . (int) $r['collection'] . '</td>';
 			echo '</tr>';
@@ -145,6 +158,7 @@ final class UpcomingFulfilment {
 		echo '<td>' . esc_html__( 'Total', 'fastnutrition-mealprep' ) . '</td>';
 		echo '<td>' . (int) $t_orders . '</td>';
 		echo '<td>' . (int) $t_meals . '</td>';
+		echo '<td>' . (int) $t_addons . '</td>';
 		echo '<td>' . (int) $t_del . '</td>';
 		echo '<td>' . (int) $t_col . '</td>';
 		echo '</tr></tfoot></table>';
