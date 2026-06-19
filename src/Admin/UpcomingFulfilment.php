@@ -167,17 +167,32 @@ final class UpcomingFulfilment {
 			}
 		}
 
+		// Column label + hover/explanation help, so staff understand each figure.
+		$cols = [
+			'day'         => [ __( 'Day', 'fastnutrition-mealprep' ), __( 'Each of the next 7 days, by delivery/collection date.', 'fastnutrition-mealprep' ) ],
+			'orders'      => [ __( 'Orders', 'fastnutrition-mealprep' ), __( 'Orders to fulfil that day (deliveries + collections).', 'fastnutrition-mealprep' ) ],
+			'meals'       => [ __( 'Meals', 'fastnutrition-mealprep' ), __( 'Individual meals to make — built, set and standalone meals plus sweets. Excludes add-ons and meal plans.', 'fastnutrition-mealprep' ) ],
+			'addons'      => [ __( 'Add-ons', 'fastnutrition-mealprep' ), __( 'Extra add-on items to prepare that day.', 'fastnutrition-mealprep' ) ],
+			'deliveries'  => [ __( 'Deliveries', 'fastnutrition-mealprep' ), __( 'Number of orders going out for delivery that day.', 'fastnutrition-mealprep' ) ],
+			'collections' => [ __( 'Collections', 'fastnutrition-mealprep' ), __( 'Number of orders being collected that day.', 'fastnutrition-mealprep' ) ],
+		];
+		if ( $show_plans ) {
+			$cols['plans'] = [ __( 'Meal plans', 'fastnutrition-mealprep' ), __( 'How many of each meal-plan product to produce. Counted separately — NOT included in the Meals column.', 'fastnutrition-mealprep' ) ];
+		}
+
 		echo '<div class="fn-upcoming notice notice-info" style="padding:10px 14px;">';
 		echo '<h2 style="margin:.4em 0;">' . esc_html__( 'Upcoming fulfilment — next 7 days', 'fastnutrition-mealprep' ) . '</h2>';
+
+		echo '<details style="margin:.2em 0 .6em;"><summary style="cursor:pointer;">' . esc_html__( 'What do these columns mean?', 'fastnutrition-mealprep' ) . '</summary>';
+		echo '<ul style="margin:.4em 0 .2em 1.2em;list-style:disc;">';
+		foreach ( $cols as $c ) {
+			echo '<li><strong>' . esc_html( $c[0] ) . '</strong> — ' . esc_html( $c[1] ) . '</li>';
+		}
+		echo '</ul></details>';
+
 		echo '<table class="widefat striped" style="max-width:900px;"><thead><tr>';
-		echo '<th>' . esc_html__( 'Day', 'fastnutrition-mealprep' ) . '</th>';
-		echo '<th>' . esc_html__( 'Orders', 'fastnutrition-mealprep' ) . '</th>';
-		echo '<th>' . esc_html__( 'Meals', 'fastnutrition-mealprep' ) . '</th>';
-		echo '<th>' . esc_html__( 'Add-ons', 'fastnutrition-mealprep' ) . '</th>';
-		echo '<th>' . esc_html__( 'Deliveries', 'fastnutrition-mealprep' ) . '</th>';
-		echo '<th>' . esc_html__( 'Collections', 'fastnutrition-mealprep' ) . '</th>';
-		if ( $show_plans ) {
-			echo '<th>' . esc_html__( 'Meal plans', 'fastnutrition-mealprep' ) . '</th>';
+		foreach ( $cols as $c ) {
+			echo '<th title="' . esc_attr( $c[1] ) . '">' . esc_html( $c[0] ) . '</th>';
 		}
 		echo '</tr></thead><tbody>';
 		foreach ( $rows as $r ) {
