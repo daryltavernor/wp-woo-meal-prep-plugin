@@ -54,6 +54,7 @@ final class MenuRegistry {
 
 		// Sales insight.
 		add_submenu_page( self::SLUG, __( 'Reports', 'fastnutrition-mealprep' ), __( 'Reports', 'fastnutrition-mealprep' ), 'manage_woocommerce', Reports::PAGE_SLUG, [ Reports::class, 'render_static' ] );
+		add_submenu_page( self::SLUG, __( 'Meal Plans', 'fastnutrition-mealprep' ), __( 'Meal Plans', 'fastnutrition-mealprep' ), 'manage_woocommerce', MealPlansSettings::PAGE_SLUG, [ MealPlansSettings::class, 'render_static' ] );
 		add_submenu_page( self::SLUG, __( 'Popular Combinations', 'fastnutrition-mealprep' ), __( 'Popular Combinations', 'fastnutrition-mealprep' ), 'manage_woocommerce', PopularCombosAdmin::PAGE_SLUG, [ PopularCombosAdmin::class, 'render_static' ] );
 
 		// Label printing.

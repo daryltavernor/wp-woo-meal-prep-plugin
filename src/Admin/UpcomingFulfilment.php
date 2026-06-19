@@ -20,7 +20,7 @@ use FastNutrition\MealPrep\InStore\PrepOrderStatus;
 final class UpcomingFulfilment {
 
 	private const DAYS      = 7;
-	private const CACHE_KEY = 'fn_upcoming_fulfilment_v2';
+	private const CACHE_KEY = 'fn_upcoming_fulfilment_v3';
 
 	public function register(): void {
 		add_action( 'admin_notices', [ $this, 'maybe_render' ] );
@@ -69,8 +69,11 @@ final class UpcomingFulfilment {
 				'addons'     => 0,
 				'delivery'   => 0,
 				'collection' => 0,
+				'plans'      => [], // variation id => count (meal plans, kept separate).
 			];
 		}
+
+		$plan_config = MealPlansSettings::get_config(); // product id => excluded variation ids.
 
 		if ( function_exists( 'wc_get_orders' ) ) {
 			// One bounded scan covers every order that could fall on these dates:
@@ -102,8 +105,17 @@ final class UpcomingFulfilment {
 				}
 				// Every line item is a plated meal/sweet (quantities sum to meals);
 				// add-ons live inside each selection and are tallied separately.
+				// Meal-plan variations are counted on their own and NOT as meals.
 				foreach ( $order->get_items() as $item ) {
-					$qty                  = (int) $item->get_quantity();
+					$qty = (int) $item->get_quantity();
+
+					$pid = (int) $item->get_product_id();
+					$vid = (int) $item->get_variation_id();
+					if ( $vid > 0 && isset( $plan_config[ $pid ] ) && ! in_array( $vid, $plan_config[ $pid ], true ) ) {
+						$rows[ $d ]['plans'][ $vid ] = ( $rows[ $d ]['plans'][ $vid ] ?? 0 ) + $qty;
+						continue;
+					}
+
 					$rows[ $d ]['meals'] += $qty;
 					$sel                  = $item->get_meta( '_fn_selection', true );
 					if ( is_array( $sel ) ) {
@@ -121,28 +133,52 @@ final class UpcomingFulfilment {
 	}
 
 	private function render( array $rows ): void {
+		$show_plans  = ! empty( MealPlansSettings::get_config() );
+		$label_cache = [];
+		$plans_cell  = static function ( array $plans ) use ( &$label_cache ): string {
+			if ( empty( $plans ) ) {
+				return '—';
+			}
+			ksort( $plans );
+			$parts = [];
+			foreach ( $plans as $vid => $count ) {
+				if ( ! isset( $label_cache[ $vid ] ) ) {
+					$label_cache[ $vid ] = MealPlansSettings::variation_label( (int) $vid );
+				}
+				$parts[] = esc_html( $label_cache[ $vid ] . ' ×' . (int) $count );
+			}
+			return implode( '<br>', $parts );
+		};
+
 		$t_orders = 0;
 		$t_meals  = 0;
 		$t_addons = 0;
 		$t_del    = 0;
 		$t_col    = 0;
+		$t_plans  = [];
 		foreach ( $rows as $r ) {
 			$t_orders += (int) $r['orders'];
 			$t_meals  += (int) $r['meals'];
 			$t_addons += (int) ( $r['addons'] ?? 0 );
 			$t_del    += (int) $r['delivery'];
 			$t_col    += (int) $r['collection'];
+			foreach ( (array) ( $r['plans'] ?? [] ) as $vid => $count ) {
+				$t_plans[ $vid ] = ( $t_plans[ $vid ] ?? 0 ) + (int) $count;
+			}
 		}
 
 		echo '<div class="fn-upcoming notice notice-info" style="padding:10px 14px;">';
 		echo '<h2 style="margin:.4em 0;">' . esc_html__( 'Upcoming fulfilment — next 7 days', 'fastnutrition-mealprep' ) . '</h2>';
-		echo '<table class="widefat striped" style="max-width:760px;"><thead><tr>';
+		echo '<table class="widefat striped" style="max-width:900px;"><thead><tr>';
 		echo '<th>' . esc_html__( 'Day', 'fastnutrition-mealprep' ) . '</th>';
 		echo '<th>' . esc_html__( 'Orders', 'fastnutrition-mealprep' ) . '</th>';
 		echo '<th>' . esc_html__( 'Meals', 'fastnutrition-mealprep' ) . '</th>';
 		echo '<th>' . esc_html__( 'Add-ons', 'fastnutrition-mealprep' ) . '</th>';
 		echo '<th>' . esc_html__( 'Deliveries', 'fastnutrition-mealprep' ) . '</th>';
 		echo '<th>' . esc_html__( 'Collections', 'fastnutrition-mealprep' ) . '</th>';
+		if ( $show_plans ) {
+			echo '<th>' . esc_html__( 'Meal plans', 'fastnutrition-mealprep' ) . '</th>';
+		}
 		echo '</tr></thead><tbody>';
 		foreach ( $rows as $r ) {
 			echo '<tr>';
@@ -152,6 +188,9 @@ final class UpcomingFulfilment {
 			echo '<td>' . (int) ( $r['addons'] ?? 0 ) . '</td>';
 			echo '<td>' . (int) $r['delivery'] . '</td>';
 			echo '<td>' . (int) $r['collection'] . '</td>';
+			if ( $show_plans ) {
+				echo '<td>' . $plans_cell( (array) ( $r['plans'] ?? [] ) ) . '</td>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+			}
 			echo '</tr>';
 		}
 		echo '</tbody><tfoot><tr style="font-weight:600;">';
@@ -161,6 +200,9 @@ final class UpcomingFulfilment {
 		echo '<td>' . (int) $t_addons . '</td>';
 		echo '<td>' . (int) $t_del . '</td>';
 		echo '<td>' . (int) $t_col . '</td>';
+		if ( $show_plans ) {
+			echo '<td>' . $plans_cell( $t_plans ) . '</td>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+		}
 		echo '</tr></tfoot></table>';
 		echo '</div>';
 	}
