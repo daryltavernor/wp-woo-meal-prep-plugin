@@ -159,10 +159,10 @@ final class Selections {
 		return $item_data;
 	}
 
-	public static function normalize( int $product_id, array $raw ): array {
+	public static function normalize( int $product_id, array $raw, string $channel = Ingredient::CHANNEL_BUILDER ): array {
 		// Standalone products: a single chosen item of the configured type.
 		if ( StandaloneProduct::is_enabled( $product_id ) ) {
-			return self::normalize_standalone( $product_id, $raw );
+			return self::normalize_standalone( $product_id, $raw, $channel );
 		}
 
 		$config = MealProduct::get_config( $product_id );
@@ -183,6 +183,9 @@ final class Selections {
 			}
 			if ( 'set_meal' !== Ingredient::get_type_slug( $set_meal_id ) ) {
 				return [];
+			}
+			if ( ! Ingredient::available_in( $set_meal_id, $channel ) ) {
+				return []; // set meal not offered in this ordering channel.
 			}
 			$addons = self::sanitize_addons( $product_id, $raw['addons'] ?? [] );
 			return [
@@ -226,6 +229,17 @@ final class Selections {
 			$greens_ids = array_values( array_intersect( $greens_ids, $config['allowed_greens'] ) );
 		}
 
+		// Channel availability: drop any component not offered in this channel.
+		if ( $protein_id && ! Ingredient::available_in( $protein_id, $channel ) ) {
+			$protein_id = 0;
+		}
+		if ( $carb_id && ! Ingredient::available_in( $carb_id, $channel ) ) {
+			$carb_id = 0;
+		}
+		$greens_ids = array_values(
+			array_filter( $greens_ids, static fn( $id ) => Ingredient::available_in( (int) $id, $channel ) )
+		);
+
 		if ( count( $greens_ids ) === 2 ) {
 			$carb_id = 0;
 		}
@@ -247,7 +261,7 @@ final class Selections {
 	 * product's configured allow-list. When the product offers exactly one item
 	 * it is auto-selected, so the customer needs no on-page choice.
 	 */
-	private static function normalize_standalone( int $product_id, array $raw ): array {
+	private static function normalize_standalone( int $product_id, array $raw, string $channel = Ingredient::CHANNEL_BUILDER ): array {
 		$cfg = StandaloneProduct::get_config( $product_id );
 		if ( ! $cfg['enabled'] || empty( $cfg['ids'] ) ) {
 			return [];
@@ -265,6 +279,9 @@ final class Selections {
 		// The chosen item must really be of the configured type.
 		if ( $cfg['type'] !== Ingredient::get_type_slug( $item_id ) ) {
 			return [];
+		}
+		if ( ! Ingredient::available_in( $item_id, $channel ) ) {
+			return []; // item not offered in this ordering channel.
 		}
 
 		return [

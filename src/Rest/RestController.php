@@ -57,7 +57,8 @@ final class RestController {
 				'callback'            => [ $this, 'get_ingredients' ],
 				'permission_callback' => '__return_true',
 				'args'                => [
-					'type' => [ 'type' => 'string' ],
+					'type'    => [ 'type' => 'string' ],
+					'channel' => [ 'type' => 'string' ],
 				],
 			]
 		);
@@ -165,14 +166,20 @@ final class RestController {
 	}
 
 	public function get_ingredients( WP_REST_Request $req ): array {
-		$type = sanitize_key( (string) $req->get_param( 'type' ) );
+		$type    = sanitize_key( (string) $req->get_param( 'type' ) );
+		$channel = sanitize_key( (string) $req->get_param( 'channel' ) );
+		// Only a known channel filters the list; anything else (incl. blank) returns
+		// the full active catalogue, so existing/other callers are unaffected.
+		if ( ! in_array( $channel, Ingredient::CHANNELS, true ) ) {
+			$channel = '';
+		}
 
 		// The catalogue is identical for every (anonymous) caller and only changes
 		// when an ingredient is saved, so serve it from a per-type transient keyed
 		// by the cache version. On a hit this skips the unbounded posts_per_page
 		// => -1 query and all the term/meta/thumbnail priming below.
 		$ver       = (string) get_option( self::ING_CACHE_VER_OPT, '0' );
-		$cache_key = 'fn_ing_rest_' . md5( $ver . '|' . $type );
+		$cache_key = 'fn_ing_rest_' . md5( $ver . '|' . $type . '|' . $channel );
 		$cached    = get_transient( $cache_key );
 		if ( is_array( $cached ) ) {
 			return $cached;
@@ -219,7 +226,10 @@ final class RestController {
 
 		$out = [];
 		foreach ( $posts as $p ) {
-			$id    = (int) $p->ID;
+			$id = (int) $p->ID;
+			if ( '' !== $channel && ! Ingredient::available_in( $id, $channel ) ) {
+				continue; // hidden from this ordering channel.
+			}
 			$out[] = [
 				'id'          => $id,
 				'name'        => (string) $p->post_title,

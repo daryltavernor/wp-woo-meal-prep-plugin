@@ -10,6 +10,7 @@ use FastNutrition\MealPrep\Checkout\StoreApiExtensions;
 use FastNutrition\MealPrep\Delivery\BlockedDates;
 use FastNutrition\MealPrep\Delivery\Profile;
 use FastNutrition\MealPrep\Delivery\SlotAvailability;
+use FastNutrition\MealPrep\PostTypes\Ingredient;
 use FastNutrition\MealPrep\Products\MealProduct;
 use WC_Order;
 use WC_Order_Item_Product;
@@ -364,7 +365,7 @@ final class OrderFactory {
 				return new WP_Error( 'fn_line_invalid', __( 'One of the items is not a valid meal product.', 'fastnutrition-mealprep' ), [ 'status' => 400 ] );
 			}
 			$raw       = isset( $line['selection'] ) && is_array( $line['selection'] ) ? $line['selection'] : [];
-			$selection = Selections::normalize( $pid, $raw );
+			$selection = Selections::normalize( $pid, $raw, Ingredient::CHANNEL_INSTORE );
 			if ( empty( $selection ) ) {
 				return new WP_Error( 'fn_selection_invalid', __( 'One of the items has an invalid selection.', 'fastnutrition-mealprep' ), [ 'status' => 400 ] );
 			}

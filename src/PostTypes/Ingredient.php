@@ -11,6 +11,30 @@ final class Ingredient {
 
 	public const POST_TYPE = 'fn_ingredient';
 
+	/** Ordering channels an ingredient can be made (un)available in. */
+	public const CHANNEL_BUILDER = 'builder';  // Front-end Meal Builder (online store).
+	public const CHANNEL_INSTORE = 'instore';  // Quick Order + Label Maker (staff).
+
+	/** All known channels, for the admin UI + validation. */
+	public const CHANNELS = [ self::CHANNEL_BUILDER, self::CHANNEL_INSTORE ];
+
+	/**
+	 * Whether an ingredient may be selected through a given ordering channel.
+	 * Defaults to available everywhere: the master `_fn_active` flag (missing =
+	 * active) must be on, and the channel must not be in `_fn_unavailable_channels`
+	 * (missing/empty = available in every channel), so existing ingredients need
+	 * no migration.
+	 */
+	public static function available_in( int $ingredient_id, string $channel ): bool {
+		$active = get_post_meta( $ingredient_id, '_fn_active', true );
+		if ( '' !== $active && ! (bool) $active ) {
+			return false;
+		}
+		$off = get_post_meta( $ingredient_id, '_fn_unavailable_channels', true );
+		$off = is_array( $off ) ? $off : [];
+		return ! in_array( $channel, $off, true );
+	}
+
 	public function register(): void {
 		add_action( 'init', [ $this, 'register_post_type' ] );
 		add_action( 'add_meta_boxes', [ $this, 'add_meta_boxes' ] );
@@ -244,6 +268,23 @@ final class Ingredient {
 			checked( $active, true, false ),
 			esc_html__( 'Available for customers to select', 'fastnutrition-mealprep' )
 		);
+		$off        = get_post_meta( $post->ID, '_fn_unavailable_channels', true );
+		$off        = is_array( $off ) ? $off : [];
+		$builder_on = ! in_array( self::CHANNEL_BUILDER, $off, true );
+		$instore_on = ! in_array( self::CHANNEL_INSTORE, $off, true );
+		printf(
+			'<tr><th>%1$s</th><td>
+				<label style="display:block;margin-bottom:4px"><input type="checkbox" name="fn_channel_builder" value="1" %2$s /> %3$s</label>
+				<label style="display:block"><input type="checkbox" name="fn_channel_instore" value="1" %4$s /> %5$s</label>
+				<p class="description">%6$s</p>
+			</td></tr>',
+			esc_html__( 'Available in', 'fastnutrition-mealprep' ),
+			checked( $builder_on, true, false ),
+			esc_html__( 'Meal Builder (online store)', 'fastnutrition-mealprep' ),
+			checked( $instore_on, true, false ),
+			esc_html__( 'In-store (Quick Order & Label Maker)', 'fastnutrition-mealprep' ),
+			esc_html__( 'Both are on by default. Untick a channel to stop this ingredient being selectable there — e.g. offer it to staff in-store only.', 'fastnutrition-mealprep' )
+		);
 		echo '</tbody></table>';
 		?>
 		<script>
@@ -296,6 +337,17 @@ final class Ingredient {
 		update_post_meta( $post_id, '_fn_price_delta', $price_delta );
 
 		update_post_meta( $post_id, '_fn_active', ! empty( $_POST['fn_active'] ) );
+
+		// Per-channel availability: store the channels that are switched OFF, so a
+		// missing/empty value means available everywhere (no migration needed).
+		$off = [];
+		if ( empty( $_POST['fn_channel_builder'] ) ) {
+			$off[] = self::CHANNEL_BUILDER;
+		}
+		if ( empty( $_POST['fn_channel_instore'] ) ) {
+			$off[] = self::CHANNEL_INSTORE;
+		}
+		update_post_meta( $post_id, '_fn_unavailable_channels', $off );
 
 		if ( isset( $_POST['fn_ingredient_type'] ) ) {
 			$type_slug = sanitize_key( wp_unslash( (string) $_POST['fn_ingredient_type'] ) );

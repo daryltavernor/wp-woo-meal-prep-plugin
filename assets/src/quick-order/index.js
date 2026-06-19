@@ -1088,8 +1088,9 @@ function App() {
 		setSendEmail( !! cfg.send_email );
 		setSetKey( Object.keys( cfg.sets || {} )[ 0 ] || '' );
 		// One request for the whole catalogue, grouped client-side by type,
-		// instead of five type-filtered round-trips.
-		const all = await apiV1( 'ingredients' );
+		// instead of five type-filtered round-trips. channel=instore hides
+		// ingredients an admin has made unavailable for in-store ordering.
+		const all = await apiV1( 'ingredients?channel=instore' );
 		const grouped = {
 			protein: [],
 			carb: [],

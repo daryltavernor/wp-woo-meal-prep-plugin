@@ -849,11 +849,21 @@ function Configurator( { productId } ) {
 			path: `fastnutrition/v1/meal-config/${ productId }`,
 		} ).then( setConfig );
 		Promise.all( [
-			apiFetch( { path: 'fastnutrition/v1/ingredients?type=protein' } ),
-			apiFetch( { path: 'fastnutrition/v1/ingredients?type=carb' } ),
-			apiFetch( { path: 'fastnutrition/v1/ingredients?type=greens' } ),
-			apiFetch( { path: 'fastnutrition/v1/ingredients?type=set_meal' } ),
-			apiFetch( { path: 'fastnutrition/v1/ingredients?type=sweet' } ),
+			apiFetch( {
+				path: 'fastnutrition/v1/ingredients?type=protein&channel=builder',
+			} ),
+			apiFetch( {
+				path: 'fastnutrition/v1/ingredients?type=carb&channel=builder',
+			} ),
+			apiFetch( {
+				path: 'fastnutrition/v1/ingredients?type=greens&channel=builder',
+			} ),
+			apiFetch( {
+				path: 'fastnutrition/v1/ingredients?type=set_meal&channel=builder',
+			} ),
+			apiFetch( {
+				path: 'fastnutrition/v1/ingredients?type=sweet&channel=builder',
+			} ),
 		] ).then( ( [ p, c, g, s, sw ] ) =>
 			setIngredients( {
 				protein: p,
