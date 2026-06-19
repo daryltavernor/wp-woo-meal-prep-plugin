@@ -171,13 +171,13 @@ final class UpcomingFulfilment {
 		$cols = [
 			'day'         => [ __( 'Day', 'fastnutrition-mealprep' ), __( 'Each of the next 7 days, by delivery/collection date.', 'fastnutrition-mealprep' ) ],
 			'orders'      => [ __( 'Orders', 'fastnutrition-mealprep' ), __( 'Orders to fulfil that day (deliveries + collections).', 'fastnutrition-mealprep' ) ],
-			'meals'       => [ __( 'Meals', 'fastnutrition-mealprep' ), __( 'Individual meals to make — built, set and standalone meals plus sweets. Excludes add-ons and meal plans.', 'fastnutrition-mealprep' ) ],
+			'meals'       => [ __( 'Meals', 'fastnutrition-mealprep' ), __( 'Individual meals to make that day — built, set and standalone meals plus sweets — from online orders AND from the in-store Label Maker and Quick Order. Excludes add-ons and meal plans.', 'fastnutrition-mealprep' ) ],
 			'addons'      => [ __( 'Add-ons', 'fastnutrition-mealprep' ), __( 'Extra add-on items to prepare that day.', 'fastnutrition-mealprep' ) ],
 			'deliveries'  => [ __( 'Deliveries', 'fastnutrition-mealprep' ), __( 'Number of orders going out for delivery that day.', 'fastnutrition-mealprep' ) ],
 			'collections' => [ __( 'Collections', 'fastnutrition-mealprep' ), __( 'Number of orders being collected that day.', 'fastnutrition-mealprep' ) ],
 		];
 		if ( $show_plans ) {
-			$cols['plans'] = [ __( 'Meal plans', 'fastnutrition-mealprep' ), __( 'How many of each meal-plan product to produce. Counted separately — NOT included in the Meals column.', 'fastnutrition-mealprep' ) ];
+			$cols['plans'] = [ __( 'Meal plans', 'fastnutrition-mealprep' ), __( 'For information only: how many of each meal-plan product was sold for that day. Meal plans are NOT added to the Meals count until their labels are made on the Label Maker — at which point those meals appear in the Meals column like any other.', 'fastnutrition-mealprep' ) ];
 		}
 
 		echo '<div class="fn-upcoming notice notice-info" style="padding:10px 14px;">';
