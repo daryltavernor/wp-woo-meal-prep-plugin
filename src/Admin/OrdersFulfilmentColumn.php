@@ -18,9 +18,10 @@ use WC_Order;
  */
 final class OrdersFulfilmentColumn {
 
-	private const FILTER_VAR = 'fn_ff_date';
-	private const COLUMN_ID  = 'fn_fulfilment';
-	private const DAYS_AHEAD = 10;
+	private const FILTER_VAR  = 'fn_ff_date';
+	private const COLUMN_ID   = 'fn_fulfilment';
+	private const DAYS_BEFORE = 10;
+	private const DAYS_AHEAD  = 10;
 
 	public function register(): void {
 		// HPOS orders screen.
@@ -112,14 +113,19 @@ final class OrdersFulfilmentColumn {
 
 		$html = '<select name="' . esc_attr( self::FILTER_VAR ) . '">';
 		$html .= '<option value="">' . esc_html__( 'Any fulfilment date', 'fastnutrition-mealprep' ) . '</option>';
-		for ( $i = 0; $i < self::DAYS_AHEAD; $i++ ) {
-			$d     = $today->modify( "+{$i} days" );
+		// Previous 10 days through the next 10 days.
+		for ( $i = -self::DAYS_BEFORE; $i <= self::DAYS_AHEAD; $i++ ) {
+			$d     = $today->modify( $i . ' days' );
 			$value = $d->format( 'Y-m-d' );
+			$label = $d->format( 'D j M' );
+			if ( 0 === $i ) {
+				$label .= ' ' . __( '(today)', 'fastnutrition-mealprep' );
+			}
 			$html .= sprintf(
 				'<option value="%1$s"%2$s>%3$s</option>',
 				esc_attr( $value ),
 				selected( $current, $value, false ),
-				esc_html( $d->format( 'D j M' ) )
+				esc_html( $label )
 			);
 		}
 		$html .= '</select>';
