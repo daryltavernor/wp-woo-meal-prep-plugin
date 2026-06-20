@@ -12,6 +12,7 @@ use FastNutrition\MealPrep\Admin\LabelsAdmin;
 use FastNutrition\MealPrep\Admin\MenuRegistry;
 use FastNutrition\MealPrep\Admin\PopularCombosAdmin;
 use FastNutrition\MealPrep\Admin\OrdersListBulkActions;
+use FastNutrition\MealPrep\Admin\OrdersFulfilmentColumn;
 use FastNutrition\MealPrep\Admin\PrepDashboard;
 use FastNutrition\MealPrep\Admin\PrepSheet;
 use FastNutrition\MealPrep\Admin\ProfileAdmin;
@@ -110,6 +111,7 @@ final class Plugin {
 		( new Reports() )->register();
 		( new UpcomingFulfilment() )->register();
 		( new FulfilmentAmend() )->register();
+		( new OrdersFulfilmentColumn() )->register();
 		( new LabelsAdmin() )->register();
 		( new OrdersListBulkActions() )->register();
 
