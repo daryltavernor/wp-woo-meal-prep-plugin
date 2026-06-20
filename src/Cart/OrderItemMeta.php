@@ -73,15 +73,26 @@ final class OrderItemMeta {
 		if ( ! $order ) {
 			return;
 		}
-
-		global $wpdb;
-		$table = $wpdb->prefix . 'fn_prep_cache';
-
 		$fulfilment = $order->get_meta( '_fn_fulfilment' );
 		if ( ! is_array( $fulfilment ) || empty( $fulfilment['date'] ) ) {
 			return;
 		}
-		$date = (string) $fulfilment['date'];
+		self::rebuild_for_date( (string) $fulfilment['date'] );
+	}
+
+	/**
+	 * Re-aggregate the prep cache for a single fulfilment date from all of that
+	 * day's active orders. Idempotent, so it's the primitive used by checkout,
+	 * status changes and the fulfilment-date amend tool (which rebuilds both the
+	 * old and the new date).
+	 */
+	public static function rebuild_for_date( string $date ): void {
+		if ( '' === $date ) {
+			return;
+		}
+
+		global $wpdb;
+		$table = $wpdb->prefix . 'fn_prep_cache';
 
 		// Re-aggregate all orders for that date in a single pass.
 		$wpdb->delete( $table, [ 'fulfilment_date' => $date ], [ '%s' ] );
@@ -102,7 +113,7 @@ final class OrderItemMeta {
 
 		$totals = [];
 		foreach ( $orders as $oid ) {
-			$o  = wc_get_order( $oid );
+			$o = wc_get_order( $oid );
 			if ( ! $o ) {
 				continue;
 			}

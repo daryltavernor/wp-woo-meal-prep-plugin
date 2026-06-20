@@ -7,6 +7,7 @@ use FastNutrition\MealPrep\Account\Favourites;
 use FastNutrition\MealPrep\Admin\BlockedDatesAdmin;
 use FastNutrition\MealPrep\Admin\BundleAdmin;
 use FastNutrition\MealPrep\Admin\ConflictsNotice;
+use FastNutrition\MealPrep\Admin\FulfilmentAmend;
 use FastNutrition\MealPrep\Admin\LabelsAdmin;
 use FastNutrition\MealPrep\Admin\MenuRegistry;
 use FastNutrition\MealPrep\Admin\PopularCombosAdmin;
@@ -108,6 +109,7 @@ final class Plugin {
 		( new PopularCombosAdmin() )->register();
 		( new Reports() )->register();
 		( new UpcomingFulfilment() )->register();
+		( new FulfilmentAmend() )->register();
 		( new LabelsAdmin() )->register();
 		( new OrdersListBulkActions() )->register();
 
