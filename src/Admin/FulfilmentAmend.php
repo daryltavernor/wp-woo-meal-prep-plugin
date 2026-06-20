@@ -147,7 +147,8 @@ final class FulfilmentAmend {
 		if ( empty( $ids ) ) {
 			return $redirect;
 		}
-		$token = wp_generate_password( 16, false );
+		// Lowercase hex so it survives sanitize_key() unchanged on the way back.
+		$token = bin2hex( random_bytes( 16 ) );
 		set_transient(
 			'fn_amend_' . $token,
 			[ 'ids' => $ids, 'return' => remove_query_arg( [ 'fn_amend_token', 'fn_amended' ], $redirect ) ],
