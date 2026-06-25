@@ -253,7 +253,8 @@ final class ProfileAdmin {
 				esc_attr( (string) ( $s['start'] ?? '' ) ),
 				esc_attr( (string) ( $s['end'] ?? '' ) )
 			);
-			printf( '<td><input type="number" min="0" placeholder="%s" name="slots[%1$d][capacity]" value="%2$s" /></td>',
+			printf( '<td><input type="number" min="0" placeholder="%2$s" name="slots[%1$d][capacity]" value="%3$s" /></td>',
+				(int) $i,
 				esc_attr__( 'Capacity (blank = unlimited)', 'fastnutrition-mealprep' ),
 				esc_attr( (string) ( $s['capacity'] ?? '' ) )
 			);

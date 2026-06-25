@@ -123,6 +123,33 @@ final class SlotAvailability {
 	}
 
 	/**
+	 * Remaining capacity for one specific slot, or null when the slot is
+	 * unlimited or can't be evaluated. The picker (options()) only *hides* full
+	 * slots, so this is used to enforce capacity at booking commit time. The
+	 * booked-count key format matches bookings_map().
+	 */
+	public static function remaining_for( int $profile_id, string $date, string $start, string $end ): ?int {
+		if ( ! $profile_id || '' === $date || '' === $start || '' === $end ) {
+			return null;
+		}
+		$profile = Profile::get( $profile_id );
+		if ( ! $profile || empty( $profile['slots'] ) ) {
+			return null;
+		}
+		foreach ( $profile['slots'] as $slot ) {
+			if ( (string) ( $slot['start'] ?? '' ) !== $start || (string) ( $slot['end'] ?? '' ) !== $end ) {
+				continue;
+			}
+			if ( ! isset( $slot['capacity'] ) ) {
+				return null; // unlimited.
+			}
+			$booked = self::bookings_map()[ $profile_id ][ $date ][ $start . '|' . $end ] ?? 0;
+			return max( 0, (int) $slot['capacity'] - (int) $booked );
+		}
+		return null; // slot not found — don't block.
+	}
+
+	/**
 	 * Booked-slot counts for upcoming orders, as a nested map:
 	 *   [ profile_id ][ 'Y-m-d' ][ 'start|end' ] => count.
 	 *

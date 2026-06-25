@@ -190,6 +190,16 @@ final class StoreApiExtensions {
 			self::flush_shipping_cache();
 			return;
 		}
+
+		// Capacity: the picker only hides full slots, so a stale page could still
+		// submit one. Re-check now and reject the selection if it's full.
+		$remaining = SlotAvailability::remaining_for( $pid, $date, $slot['start'], $slot['end'] );
+		if ( null !== $remaining && $remaining <= 0 ) {
+			WC()->session->set( 'fn_fulfilment', null );
+			self::flush_shipping_cache();
+			return;
+		}
+
 		WC()->session->set(
 			'fn_fulfilment',
 			[
@@ -474,10 +484,32 @@ final class StoreApiExtensions {
 
 	public function apply_to_order( $order, $request ): void {
 		$fulfilment = self::get_session_fulfilment();
-		if ( ! empty( $fulfilment ) && $order ) {
-			$order->update_meta_data( '_fn_fulfilment', $fulfilment );
-			$order->save();
+		if ( empty( $fulfilment ) || ! $order ) {
+			return;
 		}
+
+		// Final capacity guard at commit time: a slot can fill between the picker
+		// rendering and the order being placed. Block here so it can't overbook.
+		$slot      = is_array( $fulfilment['slot'] ?? null ) ? $fulfilment['slot'] : [];
+		$remaining = SlotAvailability::remaining_for(
+			(int) ( $fulfilment['profile_id'] ?? 0 ),
+			(string) ( $fulfilment['date'] ?? '' ),
+			(string) ( $slot['start'] ?? '' ),
+			(string) ( $slot['end'] ?? '' )
+		);
+		if ( null !== $remaining && $remaining <= 0 ) {
+			throw new \Automattic\WooCommerce\StoreApi\Exceptions\RouteException(
+				'fn_slot_full',
+				esc_html__( 'Sorry, that delivery/collection slot has just filled up. Please choose another slot.', 'fastnutrition-mealprep' ),
+				409
+			);
+		}
+
+		$order->update_meta_data( '_fn_fulfilment', $fulfilment );
+		$order->save();
+		// Make the booking count exact as soon as the fulfilment meta exists,
+		// rather than waiting for the later status transition or the TTL.
+		SlotAvailability::flush_bookings_cache();
 	}
 
 	public static function get_session_fulfilment(): array {
