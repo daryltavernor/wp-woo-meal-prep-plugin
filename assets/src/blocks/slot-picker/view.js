@@ -1,6 +1,6 @@
 import apiFetch from '@wordpress/api-fetch';
 import { createRoot, useEffect, useState } from '@wordpress/element';
-import { __ } from '@wordpress/i18n';
+import { __, sprintf } from '@wordpress/i18n';
 import './style.css';
 
 const extensionCartUpdate = ( args ) => {
@@ -12,12 +12,59 @@ const extensionCartUpdate = ( args ) => {
 	return Promise.resolve();
 };
 
+// Live delivery rule from the cart extension data (server-computed), so the
+// Delivery tab reacts to basket changes.
+function useDeliveryRule() {
+	const [ rule, setRule ] = useState( {
+		allowed: true,
+		min: 0,
+		subtotal: 0,
+		symbol: '',
+	} );
+
+	useEffect( () => {
+		const data = window?.wp?.data;
+		if ( ! data ) {
+			return undefined;
+		}
+		const read = () => {
+			const cart = data.select( 'wc/store/cart' )?.getCartData?.();
+			const d = cart?.extensions?.[ 'fastnutrition-mealprep' ]?.delivery;
+			if ( ! d ) {
+				return;
+			}
+			setRule( {
+				allowed: d.allowed !== false,
+				min: Number( d.min_subtotal ) || 0,
+				subtotal: Number( d.items_subtotal ) || 0,
+				symbol: cart?.totals?.currency_symbol || '',
+			} );
+		};
+		read();
+		const unsub = data.subscribe( read );
+		return () => unsub && unsub();
+	}, [] );
+
+	return rule;
+}
+
 function SlotPicker() {
 	const [ method, setMethod ] = useState( 'delivery' );
 	const [ postcode, setPostcode ] = useState( '' );
 	const [ options, setOptions ] = useState( [] );
 	const [ selected, setSelected ] = useState( null );
 	const [ loading, setLoading ] = useState( false );
+
+	const delivery = useDeliveryRule();
+	const deliveryBlocked = delivery.min > 0 && ! delivery.allowed;
+
+	// Force collection whenever delivery is (or becomes) unavailable.
+	useEffect( () => {
+		if ( deliveryBlocked && method === 'delivery' ) {
+			setMethod( 'collection' );
+			setSelected( null );
+		}
+	}, [ deliveryBlocked, method ] );
 
 	useEffect( () => {
 		const input = document.querySelector( '#shipping-postcode, #billing-postcode, input[name="shippingAddress[postcode]"], input[autocomplete="postal-code"]' );
@@ -63,16 +110,34 @@ function SlotPicker() {
 		} );
 	}, [ selected, method ] );
 
+	const money = ( n ) => ( delivery.symbol || '' ) + ( Number( n ) || 0 ).toFixed( 2 );
+	const shortfall = Math.max( 0, delivery.min - delivery.subtotal );
+
 	return (
 		<div className="fn-slot-picker">
 			<div className="fn-slot-tabs">
-				<button type="button" className={ method === 'delivery' ? 'is-active' : '' } onClick={ () => setMethod( 'delivery' ) }>
+				<button
+					type="button"
+					className={ method === 'delivery' ? 'is-active' : '' }
+					disabled={ deliveryBlocked }
+					title={ deliveryBlocked ? sprintf( __( 'Delivery needs a minimum order of %s', 'fastnutrition-mealprep' ), money( delivery.min ) ) : '' }
+					onClick={ () => ! deliveryBlocked && setMethod( 'delivery' ) }
+				>
 					{ __( 'Delivery', 'fastnutrition-mealprep' ) }
 				</button>
 				<button type="button" className={ method === 'collection' ? 'is-active' : '' } onClick={ () => setMethod( 'collection' ) }>
 					{ __( 'Collection', 'fastnutrition-mealprep' ) }
 				</button>
 			</div>
+			{ deliveryBlocked && (
+				<p className="fn-slot-delivery-min">
+					{ sprintf(
+						__( 'Delivery is available on orders of %1$s or more. Add %2$s more to unlock delivery, or continue with collection.', 'fastnutrition-mealprep' ),
+						money( delivery.min ),
+						money( shortfall )
+					) }
+				</p>
+			) }
 			{ loading && <p>{ __( 'Checking availability…', 'fastnutrition-mealprep' ) }</p> }
 			{ ! loading && options.length === 0 && postcode && (
 				<p className="fn-slot-empty">{ __( 'No slots available for this postcode.', 'fastnutrition-mealprep' ) }</p>

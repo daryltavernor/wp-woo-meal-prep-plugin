@@ -9,6 +9,7 @@ use FastNutrition\MealPrep\Cart\Selections;
 use FastNutrition\MealPrep\Cart\Surcharge;
 use FastNutrition\MealPrep\Cart\TotalsDisplay;
 use FastNutrition\MealPrep\Delivery\BlockedDates;
+use FastNutrition\MealPrep\Delivery\DeliveryThreshold;
 use FastNutrition\MealPrep\Delivery\Profile;
 use FastNutrition\MealPrep\Delivery\ProfileResolver;
 use FastNutrition\MealPrep\Delivery\SlotAvailability;
@@ -117,6 +118,11 @@ final class StoreApiExtensions {
 			'bundle_savings' => $summary['bundle_savings'],
 			'upsells'        => $upsells,
 			'surcharge'      => $surcharge,
+			'delivery'       => [
+				'min_subtotal'   => DeliveryThreshold::min(),
+				'items_subtotal' => (float) ( DeliveryThreshold::cart_items_total() ?? 0.0 ),
+				'allowed'        => DeliveryThreshold::delivery_allowed(),
+			],
 		];
 	}
 
@@ -148,6 +154,12 @@ final class StoreApiExtensions {
 			],
 			'surcharge'      => [
 				'description' => __( 'Status of the basket surcharge: enabled, threshold, amount, and whether it currently applies.', 'fastnutrition-mealprep' ),
+				'type'        => 'object',
+				'context'     => [ 'view' ],
+				'readonly'    => true,
+			],
+			'delivery'       => [
+				'description' => __( 'Delivery availability: the minimum food subtotal for delivery, the current food subtotal, and whether delivery is allowed for this cart.', 'fastnutrition-mealprep' ),
 				'type'        => 'object',
 				'context'     => [ 'view' ],
 				'readonly'    => true,
@@ -186,6 +198,14 @@ final class StoreApiExtensions {
 			|| BlockedDates::is_blocked( $date )
 			|| $date < SlotAvailability::earliest_allowed_date()
 		) {
+			WC()->session->set( 'fn_fulfilment', null );
+			self::flush_shipping_cache();
+			return;
+		}
+
+		// Delivery minimum: below the food-subtotal threshold, delivery is not
+		// offered — reject a delivery selection (collection only).
+		if ( 'delivery' === $type && ! DeliveryThreshold::delivery_allowed() ) {
 			WC()->session->set( 'fn_fulfilment', null );
 			self::flush_shipping_cache();
 			return;
@@ -363,7 +383,9 @@ final class StoreApiExtensions {
 			return [];
 		}
 
-		$want_pickup = ( 'collection' === $type );
+		// Below the delivery minimum, only collection rates may show, even if the
+		// session somehow still carries a delivery type.
+		$want_pickup = ( 'collection' === $type ) || ( 'delivery' === $type && ! DeliveryThreshold::delivery_allowed() );
 		$filtered    = [];
 		foreach ( $rates as $key => $rate ) {
 			if ( self::is_pickup_like( $rate ) === $want_pickup ) {
@@ -486,6 +508,16 @@ final class StoreApiExtensions {
 		$fulfilment = self::get_session_fulfilment();
 		if ( empty( $fulfilment ) || ! $order ) {
 			return;
+		}
+
+		// Delivery-minimum guard at commit time: block a delivery order whose food
+		// subtotal is under the threshold (e.g. a stale page or edited payload).
+		if ( 'delivery' === ( $fulfilment['type'] ?? '' ) && ! DeliveryThreshold::delivery_allowed() ) {
+			throw new \Automattic\WooCommerce\StoreApi\Exceptions\RouteException(
+				'fn_delivery_min',
+				esc_html__( 'Delivery is not available for orders under the minimum. Please choose collection.', 'fastnutrition-mealprep' ),
+				409
+			);
 		}
 
 		// Final capacity guard at commit time: a slot can fill between the picker

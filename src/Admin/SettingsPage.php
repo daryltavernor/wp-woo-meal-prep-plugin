@@ -4,6 +4,7 @@ declare( strict_types=1 );
 namespace FastNutrition\MealPrep\Admin;
 
 use FastNutrition\MealPrep\Cart\Surcharge;
+use FastNutrition\MealPrep\Delivery\DeliveryThreshold;
 use FastNutrition\MealPrep\Install\IngredientSeeder;
 
 final class SettingsPage {
@@ -107,7 +108,8 @@ final class SettingsPage {
 			update_option( Surcharge::OPTION_THRESHOLD, isset( $_POST['fn_surcharge_threshold'] ) ? (float) wp_unslash( (string) $_POST['fn_surcharge_threshold'] ) : 23 );
 			update_option( Surcharge::OPTION_AMOUNT, isset( $_POST['fn_surcharge_amount'] ) ? (float) wp_unslash( (string) $_POST['fn_surcharge_amount'] ) : 8 );
 			update_option( Surcharge::OPTION_LABEL, isset( $_POST['fn_surcharge_label'] ) ? sanitize_text_field( wp_unslash( (string) $_POST['fn_surcharge_label'] ) ) : 'Basket surcharge' );
-			set_transient( 'fn_settings_notice', __( 'Surcharge settings saved.', 'fastnutrition-mealprep' ), 30 );
+			update_option( DeliveryThreshold::OPTION, isset( $_POST['fn_delivery_min_subtotal'] ) ? max( 0, (float) wp_unslash( (string) $_POST['fn_delivery_min_subtotal'] ) ) : 0 );
+			set_transient( 'fn_settings_notice', __( 'Surcharge & delivery settings saved.', 'fastnutrition-mealprep' ), 30 );
 		} elseif ( 'save_brand' === $action ) {
 			update_option( self::OPTION_BRAND_LOGO_ID, isset( $_POST['fn_brand_logo_id'] ) ? (int) $_POST['fn_brand_logo_id'] : 0 );
 			update_option( self::OPTION_BRAND_WEB, isset( $_POST['fn_brand_web'] ) ? esc_url_raw( wp_unslash( (string) $_POST['fn_brand_web'] ) ) : '' );
@@ -273,8 +275,17 @@ final class SettingsPage {
 			esc_attr__( 'Basket surcharge', 'fastnutrition-mealprep' ),
 			esc_html__( 'The label customers see on the totals row.', 'fastnutrition-mealprep' )
 		);
+		$currency     = function_exists( 'get_woocommerce_currency_symbol' ) ? get_woocommerce_currency_symbol() : '£';
+		$delivery_min = DeliveryThreshold::min();
+		printf(
+			'<tr><th><label for="fn_delivery_min_subtotal">%1$s</label></th><td>%2$s <input type="number" id="fn_delivery_min_subtotal" name="fn_delivery_min_subtotal" value="%3$s" step="0.01" min="0" class="small-text" /><p class="description">%4$s</p></td></tr>',
+			esc_html__( 'Minimum order for delivery', 'fastnutrition-mealprep' ),
+			esc_html( $currency ),
+			esc_attr( (string) $delivery_min ),
+			esc_html__( 'Orders whose food subtotal (cart items only — before the delivery charge and surcharge) is under this amount can only choose collection. Set 0 to allow delivery on any order.', 'fastnutrition-mealprep' )
+		);
 		echo '</tbody></table>';
-		submit_button( __( 'Save surcharge settings', 'fastnutrition-mealprep' ) );
+		submit_button( __( 'Save surcharge & delivery settings', 'fastnutrition-mealprep' ) );
 		echo '</form>';
 
 		// Brand info (used on printed labels + emails).
