@@ -8,6 +8,42 @@ const extensionCartUpdate = ( args ) => {
 	return typeof fn === 'function' ? fn( args ) : Promise.resolve();
 };
 
+// Live "minimum order for delivery" rule from the cart extension data
+// (server-computed), so the Delivery tab reacts as the basket changes.
+function useDeliveryRule() {
+	const [ rule, setRule ] = useState( {
+		allowed: true,
+		min: 0,
+		subtotal: 0,
+		symbol: '',
+	} );
+
+	useEffect( () => {
+		const data = window?.wp?.data;
+		if ( ! data ) {
+			return undefined;
+		}
+		const read = () => {
+			const cart = data.select( 'wc/store/cart' )?.getCartData?.();
+			const d = cart?.extensions?.[ 'fastnutrition-mealprep' ]?.delivery;
+			if ( ! d ) {
+				return;
+			}
+			setRule( {
+				allowed: d.allowed !== false,
+				min: Number( d.min_subtotal ) || 0,
+				subtotal: Number( d.items_subtotal ) || 0,
+				symbol: cart?.totals?.currency_symbol || '',
+			} );
+		};
+		read();
+		const unsub = data.subscribe( read );
+		return () => unsub && unsub();
+	}, [] );
+
+	return rule;
+}
+
 const STEPS = [
 	{
 		key: 'address',
@@ -105,6 +141,18 @@ function SlotPicker() {
 	// zone's flat rate for the entered postcode (pre-formatted string, or null
 	// when it can't be reduced to a single figure).
 	const [ deliveryFee, setDeliveryFee ] = useState( null );
+
+	const delivery = useDeliveryRule();
+	const deliveryBlocked = delivery.min > 0 && ! delivery.allowed;
+
+	// Force collection whenever delivery is (or becomes) unavailable — e.g. the
+	// customer removes items and drops under the delivery minimum.
+	useEffect( () => {
+		if ( deliveryBlocked && method === 'delivery' ) {
+			setMethod( 'collection' );
+			setSelected( null );
+		}
+	}, [ deliveryBlocked, method ] );
 
 	useEffect( () => {
 		const readPostcode = () => {
@@ -207,15 +255,35 @@ function SlotPicker() {
 					<button
 						type="button"
 						className={ method === 'delivery' ? 'is-active' : '' }
-						onClick={ () => setMethod( 'delivery' ) }
+						disabled={ deliveryBlocked }
+						onClick={ () =>
+							! deliveryBlocked && setMethod( 'delivery' )
+						}
 					>
 						{ __( 'Delivery', 'fastnutrition-mealprep' ) }
 					</button>
-					{ deliveryFee && (
+					{ ! deliveryBlocked && deliveryFee && (
 						<small className="fn-fee">{ deliveryFee }</small>
 					) }
 				</div>
 			</div>
+			{ deliveryBlocked && (
+				<p className="fn-slot-delivery-min">
+					{ sprintf(
+						/* translators: 1: minimum order amount, 2: amount still needed */
+						__(
+							'Delivery is available on orders of %1$s or more. Add %2$s more to unlock delivery, or continue with collection.',
+							'fastnutrition-mealprep'
+						),
+						( delivery.symbol || '' ) + delivery.min.toFixed( 2 ),
+						( delivery.symbol || '' ) +
+							Math.max(
+								0,
+								delivery.min - delivery.subtotal
+							).toFixed( 2 )
+					) }
+				</p>
+			) }
 			{ loading && (
 				<p>
 					{ __( 'Checking availability…', 'fastnutrition-mealprep' ) }
