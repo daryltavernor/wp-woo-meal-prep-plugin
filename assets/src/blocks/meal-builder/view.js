@@ -11,6 +11,78 @@ import './style.css';
 const SET_MEAL_PREFIX = 'set:';
 const CARB_PREFIX = 'carb:';
 const GREENS_PREFIX = 'greens:';
+const COMBO_PREFIX = 'combo:';
+
+// How many popular combos to list at the top of the builder dropdown.
+const BUILDER_COMBO_LIMIT = 10;
+
+/*
+ * Resolve the shop's ranked popular combos (Stats\PopularCombos, delivered in
+ * config.popular_combos) to options the builder dropdown can offer: every
+ * ingredient must exist in this product's allowed + available lists, and the
+ * shape must be one the builder can represent — protein + carb + 1 greens, or
+ * protein + 2 greens when the product allows double greens. Returns the top
+ * BUILDER_COMBO_LIMIT as { key, label, protein_id, carb_id, greens_ids }.
+ */
+function resolveComboOptions( config, ingredients ) {
+	const cfg = config.config || {};
+	const inAllow = ( id, allow ) =>
+		! allow || ! allow.length || allow.includes( id );
+	const out = [];
+	( config.popular_combos || [] ).forEach( ( c ) => {
+		const protein = findById( c.protein_id, ingredients.protein );
+		if ( ! protein || ! inAllow( c.protein_id, cfg.allowed_proteins ) ) {
+			return;
+		}
+		let carb = null;
+		if ( c.carb_id ) {
+			carb = findById( c.carb_id, ingredients.carb );
+			if ( ! carb || ! inAllow( c.carb_id, cfg.allowed_carbs ) ) {
+				return;
+			}
+		}
+		const greens = [];
+		let ok = true;
+		( c.greens_ids || [] ).forEach( ( gid ) => {
+			const g = findById( gid, ingredients.greens );
+			if ( ! g || ! inAllow( gid, cfg.allowed_greens ) ) {
+				ok = false;
+				return;
+			}
+			greens.push( g );
+		} );
+		if ( ! ok ) {
+			return;
+		}
+		// Builder shapes only: carb + exactly 1 greens, or (double greens
+		// allowed) no carb + exactly 2 greens.
+		const isCarbShape = carb && greens.length === 1;
+		const isDoubleShape =
+			! carb && greens.length === 2 && cfg.allow_double_greens;
+		if ( ! isCarbShape && ! isDoubleShape ) {
+			return;
+		}
+		out.push( {
+			key:
+				c.protein_id +
+				':' +
+				( c.carb_id || 0 ) +
+				':' +
+				( c.greens_ids || [] ).join( ',' ),
+			label: [
+				protein.name,
+				carb ? carb.name : null,
+				greens.map( ( g ) => g.name ).join( ' & ' ),
+			]
+				.filter( Boolean )
+				.join( ' + ' ),
+			protein_id: c.protein_id,
+			carb_id: c.carb_id || 0,
+			greens_ids: ( c.greens_ids || [] ).slice(),
+		} );
+	} );
+	return out.slice( 0, BUILDER_COMBO_LIMIT );
+}
 
 const priceLabel = ( n ) => `£${ Number( n || 0 ).toFixed( 2 ) }`;
 const ZERO = { kcal: 0, protein_g: 0, carbs_g: 0, fat_g: 0 };
@@ -305,6 +377,16 @@ function MealBuilder( { config, ingredients } ) {
 		};
 	}, [ config, ingredients ] );
 
+	// Top popular combos offered at the head of the slot-1 dropdown (per-product
+	// toggle). Picking one fills protein + carb/greens in one go.
+	const comboOptions = useMemo(
+		() =>
+			config.config.builder_popular_combos
+				? resolveComboOptions( config, ingredients )
+				: [],
+		[ config, ingredients ]
+	);
+
 	const isSetMeal = !! selection.set_meal_id;
 
 	const slot1Price = isSetMeal
@@ -408,6 +490,36 @@ function MealBuilder( { config, ingredients } ) {
 	useCartSync( payload, isValid, totals );
 
 	const onSlot1Change = ( value ) => {
+		if ( value.startsWith( COMBO_PREFIX ) ) {
+			const combo = comboOptions.find(
+				( c ) => c.key === value.slice( COMBO_PREFIX.length )
+			);
+			if ( ! combo ) {
+				return;
+			}
+			// Fill all three choices as a normal build selection; the customer
+			// can still tweak any of them afterwards.
+			if ( combo.carb_id ) {
+				setSelection( {
+					...selection,
+					set_meal_id: 0,
+					protein_id: combo.protein_id,
+					slot2_kind: 'carb',
+					slot2_id: combo.carb_id,
+					greens_id: combo.greens_ids[ 0 ] || 0,
+				} );
+			} else {
+				setSelection( {
+					...selection,
+					set_meal_id: 0,
+					protein_id: combo.protein_id,
+					slot2_kind: 'greens',
+					slot2_id: combo.greens_ids[ 0 ] || 0,
+					greens_id: combo.greens_ids[ 1 ] || 0,
+				} );
+			}
+			return;
+		}
 		if ( value.startsWith( SET_MEAL_PREFIX ) ) {
 			const id =
 				parseInt( value.slice( SET_MEAL_PREFIX.length ), 10 ) || 0;
@@ -480,6 +592,23 @@ function MealBuilder( { config, ingredients } ) {
 							'fastnutrition-mealprep'
 						) }
 					</option>
+					{ comboOptions.length > 0 && (
+						<optgroup
+							label={ __(
+								'⭐ Most Popular',
+								'fastnutrition-mealprep'
+							) }
+						>
+							{ comboOptions.map( ( c ) => (
+								<option
+									key={ 'c' + c.key }
+									value={ COMBO_PREFIX + c.key }
+								>
+									{ c.label }
+								</option>
+							) ) }
+						</optgroup>
+					) }
 					{ allowed.protein.length > 0 && (
 						<optgroup
 							label={ __( 'Proteins', 'fastnutrition-mealprep' ) }

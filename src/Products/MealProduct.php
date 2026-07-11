@@ -198,6 +198,15 @@ final class MealProduct {
 			]
 		);
 
+		woocommerce_wp_checkbox(
+			[
+				'id'          => '_fn_builder_popular_combos',
+				'label'       => __( 'Show popular combinations', 'fastnutrition-mealprep' ),
+				'description' => __( 'List the shop\'s top 10 most-ordered combos at the top of the builder dropdown — picking one fills the protein, carb and greens in one tap.', 'fastnutrition-mealprep' ),
+				'value'       => self::builder_popular_combos( $post->ID ) ? 'yes' : 'no',
+			]
+		);
+
 		echo '</div><div class="options_group">';
 		echo '<p class="form-field"><strong>' . esc_html__( 'Allowed ingredients (leave blank for all active of that type)', 'fastnutrition-mealprep' ) . '</strong></p>';
 		echo '<p class="form-field"><em>' . esc_html__( 'The lists below are filtered by the Meal tier above — switching between Standard and Bulk hides ingredients that don\'t match the tier.', 'fastnutrition-mealprep' ) . '</em></p>';
@@ -291,6 +300,9 @@ final class MealProduct {
 		update_post_meta( $product_id, '_fn_is_meal', ! empty( $_POST['_fn_is_meal'] ) );
 		update_post_meta( $product_id, '_fn_allow_double_greens', ! empty( $_POST['_fn_allow_double_greens'] ) );
 		update_post_meta( $product_id, '_fn_allow_set_meal_mode', ! empty( $_POST['_fn_allow_set_meal_mode'] ) );
+		// 'yes'/'no' rather than bool so a missing meta (products saved before this
+		// feature) reads as ON by default — see builder_popular_combos().
+		update_post_meta( $product_id, '_fn_builder_popular_combos', ! empty( $_POST['_fn_builder_popular_combos'] ) ? 'yes' : 'no' );
 
 		$tier = isset( $_POST['_fn_meal_tier'] ) ? sanitize_key( wp_unslash( $_POST['_fn_meal_tier'] ) ) : 'standard';
 		update_post_meta( $product_id, '_fn_meal_tier', in_array( $tier, [ 'standard', 'bulk' ], true ) ? $tier : 'standard' );
@@ -318,6 +330,11 @@ final class MealProduct {
 			|| PopularCombosProduct::is_enabled( $product_id );
 	}
 
+	/** Whether the builder lists the top popular combos (default ON; meta 'no' turns it off). */
+	public static function builder_popular_combos( int $product_id ): bool {
+		return 'no' !== (string) get_post_meta( $product_id, '_fn_builder_popular_combos', true );
+	}
+
 	public static function get_config( int $product_id ): array {
 		$popular_combos = PopularCombosProduct::is_enabled( $product_id );
 		return [
@@ -333,6 +350,7 @@ final class MealProduct {
 			'allowed_set_meals'      => array_map( 'intval', (array) get_post_meta( $product_id, '_fn_allowed_set_meal_ids', true ) ),
 			'standalone'             => StandaloneProduct::get_config( $product_id ),
 			'popular_combos_enabled' => $popular_combos,
+			'builder_popular_combos' => self::builder_popular_combos( $product_id ),
 		];
 	}
 }

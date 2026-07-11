@@ -269,9 +269,12 @@ final class RestController {
 			'addons'         => AddOnMeta::get_addons( $product_id ),
 			'bundles'        => BundleMeta::get_bundles( $product_id ),
 			'price'          => (float) ( wc_get_product( $product_id ) ? wc_get_product( $product_id )->get_price() : 0 ),
-			// Ranked top combos for the Popular Combinations picker (front end
-			// filters to this product's allowed + available ingredients).
-			'popular_combos' => ! empty( $config['popular_combos_enabled'] ) ? PopularCombos::ranked_combos() : [],
+			// Ranked top combos, used by the Popular Combinations picker AND by the
+			// builder's "Most Popular" dropdown group (front end filters both to
+			// this product's allowed + available ingredients).
+			'popular_combos' => ( ! empty( $config['popular_combos_enabled'] ) || ( ! empty( $config['is_meal'] ) && ! empty( $config['builder_popular_combos'] ) ) )
+				? PopularCombos::ranked_combos()
+				: [],
 		];
 	}
 
