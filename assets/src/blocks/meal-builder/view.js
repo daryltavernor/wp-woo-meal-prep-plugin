@@ -26,18 +26,30 @@ const BUILDER_COMBO_LIMIT = 10;
  */
 function resolveComboOptions( config, ingredients ) {
 	const cfg = config.config || {};
+	const tier = cfg.tier || 'standard';
 	const inAllow = ( id, allow ) =>
 		! allow || ! allow.length || allow.includes( id );
+	// Same tier rule as the builder's own dropdowns: an ingredient shows only
+	// on products of its tier, so a Standard builder never offers a bulk combo.
+	const tierOk = ( i ) => ! i.tier || i.tier === tier;
 	const out = [];
 	( config.popular_combos || [] ).forEach( ( c ) => {
 		const protein = findById( c.protein_id, ingredients.protein );
-		if ( ! protein || ! inAllow( c.protein_id, cfg.allowed_proteins ) ) {
+		if (
+			! protein ||
+			! tierOk( protein ) ||
+			! inAllow( c.protein_id, cfg.allowed_proteins )
+		) {
 			return;
 		}
 		let carb = null;
 		if ( c.carb_id ) {
 			carb = findById( c.carb_id, ingredients.carb );
-			if ( ! carb || ! inAllow( c.carb_id, cfg.allowed_carbs ) ) {
+			if (
+				! carb ||
+				! tierOk( carb ) ||
+				! inAllow( c.carb_id, cfg.allowed_carbs )
+			) {
 				return;
 			}
 		}
@@ -45,7 +57,7 @@ function resolveComboOptions( config, ingredients ) {
 		let ok = true;
 		( c.greens_ids || [] ).forEach( ( gid ) => {
 			const g = findById( gid, ingredients.greens );
-			if ( ! g || ! inAllow( gid, cfg.allowed_greens ) ) {
+			if ( ! g || ! tierOk( g ) || ! inAllow( gid, cfg.allowed_greens ) ) {
 				ok = false;
 				return;
 			}
@@ -790,18 +802,30 @@ function PopularCombosPicker( { config, ingredients } ) {
 
 	// Resolve + filter the ranked combos to those valid for this product.
 	const resolved = useMemo( () => {
+		const tier = cfg.tier || 'standard';
 		const inAllow = ( id, allow ) =>
 			! allow || ! allow.length || allow.includes( id );
+		// Match the builder's tier rule so a Standard product never offers a
+		// combo built from bulk-tier ingredients (and vice versa).
+		const tierOk = ( i ) => ! i.tier || i.tier === tier;
 		const out = [];
 		( config.popular_combos || [] ).forEach( ( c ) => {
 			const protein = findById( c.protein_id, ingredients.protein );
-			if ( ! protein || ! inAllow( c.protein_id, cfg.allowed_proteins ) ) {
+			if (
+				! protein ||
+				! tierOk( protein ) ||
+				! inAllow( c.protein_id, cfg.allowed_proteins )
+			) {
 				return;
 			}
 			let carb = null;
 			if ( c.carb_id ) {
 				carb = findById( c.carb_id, ingredients.carb );
-				if ( ! carb || ! inAllow( c.carb_id, cfg.allowed_carbs ) ) {
+				if (
+					! carb ||
+					! tierOk( carb ) ||
+					! inAllow( c.carb_id, cfg.allowed_carbs )
+				) {
 					return;
 				}
 			}
@@ -809,7 +833,11 @@ function PopularCombosPicker( { config, ingredients } ) {
 			let ok = true;
 			( c.greens_ids || [] ).forEach( ( gid ) => {
 				const g = findById( gid, ingredients.greens );
-				if ( ! g || ! inAllow( gid, cfg.allowed_greens ) ) {
+				if (
+					! g ||
+					! tierOk( g ) ||
+					! inAllow( gid, cfg.allowed_greens )
+				) {
 					ok = false;
 					return;
 				}
