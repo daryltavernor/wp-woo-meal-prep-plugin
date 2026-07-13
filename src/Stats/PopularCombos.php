@@ -148,15 +148,27 @@ final class PopularCombos {
 		}
 
 		uasort( $combo_counts, static fn( $a, $b ) => $b['count'] <=> $a['count'] );
-		$combos = [];
-		foreach ( array_slice( $combo_counts, 0, self::STORE_TOP, true ) as $data ) {
-			$combos[] = [
+
+		// Rank each tier separately (top STORE_TOP per tier), so lower-volume
+		// bulk combos aren't crowded out of a single overall list by standard
+		// sales. A combo's tier is its protein's tier (the builder never mixes
+		// tiers within one meal), which matches how the front end resolves.
+		$per_tier = [];
+		foreach ( $combo_counts as $data ) {
+			$tier = (string) ( get_post_meta( (int) $data['composition']['protein_id'], '_fn_tier', true ) ?: 'standard' );
+			if ( count( $per_tier[ $tier ] ?? [] ) >= self::STORE_TOP ) {
+				continue; // already sorted by count, so this tier's list is full.
+			}
+			$per_tier[ $tier ][] = [
 				'protein_id' => $data['composition']['protein_id'],
 				'carb_id'    => $data['composition']['carb_id'],
 				'greens_ids' => $data['composition']['greens_ids'],
 				'count'      => (int) $data['count'],
+				'tier'       => $tier,
 			];
 		}
+		$combos = array_merge( ...( array_values( $per_tier ) ?: [ [] ] ) );
+		usort( $combos, static fn( $a, $b ) => $b['count'] <=> $a['count'] );
 
 		arsort( $ingredient_counts );
 		$ingredients = [];

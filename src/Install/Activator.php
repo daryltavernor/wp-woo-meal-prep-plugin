@@ -10,7 +10,9 @@ use FastNutrition\MealPrep\Taxonomies\IngredientType;
 
 final class Activator {
 
-	public const DB_VERSION = '1.4.0';
+	// 1.4.1: no schema change — bumped so maybe_migrate() queues a PopularCombos
+	// recompute, regenerating the stored rankings with per-tier top lists.
+	public const DB_VERSION = '1.4.1';
 
 	/** Token for the one-off re-roll when the stats aggregation rules changed. */
 	private const STATS_REAGG_TOKEN = 'meals_zones_v2';
