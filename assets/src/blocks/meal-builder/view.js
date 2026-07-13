@@ -17,6 +17,18 @@ const COMBO_PREFIX = 'combo:';
 const BUILDER_COMBO_LIMIT = 10;
 
 /*
+ * Bulk-tier ingredients carry "Bulk" in their names ("Chicken Breast (Bulk)",
+ * "Bulk Rice", …) — useful everywhere else, but noise when repeated after every
+ * item in a combo label on a builder that is already bulk. Strip the word (and
+ * any brackets/dash around it) from names used in combo labels only.
+ */
+const stripBulkWord = ( name ) =>
+	String( name || '' )
+		.replace( /\s*[-–—]?\s*[([]?\s*\bbulk\b\s*[)\]]?/gi, ' ' )
+		.replace( /\s{2,}/g, ' ' )
+		.trim();
+
+/*
  * Resolve the shop's ranked popular combos (Stats\PopularCombos, delivered in
  * config.popular_combos) to options the builder dropdown can offer: every
  * ingredient must exist in this product's allowed + available lists, and the
@@ -82,9 +94,9 @@ function resolveComboOptions( config, ingredients ) {
 				':' +
 				( c.greens_ids || [] ).join( ',' ),
 			label: [
-				protein.name,
-				carb ? carb.name : null,
-				greens.map( ( g ) => g.name ).join( ' & ' ),
+				stripBulkWord( protein.name ),
+				carb ? stripBulkWord( carb.name ) : null,
+				greens.map( ( g ) => stripBulkWord( g.name ) ).join( ' & ' ),
 			]
 				.filter( Boolean )
 				.join( ' + ' ),
