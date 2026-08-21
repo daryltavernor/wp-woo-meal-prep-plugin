@@ -661,8 +661,12 @@ CSS;
 	/**
 	 * Inline the brand logo as a base64 data URI so Dompdf never has to touch
 	 * the filesystem (which can fail silently due to chroot or open_basedir).
+	 *
+	 * Public so every Dompdf document in the plugin (labels, invoices) inlines
+	 * the logo the same way instead of each re-deriving the rules about which
+	 * MIME types Dompdf can actually handle.
 	 */
-	private static function logo_data_uri( array $brand ): string {
+	public static function logo_data_uri( array $brand ): string {
 		$path = (string) ( $brand['logo_path'] ?? '' );
 		if ( '' === $path || ! is_readable( $path ) ) {
 			return '';
@@ -686,9 +690,13 @@ CSS;
 	 * money — even though WooCommerce marks the order as "processing" and
 	 * WC_Order::is_paid() returns true.
 	 *
+	 * Public so the invoice prints the same verdict as the label on the box —
+	 * an order that reads UNPAID to the packer must not read PAID to the
+	 * customer.
+	 *
 	 * @return array{state:string,title:string}
 	 */
-	private static function payment_status( \WC_Order $order ): array {
+	public static function payment_status( \WC_Order $order ): array {
 		$method_id = $order->get_payment_method();
 		$title     = trim( (string) $order->get_payment_method_title() );
 

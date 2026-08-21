@@ -149,6 +149,18 @@ WooCommerce → Meal Prep → **Prep Dashboard**.
 WooCommerce → Meal Prep → **Prep Sheet**.
 Three sections: Ingredient totals · Per-order pick list (with tick-off checkboxes) · Delivery run sheet grouped by profile and postcode. Print via the browser or download as a server-side PDF (Dompdf).
 
+### Customer invoices (A4 PDF)
+*WooCommerce → Orders* → tick the orders you want → **Bulk actions → Generate invoices (A4 PDF)** → *Apply*. One print-ready A4 invoice per selected order, all in a single PDF, opened in a new tab.
+
+Each invoice shows the brand logo, company name, address, phone, email and web address (all from *Meal Prep → Settings → Branding*), the invoice number and date, the billing address, the delivery address (or the collection point for collection orders), the delivery/collection slot, the payment method, every ordered line with its full meal description and add-ons, and the totals — including any discount, the basket surcharge and the delivery fee.
+
+* **Invoice number** is the WooCommerce order number, so re-printing an invoice always reproduces the same paperwork.
+* **Paid vs unpaid** uses the same rule as the labels: cash-on-delivery counts as **AMOUNT DUE** (a full-width inverted bar) until the money is actually collected, everything else as **PAID IN FULL** (a quiet ruled line). An unpaid invoice is impossible to miss.
+* **Black and white only** — designed for a mono laser printer, no greys anywhere.
+* **One sheet** for orders up to roughly nine lines. Longer orders flow onto a second page with the table header and the invoice number repeated, so a continuation page still identifies itself.
+* **No VAT** — the business is not VAT registered, so no VAT number or tax breakdown is printed.
+* **Preview invoice (HTML, no cache)** is a sibling bulk action that renders the first ticked order as plain HTML in a new tab. Use it to iterate on the invoice design without fighting PDF viewer caches — refresh the tab to see the latest code.
+
 ### Customer favourites
 Logged-in customers can save meal combos to their account and re-add them with a single click from *My Account → Favourites*.
 
@@ -218,6 +230,9 @@ fastnutrition-mealprep/
     Delivery/{Profile,ProfileResolver,BlockedDates,SlotAvailability}.php
     Checkout/{MultiStep,StoreApiExtensions}.php
     Admin/{MenuRegistry,PrepDashboard,PrepSheet,ProfileAdmin,BlockedDatesAdmin,BundleAdmin,ConflictsNotice}.php
+    Admin/OrdersListBulkActions.php # Orders-list bulk actions: labels, prep sheet, invoices
+    Labels/LabelPrinter.php         # 100x100mm thermal label PDFs
+    Invoices/InvoicePrinter.php     # A4 customer invoice PDFs
     Account/Favourites.php
     Rest/RestController.php
     InStore/{OrderFactory,InStoreSettings,QuickOrderRest,QuickOrderPage}.php

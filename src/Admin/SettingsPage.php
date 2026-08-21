@@ -16,6 +16,7 @@ final class SettingsPage {
 	public const OPTION_UPDATE_BRANCH     = 'fn_update_branch';
 	public const OPTION_UPDATE_TOKEN      = 'fn_update_token';
 	public const OPTION_BRAND_LOGO_ID     = 'fn_brand_logo_id';
+	public const OPTION_BRAND_COMPANY     = 'fn_brand_company';
 	public const OPTION_BRAND_WEB         = 'fn_brand_web';
 	public const OPTION_BRAND_EMAIL       = 'fn_brand_email';
 	public const OPTION_BRAND_PHONE       = 'fn_brand_phone';
@@ -112,6 +113,7 @@ final class SettingsPage {
 			set_transient( 'fn_settings_notice', __( 'Surcharge & delivery settings saved.', 'fastnutrition-mealprep' ), 30 );
 		} elseif ( 'save_brand' === $action ) {
 			update_option( self::OPTION_BRAND_LOGO_ID, isset( $_POST['fn_brand_logo_id'] ) ? (int) $_POST['fn_brand_logo_id'] : 0 );
+			update_option( self::OPTION_BRAND_COMPANY, isset( $_POST['fn_brand_company'] ) ? sanitize_text_field( wp_unslash( (string) $_POST['fn_brand_company'] ) ) : '' );
 			update_option( self::OPTION_BRAND_WEB, isset( $_POST['fn_brand_web'] ) ? esc_url_raw( wp_unslash( (string) $_POST['fn_brand_web'] ) ) : '' );
 			update_option( self::OPTION_BRAND_EMAIL, isset( $_POST['fn_brand_email'] ) ? sanitize_email( wp_unslash( (string) $_POST['fn_brand_email'] ) ) : '' );
 			update_option( self::OPTION_BRAND_PHONE, isset( $_POST['fn_brand_phone'] ) ? sanitize_text_field( wp_unslash( (string) $_POST['fn_brand_phone'] ) ) : '' );
@@ -293,8 +295,8 @@ final class SettingsPage {
 		$logo_id      = $brand['logo_id'];
 		$logo_preview = $logo_id ? wp_get_attachment_image_url( $logo_id, 'medium' ) : '';
 		wp_enqueue_media();
-		echo '<h2>' . esc_html__( 'Branding (labels & emails)', 'fastnutrition-mealprep' ) . '</h2>';
-		echo '<p class="description">' . esc_html__( 'These details are printed on every label (meal labels + order summaries) and used wherever the plugin needs to reference your business.', 'fastnutrition-mealprep' ) . '</p>';
+		echo '<h2>' . esc_html__( 'Branding (labels, invoices & emails)', 'fastnutrition-mealprep' ) . '</h2>';
+		echo '<p class="description">' . esc_html__( 'These details are printed on every label (meal labels + order summaries), on customer invoices, and used wherever the plugin needs to reference your business.', 'fastnutrition-mealprep' ) . '</p>';
 		echo '<form method="post">';
 		wp_nonce_field( 'fn_save_settings', 'fn_settings_nonce' );
 		echo '<input type="hidden" name="fn_action" value="save_brand" />';
@@ -310,6 +312,13 @@ final class SettingsPage {
 		echo '<button type="button" class="button" id="fn-brand-logo-remove"' . disabled( 0 === $logo_id, true, false ) . '>' . esc_html__( 'Remove', 'fastnutrition-mealprep' ) . '</button>';
 		echo '<p class="description">' . esc_html__( 'Recommended: a square or wide-rectangle PNG/SVG with a transparent background. Will be scaled to fit the label header.', 'fastnutrition-mealprep' ) . '</p>';
 		echo '</td></tr>';
+		printf(
+			'<tr><th><label for="fn_brand_company">%s</label></th><td><input type="text" id="fn_brand_company" name="fn_brand_company" value="%s" class="regular-text" placeholder="%s" /><p class="description">%s</p></td></tr>',
+			esc_html__( 'Company name', 'fastnutrition-mealprep' ),
+			esc_attr( $brand['company'] ),
+			esc_attr( (string) get_bloginfo( 'name' ) ),
+			esc_html__( 'Your trading name, printed at the head and foot of customer invoices. Leave blank to use the site title.', 'fastnutrition-mealprep' )
+		);
 		printf(
 			'<tr><th><label for="fn_brand_web">%s</label></th><td><input type="url" id="fn_brand_web" name="fn_brand_web" value="%s" class="regular-text" placeholder="https://www.fastnutrition.co.uk" /></td></tr>',
 			esc_html__( 'Web address', 'fastnutrition-mealprep' ),
@@ -481,6 +490,7 @@ final class SettingsPage {
 			'logo_id'   => $logo_id,
 			'logo_url'  => $logo_url,
 			'logo_path' => $logo_path && is_readable( $logo_path ) ? $logo_path : '',
+			'company'   => (string) get_option( self::OPTION_BRAND_COMPANY, '' ),
 			'web'       => (string) get_option( self::OPTION_BRAND_WEB, '' ),
 			'email'     => (string) get_option( self::OPTION_BRAND_EMAIL, '' ),
 			'phone'     => (string) get_option( self::OPTION_BRAND_PHONE, '' ),

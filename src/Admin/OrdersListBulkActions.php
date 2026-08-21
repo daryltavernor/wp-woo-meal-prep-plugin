@@ -3,6 +3,7 @@ declare( strict_types=1 );
 
 namespace FastNutrition\MealPrep\Admin;
 
+use FastNutrition\MealPrep\Invoices\InvoicePrinter;
 use FastNutrition\MealPrep\Labels\LabelPrinter;
 
 /**
@@ -14,6 +15,7 @@ use FastNutrition\MealPrep\Labels\LabelPrinter;
  * Real-print actions:
  *   - fn_print_labels_summary: one summary label per selected order
  *   - fn_print_labels_full:    summary + one label per meal item
+ *   - fn_print_invoices:       one A4 customer invoice per selected order
  *
  * Test-print actions (each capped to ONE order and ONE meal label so a
  * 50-meal order doesn't print 50 test labels):
@@ -33,6 +35,8 @@ final class OrdersListBulkActions {
 	private const ACTION_TEST_MEAL    = 'fn_print_labels_test_meal';
 	private const ACTION_TEST_BOTH    = 'fn_print_labels_test_both';
 	private const ACTION_PREP_SHEET   = 'fn_prep_sheet';
+	private const ACTION_INVOICES     = 'fn_print_invoices';
+	private const ACTION_INVOICE_TEST = 'fn_preview_invoice';
 
 	public function register(): void {
 		// Classic, CPT-based orders screen.
@@ -50,10 +54,12 @@ final class OrdersListBulkActions {
 	public function add_actions( array $actions ): array {
 		$actions[ self::ACTION_FULL ]         = __( 'Print labels: summary + meal labels', 'fastnutrition-mealprep' );
 		$actions[ self::ACTION_SUMMARY ]      = __( 'Print labels: summary only', 'fastnutrition-mealprep' );
+		$actions[ self::ACTION_INVOICES ]     = __( 'Generate invoices (A4 PDF)', 'fastnutrition-mealprep' );
 		$actions[ self::ACTION_PREP_SHEET ]   = __( 'Generate prep sheet (selected orders)', 'fastnutrition-mealprep' );
 		$actions[ self::ACTION_TEST_BOTH ]    = __( 'Test print (no cache): summary + 1 meal', 'fastnutrition-mealprep' );
 		$actions[ self::ACTION_TEST_SUMMARY ] = __( 'Test print (no cache): summary only', 'fastnutrition-mealprep' );
 		$actions[ self::ACTION_TEST_MEAL ]    = __( 'Test print (no cache): 1 meal label only', 'fastnutrition-mealprep' );
+		$actions[ self::ACTION_INVOICE_TEST ] = __( 'Preview invoice (HTML, no cache)', 'fastnutrition-mealprep' );
 		return $actions;
 	}
 
@@ -65,7 +71,8 @@ final class OrdersListBulkActions {
 	public function handle( string $redirect_to, string $action, array $order_ids ): string {
 		$real_actions = [ self::ACTION_SUMMARY, self::ACTION_FULL ];
 		$test_actions = [ self::ACTION_TEST_SUMMARY, self::ACTION_TEST_MEAL, self::ACTION_TEST_BOTH ];
-		if ( ! in_array( $action, array_merge( $real_actions, $test_actions, [ self::ACTION_PREP_SHEET ] ), true ) ) {
+		$other_actions = [ self::ACTION_PREP_SHEET, self::ACTION_INVOICES, self::ACTION_INVOICE_TEST ];
+		if ( ! in_array( $action, array_merge( $real_actions, $test_actions, $other_actions ), true ) ) {
 			return $redirect_to;
 		}
 		if ( ! current_user_can( 'manage_woocommerce' ) ) {
@@ -80,6 +87,22 @@ final class OrdersListBulkActions {
 		if ( self::ACTION_PREP_SHEET === $action ) {
 			PrepSheet::stream_for_orders( $order_ids );
 			// stream_for_orders() exits.
+			return $redirect_to;
+		}
+
+		// Invoices: one A4 invoice per ticked order, in a single PDF.
+		if ( self::ACTION_INVOICES === $action ) {
+			InvoicePrinter::stream( $order_ids );
+			// stream() exits.
+			return $redirect_to;
+		}
+
+		// Invoice preview: the same layout rendered as plain HTML, so invoice
+		// design can be iterated on without fighting PDF viewer caches. Capped
+		// to the first ticked order, like the label test prints.
+		if ( self::ACTION_INVOICE_TEST === $action ) {
+			InvoicePrinter::stream_html( [ $order_ids[0] ] );
+			// stream_html() exits.
 			return $redirect_to;
 		}
 
