@@ -29,6 +29,11 @@ use FastNutrition\MealPrep\Checkout\FulfilmentDisplay;
 use FastNutrition\MealPrep\Checkout\MultiStep;
 use FastNutrition\MealPrep\Checkout\StoreApiExtensions;
 use FastNutrition\MealPrep\Delivery\BlockedDates;
+use FastNutrition\MealPrep\FoodSafety\CookPackRecord;
+use FastNutrition\MealPrep\FoodSafety\FoodSafetySettings;
+use FastNutrition\MealPrep\FoodSafety\IngredientSafety;
+use FastNutrition\MealPrep\FoodSafety\PrepRecordsPage;
+use FastNutrition\MealPrep\FoodSafety\RecordsArchive;
 use FastNutrition\MealPrep\InStore\InStoreSettings;
 use FastNutrition\MealPrep\InStore\OrdersListColumn;
 use FastNutrition\MealPrep\InStore\PrepOrderStatus;
@@ -114,6 +119,13 @@ final class Plugin {
 		( new OrdersFulfilmentColumn() )->register();
 		( new LabelsAdmin() )->register();
 		( new OrdersListBulkActions() )->register();
+
+		// Food-safety prep records (Cook & Pack Record, Prep Records, archive).
+		( new FoodSafetySettings() )->register();
+		( new IngredientSafety() )->register();
+		( new CookPackRecord() )->register();
+		( new PrepRecordsPage() )->register();
+		( new RecordsArchive() )->register();
 
 		( new Favourites() )->register();
 		( new RestController() )->register();

@@ -3,6 +3,7 @@ declare( strict_types=1 );
 
 namespace FastNutrition\MealPrep\Install;
 
+use FastNutrition\MealPrep\FoodSafety\FoodSafetySettings;
 use FastNutrition\MealPrep\Stats\PopularCombos;
 use FastNutrition\MealPrep\Stats\StatsRollup;
 use FastNutrition\MealPrep\Taxonomies\Allergen;
@@ -10,9 +11,10 @@ use FastNutrition\MealPrep\Taxonomies\IngredientType;
 
 final class Activator {
 
+	// 1.5.0: adds fn_prep_records + fn_daily_checks (food-safety prep records).
 	// 1.4.1: no schema change — bumped so maybe_migrate() queues a PopularCombos
 	// recompute, regenerating the stored rankings with per-tier top lists.
-	public const DB_VERSION = '1.4.1';
+	public const DB_VERSION = '1.5.0';
 
 	/** Token for the one-off re-roll when the stats aggregation rules changed. */
 	private const STATS_REAGG_TOKEN = 'meals_zones_v2';
@@ -53,6 +55,7 @@ final class Activator {
 	public static function deactivate(): void {
 		PopularCombos::unschedule();
 		StatsRollup::unschedule();
+		FoodSafetySettings::unschedule();
 		flush_rewrite_rules();
 	}
 
@@ -67,6 +70,8 @@ final class Activator {
 		$daily_ing       = $wpdb->prefix . 'fn_daily_ingredient_stats';
 		$daily_meal      = $wpdb->prefix . 'fn_daily_meal_stats';
 		$daily_zone      = $wpdb->prefix . 'fn_daily_zone_stats';
+		$prep_records    = $wpdb->prefix . 'fn_prep_records';
+		$daily_checks    = $wpdb->prefix . 'fn_daily_checks';
 
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 
@@ -176,6 +181,58 @@ final class Activator {
 				UNIQUE KEY date_zone (stat_date, zone_key),
 				KEY zone_key (zone_key),
 				KEY stat_date (stat_date)
+			) {$charset_collate};"
+		);
+
+		// Food-safety prep records: one row per cooked batch per day (Phase 2 of
+		// the Cook & Pack Record). Sample rows seeded for demonstration are
+		// flagged with is_sample so they can be excluded or removed.
+		dbDelta(
+			"CREATE TABLE {$prep_records} (
+				id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+				record_date date NOT NULL,
+				batch_code varchar(40) NOT NULL,
+				ingredient_id bigint(20) unsigned NOT NULL DEFAULT 0,
+				component varchar(191) NOT NULL DEFAULT '',
+				method varchar(20) NOT NULL DEFAULT '',
+				portions int(11) NOT NULL DEFAULT 0,
+				target_c decimal(5,1) NULL,
+				time_in varchar(5) NOT NULL DEFAULT '',
+				time_out varchar(5) NOT NULL DEFAULT '',
+				probe1_c decimal(5,1) NULL,
+				probe2_c decimal(5,1) NULL,
+				cooled_by varchar(5) NOT NULL DEFAULT '',
+				fridge_unit varchar(100) NOT NULL DEFAULT '',
+				packed_at varchar(5) NOT NULL DEFAULT '',
+				use_by date NULL,
+				initials varchar(10) NOT NULL DEFAULT '',
+				corrective_action text NULL,
+				out_of_limit tinyint(1) NOT NULL DEFAULT 0,
+				is_sample tinyint(1) NOT NULL DEFAULT 0,
+				created_by bigint(20) unsigned NOT NULL DEFAULT 0,
+				created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				updated_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				PRIMARY KEY  (id),
+				UNIQUE KEY date_batch (record_date, batch_code),
+				KEY ingredient_id (ingredient_id),
+				KEY record_date (record_date),
+				KEY is_sample (is_sample)
+			) {$charset_collate};"
+		);
+
+		// The day's checks (fridge temperatures, probe calibration, opening and
+		// closing, sign-off) as key/value rows.
+		dbDelta(
+			"CREATE TABLE {$daily_checks} (
+				id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+				check_date date NOT NULL,
+				check_key varchar(120) NOT NULL,
+				check_value varchar(191) NOT NULL DEFAULT '',
+				is_sample tinyint(1) NOT NULL DEFAULT 0,
+				updated_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				PRIMARY KEY  (id),
+				UNIQUE KEY date_key (check_date, check_key),
+				KEY check_date (check_date)
 			) {$charset_collate};"
 		);
 	}

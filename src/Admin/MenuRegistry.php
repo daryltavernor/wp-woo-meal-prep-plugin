@@ -31,6 +31,11 @@ final class MenuRegistry {
 		add_submenu_page( self::SLUG, __( 'Prep Dashboard', 'fastnutrition-mealprep' ), __( 'Prep Dashboard', 'fastnutrition-mealprep' ), 'manage_woocommerce', self::SLUG, [ PrepDashboard::class, 'render_static' ] );
 		add_submenu_page( self::SLUG, __( 'Printable Prep Sheet', 'fastnutrition-mealprep' ), __( 'Prep Sheet', 'fastnutrition-mealprep' ), 'manage_woocommerce', 'fn-prep-sheet', [ PrepSheet::class, 'render_static' ] );
 
+		// Food-safety records: the printable Cook & Pack Record, the tablet entry screen, the archive.
+		add_submenu_page( self::SLUG, __( 'Cook & Pack Record', 'fastnutrition-mealprep' ), __( 'Cook & Pack Record', 'fastnutrition-mealprep' ), 'manage_woocommerce', \FastNutrition\MealPrep\FoodSafety\CookPackRecord::PAGE_SLUG, [ \FastNutrition\MealPrep\FoodSafety\CookPackRecord::class, 'render_static' ] );
+		add_submenu_page( self::SLUG, __( 'Prep Records', 'fastnutrition-mealprep' ), __( 'Prep Records', 'fastnutrition-mealprep' ), 'manage_woocommerce', \FastNutrition\MealPrep\FoodSafety\PrepRecordsPage::PAGE_SLUG, [ \FastNutrition\MealPrep\FoodSafety\PrepRecordsPage::class, 'render_static' ] );
+		add_submenu_page( self::SLUG, __( 'Records Archive', 'fastnutrition-mealprep' ), __( 'Records Archive', 'fastnutrition-mealprep' ), 'manage_woocommerce', \FastNutrition\MealPrep\FoodSafety\RecordsArchive::PAGE_SLUG, [ \FastNutrition\MealPrep\FoodSafety\RecordsArchive::class, 'render_static' ] );
+
 		// Ingredients (the CPT's show_in_menu auto-adds "Ingredients" itself — taxonomy submenus follow).
 		add_submenu_page(
 			self::SLUG,
@@ -66,6 +71,7 @@ final class MenuRegistry {
 		add_submenu_page( self::SLUG, __( 'Quick Order Settings', 'fastnutrition-mealprep' ), __( 'Quick Order Settings', 'fastnutrition-mealprep' ), 'manage_woocommerce', \FastNutrition\MealPrep\InStore\InStoreSettings::PAGE_SLUG, [ \FastNutrition\MealPrep\InStore\InStoreSettings::class, 'render_static' ] );
 
 		// Settings.
+		add_submenu_page( self::SLUG, __( 'Food Safety Settings', 'fastnutrition-mealprep' ), __( 'Food Safety Settings', 'fastnutrition-mealprep' ), 'manage_woocommerce', \FastNutrition\MealPrep\FoodSafety\FoodSafetySettings::PAGE_SLUG, [ \FastNutrition\MealPrep\FoodSafety\FoodSafetySettings::class, 'render_static' ] );
 		add_submenu_page( self::SLUG, __( 'Checkout & General Settings', 'fastnutrition-mealprep' ), __( 'Settings', 'fastnutrition-mealprep' ), 'manage_woocommerce', 'fn-settings', [ SettingsPage::class, 'render_static' ] );
 	}
 

@@ -5,6 +5,8 @@ namespace FastNutrition\MealPrep\Admin;
 
 use FastNutrition\MealPrep\Cart\Selection;
 use FastNutrition\MealPrep\Delivery\SlotAvailability;
+use FastNutrition\MealPrep\FoodSafety\BatchCodes;
+use FastNutrition\MealPrep\FoodSafety\CookPackRecord;
 use FastNutrition\MealPrep\InStore\PrepOrderStatus;
 use FastNutrition\MealPrep\PostTypes\Ingredient;
 
@@ -81,6 +83,7 @@ final class PrepSheet {
 		submit_button( __( 'Update', 'fastnutrition-mealprep' ), 'primary', '', false );
 		echo ' <button type="button" class="button" onclick="window.print()">' . esc_html__( 'Print', 'fastnutrition-mealprep' ) . '</button>';
 		echo ' <a class="button" href="' . esc_url( $pdf_url ) . '">' . esc_html__( 'Download PDF', 'fastnutrition-mealprep' ) . '</a>';
+		echo ' <a class="button" href="' . esc_url( admin_url( 'admin.php?page=' . CookPackRecord::PAGE_SLUG . '&date=' . rawurlencode( $date ) ) ) . '">' . esc_html__( 'Cook & Pack Record for this date', 'fastnutrition-mealprep' ) . '</a>';
 		echo '</form>';
 
 		self::print_styles();
@@ -393,14 +396,18 @@ final class PrepSheet {
 					$sel = $item->get_meta( '_fn_selection', true );
 					$describe = is_array( $sel ) ? PrepDashboard::describe_selection( $sel ) : '';
 					$addons = is_array( $sel ) && ! empty( $sel['addons'] ) ? array_filter( array_map( static fn( $a ) => (string) ( $a['label'] ?? '' ), $sel['addons'] ) ) : [];
+					// Batch codes of the meal's components on this prep day: the
+					// traceability link to the Cook & Pack Record.
+					$codes = is_array( $sel ) ? BatchCodes::for_selection( (string) ( $ff['date'] ?? '' ), Selection::ingredient_ids( $sel ) ) : [];
 					echo '<li>';
 					echo '<label><input type="checkbox" disabled /> ';
 					printf(
-						'%d × <strong>%s</strong>%s%s',
+						'%d × <strong>%s</strong>%s%s%s',
 						(int) $item->get_quantity(),
 						esc_html( $item->get_name() ),
 						'' !== $describe ? ' — ' . esc_html( $describe ) : '',
-						! empty( $addons ) ? ' <em>(+ ' . esc_html( implode( ', ', $addons ) ) . ')</em>' : ''
+						! empty( $addons ) ? ' <em>(+ ' . esc_html( implode( ', ', $addons ) ) . ')</em>' : '',
+						! empty( $codes ) ? ' <span class="fn-sheet-batch">[' . esc_html( implode( ' · ', $codes ) ) . ']</span>' : ''
 					);
 					echo '</label></li>';
 				}
@@ -468,6 +475,7 @@ final class PrepSheet {
 		.fn-sheet-table th, .fn-sheet-table td { border: 1px solid #333; padding: 6px 10px; text-align: left; }
 		.fn-sheet-card { border: 1px solid #000; padding: 10px; margin-bottom: 10px; page-break-inside: avoid; }
 		.fn-sheet-meta { color: #444; font-size: 12px; }
+		.fn-sheet-batch { font-family: monospace; font-size: 11px; color: #222; }
 		.fn-sheet-items { list-style: none; padding-left: 0; }
 		.fn-sheet-items li { padding: 4px 0; border-bottom: 1px dashed #ccc; }
 		.fn-sheet-title { font-size: 20px; margin: 10px 0; }

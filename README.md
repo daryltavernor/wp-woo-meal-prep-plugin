@@ -162,6 +162,18 @@ Each invoice shows the brand logo, company name, address, phone, email and web a
 * **No VAT** — the business is not VAT registered, so no VAT number or tax breakdown is printed.
 * **Preview invoice (HTML, no cache)** is a sibling bulk action that renders the first ticked order as plain HTML in a new tab. Use it to iterate on the invoice design without fighting PDF viewer caches — refresh the tab to see the latest code.
 
+### Food-safety prep records (Cook & Pack Record)
+The HACCP-style paperwork a kitchen keeps for its Environmental Health Officer, generated from what the prep list already knows. Four screens under *Meal Prep*:
+
+* **Cook & Pack Record** — an A4 landscape sheet for a prep date: one row per component on the day's prep list with its **batch code** (`YYMMDD-CHC-1`), cooking method, portions, target core temperature and use-by, plus a daily-checks block (fridge/freezer AM and PM temperatures, probe calibration, opening/closing/cleaning ticks, sign-off). Print it blank with the Prep Sheet and fill it in by hand, or print it with the readings saved in Prep Records. **Fill with sample readings** fills a sheet with believable demonstration values (see below). Print or Download PDF (Dompdf, landscape).
+* **Prep Records** — the tablet entry screen: the same rows with `Now` buttons that stamp the current time, probe fields, fridge pick-list, use-by and initials. Readings below the target core temperature or outside the cooling window are flagged and ask for an "Action taken" note. Components cooked in more than one batch get extra rows (`-2`, `-3`…). Saved rows print on the Cook & Pack Record.
+* **Records Archive** — search by date, component, batch code or **order number** (traces the order's components to that day's cook batches), export CSV for the EHO, open or print any day, and a monthly summary of batches, out-of-limit events and days with checks. Records older than the retention period are purged nightly.
+* **Food Safety Settings** — the critical limits (75 °C core, 90 min to refrigerate, 5 °C / 8 °C fridge, dispatch, reheat, calibration cadence), fridges and freezers, default shelf life, signatory, retention, and the **sample-reading pools**.
+
+**Per-ingredient data** lives in a *Food safety* box on the Ingredient edit screen: cooking method (defaults by type — proteins and set meals oven, carbs boil, greens steam, sweets no-cook), target core temperature, a typical-cook reminder, cooling step, shelf life, storage and the batch short code. Every field falls back to a default, so the client only corrects exceptions.
+
+**Sample readings for demonstration.** Temperatures, cook times (inside the 06:00–10:00 window), cooling and packing times, fridge readings and initials are drawn from editable pools in Food Safety Settings and seeded from the date and batch code, so a given day always produces the same believable figures and a demo can be repeated. A sample-filled print carries a small specimen line in its footer; seeded archive records are flagged *Sample*, never overwrite a real record, and are removed with one button. Batch codes also print beside each meal on the Prep Sheet pick list.
+
 ### Customer favourites
 Logged-in customers can save meal combos to their account and re-add them with a single click from *My Account → Favourites*.
 
