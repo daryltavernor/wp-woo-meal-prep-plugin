@@ -411,6 +411,10 @@ CSS;
 	   the same box, with a little air above it. */
 	.inv-note-title--next { margin-top: 1.5mm; }
 	.inv-note-text { line-height: 11pt; word-wrap: break-word; overflow-wrap: break-word; }
+	/* Long notes: full width under the summary row instead of beside the
+	   totals, so a ten-line note wraps less and can flow onto page 2.
+	   179.5 = 186 − (2 × 3 mm padding) − (2 × 0.6 pt border). */
+	.inv-note--wide { width: 179.5mm; margin-top: 3mm; }
 
 	/* ---- Foot ----
 	   Kept in normal flow rather than pinned to the page bottom: a fixed-position
@@ -721,9 +725,10 @@ CSS;
 						// Built as one string rather than indented markup: the
 						// whitespace around a nested <span> renders as a visible
 						// double space in the PDF.
-						$desc   = self::item_description( $item );
-						$addons = self::item_addons( $item );
-						$line   = esc_html( '' !== $desc ? $desc : $item->get_name() );
+						$desc    = self::item_description( $item );
+						$addons  = self::item_addons( $item );
+						$printed = ( '' !== $desc ? $desc : (string) $item->get_name() ) . ' ' . implode( ', ', $addons );
+						$line    = esc_html( '' !== $desc ? $desc : $item->get_name() );
 						if ( ! empty( $addons ) ) {
 							$line .= ' <span class="inv-item-addons">' . sprintf(
 								/* translators: %s: comma-separated add-on names */
@@ -734,7 +739,7 @@ CSS;
 						echo '<div class="inv-item-name">' . $line . '</div>';
 						// Anything the customer typed against this line (a product
 						// input field, a gift message) goes under it, one line each.
-						foreach ( self::item_fields( $item ) as $field ) {
+						foreach ( self::item_fields( $item, $printed ) as $field ) {
 							echo '<div class="inv-item-fields">' . esc_html( $field ) . '</div>';
 						}
 						?>
@@ -802,23 +807,41 @@ CSS;
 	 * product input field, a gift message — as "Label: value" strings.
 	 *
 	 * This is the same visible line-item meta WooCommerce prints under the line
-	 * in the admin order screen and in the order emails. The plugin's own meta
-	 * (the meal selection, the macros snapshot) is underscore-prefixed and so
-	 * hidden, and WooCommerce drops variation attributes that already appear in
-	 * the product name, so nothing here repeats the description above it.
+	 * in the admin order screen and in the order emails, minus what the invoice
+	 * already says: the plugin's own composition pairs ("Protein: Chicken"),
+	 * "Add-ons" and "Macros" rows that OrderItemMeta writes are summarised in
+	 * the description line, so they are skipped by key, and any other value the
+	 * printed line already contains (a variation attribute that IS the product,
+	 * say) is skipped too.
 	 *
+	 * @param string $printed The description and add-ons text printed above.
 	 * @return string[]
 	 */
-	private static function item_fields( \WC_Order_Item $item ): array {
+	private static function item_fields( \WC_Order_Item $item, string $printed ): array {
 		if ( ! $item instanceof \WC_Order_Item_Product ) {
 			return [];
 		}
+		$own       = [ __( 'Add-ons', 'fastnutrition-mealprep' ), __( 'Macros', 'fastnutrition-mealprep' ) ];
+		$selection = $item->get_meta( '_fn_selection', true );
+		if ( ! is_array( $selection ) ) {
+			$selection = $item->get_meta( Selections::CART_KEY, true );
+		}
+		if ( is_array( $selection ) ) {
+			foreach ( Selection::composition_pairs( $selection ) as $pair ) {
+				$own[] = (string) ( $pair['key'] ?? '' );
+			}
+		}
+		$own = array_map( 'strtolower', $own );
+
 		$out = [];
 		foreach ( $item->get_formatted_meta_data() as $meta ) {
 			$label = trim( wp_strip_all_tags( (string) ( $meta->display_key ?? '' ) ) );
 			// display_value arrives wrapped in <p> by wpautop(); flatten to text.
 			$value = trim( html_entity_decode( wp_strip_all_tags( (string) ( $meta->display_value ?? '' ) ), ENT_QUOTES, 'UTF-8' ) );
-			if ( '' === $value ) {
+			if ( '' === $value || in_array( strtolower( $label ), $own, true ) ) {
+				continue;
+			}
+			if ( false !== stripos( $printed, $value ) ) {
 				continue;
 			}
 			$out[] = '' !== $label ? $label . ': ' . $value : $value;
@@ -1027,23 +1050,17 @@ CSS;
 		if ( abs( $tax ) > 0.0001 ) {
 			$rows[] = [ __( 'Tax', 'fastnutrition-mealprep' ), self::money( $tax, $order ), false ];
 		}
+		// Short notes sit beside the totals; long ones get the full width below.
+		$wide = ! empty( $notes ) && self::notes_are_long( $notes );
 		?>
 		<table class="inv-totals-wrap">
 			<tr>
 				<td class="inv-totals-spacer">
-					<?php if ( ! empty( $notes ) ) : ?>
-						<div class="inv-note">
-							<?php foreach ( $notes as $i => $entry ) : ?>
-								<?php
-								// Title and text each on one source line: Dompdf turns
-								// whitespace around block content into extra line boxes.
-								$title = '' !== $entry['label'] ? $entry['label'] : __( 'Order notes', 'fastnutrition-mealprep' );
-								echo '<div class="inv-note-title' . ( $i > 0 ? ' inv-note-title--next' : '' ) . '">' . esc_html( $title ) . '</div>';
-								echo '<div class="inv-note-text">' . nl2br( esc_html( $entry['text'] ) ) . '</div>';
-								?>
-							<?php endforeach; ?>
-						</div>
-					<?php endif; ?>
+					<?php
+					if ( ! empty( $notes ) && ! $wide ) {
+						self::render_notes_box( $notes, false );
+					}
+					?>
 				</td>
 				<td class="inv-totals-cell">
 					<table class="inv-totals">
@@ -1075,6 +1092,49 @@ CSS;
 			</tr>
 		</table>
 		<?php
+		if ( $wide ) {
+			self::render_notes_box( $notes, true );
+		}
+	}
+
+	/**
+	 * Whether the notes deserve the full page width.
+	 *
+	 * Short notes sit beside the totals, which keeps a typical order on one
+	 * sheet. Past this size the 106mm column wraps every sentence twice, so the
+	 * box goes full-width under the summary instead: fewer wrapped lines, and a
+	 * plain block that Dompdf can carry over onto a second page if a customer
+	 * really does write an essay — nothing is ever cut off.
+	 *
+	 * @param array<int, array{label: string, text: string}> $notes
+	 */
+	private static function notes_are_long( array $notes ): bool {
+		$lines = 0;
+		$chars = 0;
+		foreach ( $notes as $entry ) {
+			$text   = (string) $entry['text'];
+			$lines += count( preg_split( '/\R/', $text ) ?: [] ) + 1; // +1 for the heading.
+			$chars += mb_strlen( $text );
+		}
+		return $lines > 8 || $chars > 450;
+	}
+
+	/**
+	 * The bordered ORDER NOTES box, beside the totals or full-width under them.
+	 *
+	 * @param array<int, array{label: string, text: string}> $notes
+	 * @param bool                                            $wide  Full-width variant.
+	 */
+	private static function render_notes_box( array $notes, bool $wide ): void {
+		echo '<div class="inv-note' . ( $wide ? ' inv-note--wide' : '' ) . '">';
+		foreach ( $notes as $i => $entry ) {
+			// Title and text each on one source line: Dompdf turns whitespace
+			// around block content into extra line boxes.
+			$title = '' !== $entry['label'] ? $entry['label'] : __( 'Order notes', 'fastnutrition-mealprep' );
+			echo '<div class="inv-note-title' . ( $i > 0 ? ' inv-note-title--next' : '' ) . '">' . esc_html( $title ) . '</div>';
+			echo '<div class="inv-note-text">' . nl2br( esc_html( $entry['text'] ) ) . '</div>';
+		}
+		echo '</div>';
 	}
 
 	private static function render_foot( array $brand ): void {
