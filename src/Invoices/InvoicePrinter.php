@@ -24,7 +24,10 @@ use FastNutrition\MealPrep\Labels\LabelPrinter;
  *   - billing address and delivery address (or the collection point),
  *   - payment method + paid/unpaid state,
  *   - delivery/collection method with date and time window,
- *   - every ordered line with its full meal description and add-ons,
+ *   - every ordered line with its full meal description and add-ons, plus
+ *     anything the customer typed against that line (product input fields),
+ *   - the customer's order notes from the checkout, and the value of any
+ *     additional checkout field another plugin or snippet registered,
  *   - totals, including the delivery surcharge and any discounts or refunds.
  *
  * Design constraints:
@@ -345,6 +348,10 @@ CSS;
 	   detail inside the bold line rather than as part of the meal itself. */
 	.inv-item-name { font-weight: bold; font-size: 8.5pt; line-height: 11pt; word-wrap: break-word; overflow-wrap: break-word; }
 	.inv-item-addons { font-style: italic; font-weight: normal; font-size: 8pt; }
+	/* Text the customer typed against the line (product input fields, gift
+	   messages): one italic line each under the description, never bold, so
+	   the meal stays the headline. */
+	.inv-item-fields { font-style: italic; font-weight: normal; font-size: 8pt; line-height: 10.5pt; word-wrap: break-word; overflow-wrap: break-word; }
 	/* Keep a line's name and description together across a page break. */
 	.inv-items tbody tr { page-break-inside: avoid; }
 
@@ -400,6 +407,10 @@ CSS;
 		font-size: 8.5pt;
 	}
 	.inv-note-title { font-weight: bold; text-transform: uppercase; font-size: 7.5pt; letter-spacing: 0.3mm; margin-bottom: 0.6mm; }
+	/* A second source (an extra checkout field) gets its own heading inside
+	   the same box, with a little air above it. */
+	.inv-note-title--next { margin-top: 1.5mm; }
+	.inv-note-text { line-height: 11pt; word-wrap: break-word; overflow-wrap: break-word; }
 
 	/* ---- Foot ----
 	   Kept in normal flow rather than pinned to the page bottom: a fixed-position
@@ -440,7 +451,7 @@ CSS;
 		$is_collection = 'collection' === ( $summary['type'] ?? '' );
 		$payment       = LabelPrinter::payment_status( $order );
 		$is_paid       = 'paid' === $payment['state'];
-		$note          = trim( (string) $order->get_customer_note() );
+		$notes         = self::order_notes( $order );
 		?>
 		<div class="invoice">
 			<?php self::render_head( $order, $brand ); ?>
@@ -448,7 +459,7 @@ CSS;
 			<?php self::render_addresses( $order, $is_collection ); ?>
 			<?php self::render_fulfilment( $summary ); ?>
 			<?php self::render_items( $order ); ?>
-			<?php self::render_summary( $order, $note ); ?>
+			<?php self::render_summary( $order, $notes ); ?>
 
 			<div class="inv-close">
 				<div class="inv-payment inv-payment--<?php echo $is_paid ? 'paid' : 'due'; ?>">
@@ -721,6 +732,11 @@ CSS;
 							) . '</span>';
 						}
 						echo '<div class="inv-item-name">' . $line . '</div>';
+						// Anything the customer typed against this line (a product
+						// input field, a gift message) goes under it, one line each.
+						foreach ( self::item_fields( $item ) as $field ) {
+							echo '<div class="inv-item-fields">' . esc_html( $field ) . '</div>';
+						}
 						?>
 					</td>
 					<td class="col-unit"><?php echo esc_html( self::money( $unit, $order ) ); ?></td>
@@ -782,10 +798,207 @@ CSS;
 	}
 
 	/**
-	 * The summary row beneath the items: the customer's order note on the left,
-	 * the money totals on the right.
+	 * Anything the customer typed against a single line while ordering — a
+	 * product input field, a gift message — as "Label: value" strings.
+	 *
+	 * This is the same visible line-item meta WooCommerce prints under the line
+	 * in the admin order screen and in the order emails. The plugin's own meta
+	 * (the meal selection, the macros snapshot) is underscore-prefixed and so
+	 * hidden, and WooCommerce drops variation attributes that already appear in
+	 * the product name, so nothing here repeats the description above it.
+	 *
+	 * @return string[]
 	 */
-	private static function render_summary( \WC_Order $order, string $note ): void {
+	private static function item_fields( \WC_Order_Item $item ): array {
+		if ( ! $item instanceof \WC_Order_Item_Product ) {
+			return [];
+		}
+		$out = [];
+		foreach ( $item->get_formatted_meta_data() as $meta ) {
+			$label = trim( wp_strip_all_tags( (string) ( $meta->display_key ?? '' ) ) );
+			// display_value arrives wrapped in <p> by wpautop(); flatten to text.
+			$value = trim( html_entity_decode( wp_strip_all_tags( (string) ( $meta->display_value ?? '' ) ), ENT_QUOTES, 'UTF-8' ) );
+			if ( '' === $value ) {
+				continue;
+			}
+			$out[] = '' !== $label ? $label . ': ' . $value : $value;
+		}
+		/**
+		 * Filter the per-line customer fields printed under an invoice line.
+		 *
+		 * @param string[]       $out  "Label: value" strings, in print order.
+		 * @param \WC_Order_Item $item The order line.
+		 */
+		$out = apply_filters( 'fn_mealprep_invoice_item_fields', $out, $item );
+		$out = is_array( $out ) ? $out : [];
+
+		$clean = [];
+		foreach ( $out as $field ) {
+			if ( is_scalar( $field ) && '' !== trim( (string) $field ) ) {
+				$clean[] = trim( (string) $field );
+			}
+		}
+		return $clean;
+	}
+
+	/**
+	 * Every note the customer typed while placing the order, as label/text
+	 * pairs in print order.
+	 *
+	 * Sources:
+	 *   1. The checkout's "Add a note to your order" box. WooCommerce stores it
+	 *      as the order's customer note — the text the admin order screen shows
+	 *      under "Customer provided note".
+	 *   2. Any additional checkout field in the order or contact location
+	 *      registered through WooCommerce Blocks (a "Delivery instructions" box
+	 *      added by another plugin or a snippet, for instance).
+	 *
+	 * @return array<int, array{label: string, text: string}>
+	 */
+	private static function order_notes( \WC_Order $order ): array {
+		$notes = [];
+
+		$customer_note = trim( (string) $order->get_customer_note() );
+		if ( '' !== $customer_note ) {
+			$notes[] = [
+				'label' => __( 'Order notes', 'fastnutrition-mealprep' ),
+				'text'  => $customer_note,
+			];
+		}
+
+		foreach ( self::additional_checkout_fields( $order ) as $field ) {
+			$notes[] = $field;
+		}
+
+		/**
+		 * Filter the notes printed on an invoice, in the box beside the totals.
+		 *
+		 * @param array<int, array{label: string, text: string}> $notes
+		 * @param \WC_Order                                       $order
+		 */
+		$notes = apply_filters( 'fn_mealprep_invoice_notes', $notes, $order );
+		$notes = is_array( $notes ) ? $notes : [];
+
+		$clean = [];
+		foreach ( $notes as $entry ) {
+			if ( ! is_array( $entry ) ) {
+				continue;
+			}
+			$text = trim( (string) ( $entry['text'] ?? '' ) );
+			if ( '' === $text ) {
+				continue;
+			}
+			$clean[] = [
+				'label' => trim( (string) ( $entry['label'] ?? '' ) ),
+				'text'  => $text,
+			];
+		}
+		return $clean;
+	}
+
+	/**
+	 * Values of additional checkout fields (WooCommerce Blocks) saved on the
+	 * order, as label/text pairs.
+	 *
+	 * Read straight from the order meta so it works whichever WooCommerce
+	 * version wrote the order; the field definitions, when the service is
+	 * available, only supply the label and option names. Address-location
+	 * fields live under other prefixes and belong to the address panels, not
+	 * here. Checkbox fields are skipped — a ticked "keep me posted" box is not a
+	 * note.
+	 *
+	 * @return array<int, array{label: string, text: string}>
+	 */
+	private static function additional_checkout_fields( \WC_Order $order ): array {
+		// Order- and contact-location fields are persisted under these prefixes
+		// ("_wc_additional/" in the first WooCommerce releases, "_wc_other/" since).
+		$prefixes    = [ '_wc_other/', '_wc_additional/' ];
+		$definitions = self::checkout_field_definitions();
+		$out         = [];
+
+		foreach ( $order->get_meta_data() as $meta ) {
+			$key    = (string) $meta->key;
+			$prefix = '';
+			foreach ( $prefixes as $candidate ) {
+				if ( str_starts_with( $key, $candidate ) ) {
+					$prefix = $candidate;
+					break;
+				}
+			}
+			if ( '' === $prefix || ! is_scalar( $meta->value ) ) {
+				continue;
+			}
+			$field_id = substr( $key, strlen( $prefix ) );
+			$field    = isset( $definitions[ $field_id ] ) && is_array( $definitions[ $field_id ] ) ? $definitions[ $field_id ] : [];
+			$type     = (string) ( $field['type'] ?? '' );
+			if ( 'checkbox' === $type ) {
+				continue;
+			}
+			$value = trim( (string) $meta->value );
+			if ( '' === $value ) {
+				continue;
+			}
+			if ( 'select' === $type && ! empty( $field['options'] ) && is_array( $field['options'] ) ) {
+				foreach ( $field['options'] as $option ) {
+					if ( is_array( $option ) && isset( $option['value'] ) && (string) $option['value'] === $value ) {
+						$value = (string) ( $option['label'] ?? $value );
+						break;
+					}
+				}
+			}
+			$label = trim( wp_strip_all_tags( (string) ( $field['label'] ?? '' ) ) );
+			if ( '' === $label ) {
+				// No definition any more (the registering plugin is gone):
+				// humanise the id's last segment, "acme/delivery-instructions"
+				// → "Delivery instructions".
+				$segments = explode( '/', $field_id );
+				$label    = ucfirst( str_replace( [ '-', '_' ], ' ', (string) end( $segments ) ) );
+			}
+			$out[] = [
+				'label' => $label,
+				'text'  => $value,
+			];
+		}
+		return $out;
+	}
+
+	/**
+	 * Additional checkout field definitions (field id => definition) from the
+	 * WooCommerce Blocks CheckoutFields service, or an empty array when the
+	 * service is not available on this WooCommerce version.
+	 *
+	 * @return array<string, array<string, mixed>>
+	 */
+	private static function checkout_field_definitions(): array {
+		$class = \Automattic\WooCommerce\Blocks\Domain\Services\CheckoutFields::class;
+		if ( ! class_exists( $class ) ) {
+			return [];
+		}
+		try {
+			$service = null;
+			if ( class_exists( \Automattic\WooCommerce\Blocks\Package::class ) ) {
+				$service = \Automattic\WooCommerce\Blocks\Package::container()->get( $class );
+			} elseif ( function_exists( 'wc_get_container' ) ) {
+				$service = wc_get_container()->get( $class );
+			}
+			if ( is_object( $service ) && method_exists( $service, 'get_additional_fields' ) ) {
+				$fields = $service->get_additional_fields();
+				return is_array( $fields ) ? $fields : [];
+			}
+		} catch ( \Throwable $e ) {
+			// Fall through: labels are derived from the field ids instead.
+			unset( $e );
+		}
+		return [];
+	}
+
+	/**
+	 * The summary row beneath the items: the customer's order notes on the
+	 * left, the money totals on the right.
+	 *
+	 * @param array<int, array{label: string, text: string}> $notes From order_notes().
+	 */
+	private static function render_summary( \WC_Order $order, array $notes ): void {
 		$rows = [];
 
 		$rows[] = [ __( 'Subtotal', 'fastnutrition-mealprep' ), self::money( (float) $order->get_subtotal(), $order ), false ];
@@ -818,10 +1031,17 @@ CSS;
 		<table class="inv-totals-wrap">
 			<tr>
 				<td class="inv-totals-spacer">
-					<?php if ( '' !== $note ) : ?>
+					<?php if ( ! empty( $notes ) ) : ?>
 						<div class="inv-note">
-							<div class="inv-note-title"><?php esc_html_e( 'Order notes', 'fastnutrition-mealprep' ); ?></div>
-							<?php echo nl2br( esc_html( $note ) ); ?>
+							<?php foreach ( $notes as $i => $entry ) : ?>
+								<?php
+								// Title and text each on one source line: Dompdf turns
+								// whitespace around block content into extra line boxes.
+								$title = '' !== $entry['label'] ? $entry['label'] : __( 'Order notes', 'fastnutrition-mealprep' );
+								echo '<div class="inv-note-title' . ( $i > 0 ? ' inv-note-title--next' : '' ) . '">' . esc_html( $title ) . '</div>';
+								echo '<div class="inv-note-text">' . nl2br( esc_html( $entry['text'] ) ) . '</div>';
+								?>
+							<?php endforeach; ?>
 						</div>
 					<?php endif; ?>
 				</td>
