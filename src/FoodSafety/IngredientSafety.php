@@ -211,17 +211,35 @@ final class IngredientSafety {
 	}
 
 	/**
-	 * A three-letter code from a name: first letter, then the next consonants
-	 * ("Chicken breast" → CHC, "Sweet potatoes" → SWT, "Broccoli" → BRC).
+	 * A three-letter code from a name.
+	 *
+	 * Multi-word names take the initials of their first three words ("Chicken
+	 * Salad Wrap" → CSW, "Jerk Chicken (Bulk)" → JCB), padded from the first
+	 * word's consonants when there are only two ("Beef Steak" → BSF, "Jerk
+	 * Chicken" → JCR). Single words take the first letter and the next
+	 * consonants ("Broccoli" → BRC, "Sweetcorn" → SWT). Names that still
+	 * collide on a day are told apart with a digit by BatchCodes.
 	 */
 	public static function suggest_code( string $name ): string {
-		$letters = strtoupper( (string) preg_replace( '/[^a-z]/i', '', remove_accents( $name ) ) );
-		if ( strlen( $letters ) < 3 ) {
-			return str_pad( '' !== $letters ? $letters : 'ITM', 3, 'X' );
+		$words = preg_split( '/[^A-Z]+/', strtoupper( remove_accents( $name ) ), -1, PREG_SPLIT_NO_EMPTY ) ?: [];
+		if ( empty( $words ) ) {
+			return 'ITM';
 		}
-		$first      = $letters[0];
-		$rest       = substr( $letters, 1 );
-		$consonants = (string) preg_replace( '/[AEIOU]/', '', $rest );
-		return substr( $first . $consonants . $rest, 0, 3 );
+		$first_rest = substr( $words[0], 1 );
+		$fill       = (string) preg_replace( '/[AEIOU]/', '', $first_rest ) . $first_rest;
+		if ( count( $words ) >= 2 ) {
+			$code = '';
+			foreach ( array_slice( $words, 0, 3 ) as $w ) {
+				$code .= $w[0];
+			}
+			if ( strlen( $code ) < 3 ) {
+				$code .= substr( $fill, 0, 3 - strlen( $code ) );
+			}
+			return substr( str_pad( $code, 3, 'X' ), 0, 3 );
+		}
+		if ( strlen( $words[0] ) < 3 ) {
+			return str_pad( $words[0], 3, 'X' );
+		}
+		return substr( $words[0][0] . $fill, 0, 3 );
 	}
 }

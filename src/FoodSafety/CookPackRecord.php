@@ -472,7 +472,9 @@ final class CookPackRecord {
 			return "\u{00A0}";
 		}
 		$ts = strtotime( $ymd . ' 12:00:00' );
-		return false !== $ts ? wp_date( 'D j M', $ts ) : $ymd;
+		// "25 Nov" rather than "Wed 25 Nov": the longer form wrapped the use-by
+		// column onto two lines in the PDF and cost a page on a busy day.
+		return false !== $ts ? wp_date( 'j M', $ts ) : $ymd;
 	}
 
 	/**
