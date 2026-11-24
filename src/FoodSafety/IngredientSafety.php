@@ -87,6 +87,16 @@ final class IngredientSafety {
 			esc_html__( 'No', 'fastnutrition-mealprep' )
 		);
 
+		// Cooling window override.
+		printf(
+			'<tr><th><label for="fn_safety_cool">%s</label></th><td><input type="number" step="5" min="10" id="fn_safety_cool" name="fn_safety[cool_within_min]" value="%s" placeholder="%s" style="width:90px" /> %s<p class="description">%s</p></td></tr>',
+			esc_html__( 'Refrigerate within', 'fastnutrition-mealprep' ),
+			esc_attr( (string) ( $raw['cool_within_min'] ?? '' ) ),
+			esc_attr( (string) $settings['cool_within_min'] ),
+			esc_html__( 'minutes', 'fastnutrition-mealprep' ),
+			esc_html__( 'Tighter cooling window for high-risk items such as cooked rice (60 minutes). Blank uses the setting.', 'fastnutrition-mealprep' )
+		);
+
 		// Shelf life.
 		printf(
 			'<tr><th><label for="fn_safety_shelf">%s</label></th><td><input type="number" step="1" min="1" id="fn_safety_shelf" name="fn_safety[shelf_life_days]" value="%s" placeholder="%s" style="width:90px" /> %s<p class="description">%s</p></td></tr>',
@@ -128,6 +138,17 @@ final class IngredientSafety {
 		}
 		$in = isset( $_POST['fn_safety'] ) && is_array( $_POST['fn_safety'] ) ? wp_unslash( $_POST['fn_safety'] ) : []; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- sanitised below.
 
+		update_post_meta( $post_id, self::META, self::sanitise( $in ) );
+	}
+
+	/**
+	 * Normalise a raw value set (from the edit screen or the seeder) into the
+	 * stored shape. Blanks stay blank so the defaults keep applying.
+	 *
+	 * @param array<string,mixed> $in
+	 * @return array<string,mixed>
+	 */
+	public static function sanitise( array $in ): array {
 		$method = sanitize_key( (string) ( $in['method'] ?? '' ) );
 		if ( '' !== $method && ! array_key_exists( $method, FoodSafetySettings::methods() ) ) {
 			$method = '';
@@ -138,20 +159,29 @@ final class IngredientSafety {
 		}
 		$cooling = (string) ( $in['cooling'] ?? '' );
 		$code    = strtoupper( preg_replace( '/[^A-Za-z0-9]/', '', (string) ( $in['short_code'] ?? '' ) ) ?? '' );
+		return [
+			'method'          => $method,
+			'target_c'        => is_numeric( $in['target_c'] ?? null ) ? (float) $in['target_c'] : '',
+			'typical'         => sanitize_text_field( (string) ( $in['typical'] ?? '' ) ),
+			'cooling'         => in_array( $cooling, [ '0', '1' ], true ) ? $cooling : '',
+			'cool_within_min' => is_numeric( $in['cool_within_min'] ?? null ) && (int) $in['cool_within_min'] >= 10 ? (int) $in['cool_within_min'] : '',
+			'shelf_life_days' => is_numeric( $in['shelf_life_days'] ?? null ) && (int) $in['shelf_life_days'] > 0 ? (int) $in['shelf_life_days'] : '',
+			'storage'         => $storage,
+			'short_code'      => substr( $code, 0, 6 ),
+		];
+	}
 
-		update_post_meta(
-			$post_id,
-			self::META,
-			[
-				'method'          => $method,
-				'target_c'        => is_numeric( $in['target_c'] ?? null ) ? (float) $in['target_c'] : '',
-				'typical'         => sanitize_text_field( (string) ( $in['typical'] ?? '' ) ),
-				'cooling'         => in_array( $cooling, [ '0', '1' ], true ) ? $cooling : '',
-				'shelf_life_days' => is_numeric( $in['shelf_life_days'] ?? null ) && (int) $in['shelf_life_days'] > 0 ? (int) $in['shelf_life_days'] : '',
-				'storage'         => $storage,
-				'short_code'      => substr( $code, 0, 6 ),
-			]
-		);
+	/** Whether an ingredient has any food-safety value set at all. */
+	public static function is_blank( int $ingredient_id ): bool {
+		foreach ( self::raw( $ingredient_id ) as $k => $v ) {
+			if ( 'storage' === $k ) {
+				continue;
+			}
+			if ( '' !== (string) $v ) {
+				return false;
+			}
+		}
+		return true;
 	}
 
 	/**
@@ -167,7 +197,7 @@ final class IngredientSafety {
 	/**
 	 * Values with every blank resolved to its default.
 	 *
-	 * @return array{method:string,method_label:string,no_cook:bool,target_c:float,typical:string,cooling:bool,shelf_life_days:int,storage:string,short_code:string}
+	 * @return array{method:string,method_label:string,no_cook:bool,target_c:float,typical:string,cooling:bool,cool_within_min:int,shelf_life_days:int,storage:string,short_code:string}
 	 */
 	public static function resolve( int $ingredient_id, string $type_slug = '' ): array {
 		$raw      = self::raw( $ingredient_id );
@@ -188,6 +218,7 @@ final class IngredientSafety {
 			'target_c'        => is_numeric( $raw['target_c'] ?? null ) ? (float) $raw['target_c'] : (float) $settings['cook_core_c'],
 			'typical'         => (string) ( $raw['typical'] ?? '' ),
 			'cooling'         => '' !== $cooling ? '1' === $cooling : ! $no_cook,
+			'cool_within_min' => is_numeric( $raw['cool_within_min'] ?? null ) && (int) $raw['cool_within_min'] >= 10 ? (int) $raw['cool_within_min'] : (int) $settings['cool_within_min'],
 			'shelf_life_days' => is_numeric( $raw['shelf_life_days'] ?? null ) && (int) $raw['shelf_life_days'] > 0 ? (int) $raw['shelf_life_days'] : (int) $settings['shelf_life_days'],
 			'storage'         => (string) ( $raw['storage'] ?? 'chilled' ),
 			'short_code'      => '' !== $code ? $code : self::suggest_code( (string) get_the_title( $ingredient_id ) ),

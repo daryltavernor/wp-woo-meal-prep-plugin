@@ -42,13 +42,21 @@ final class CookPackRecord {
 		if ( empty( $totals ) ) {
 			return [];
 		}
-		$codes = BatchCodes::map_for_day( $date, $totals );
-		$order = [ 'protein' => 0, 'set_meal' => 1, 'carb' => 2, 'greens' => 3, 'sweet' => 4 ];
-		$rows  = [];
+		$codes    = BatchCodes::map_for_day( $date, $totals );
+		$order    = [ 'protein' => 0, 'set_meal' => 1, 'carb' => 2, 'greens' => 3, 'sweet' => 4 ];
+		$settings = FoodSafetySettings::get();
+		$rows     = [];
 		foreach ( $totals as $t ) {
-			$iid  = (int) $t['ingredient_id'];
-			$type = (string) ( $t['type_slug'] ?? '' );
-			$safe = IngredientSafety::resolve( $iid, $type );
+			$iid     = (int) $t['ingredient_id'];
+			$type    = (string) ( $t['type_slug'] ?? '' );
+			$safe    = IngredientSafety::resolve( $iid, $type );
+			$typical = $safe['typical'];
+			// A tighter cooling window than the setting (cooked rice) is worth a
+			// reminder on the sheet itself.
+			if ( $safe['cooling'] && ! $safe['no_cook'] && $safe['cool_within_min'] < (int) $settings['cool_within_min'] ) {
+				/* translators: %d: minutes */
+				$typical = trim( $typical . ' · ' . sprintf( __( 'fridge within %d min', 'fastnutrition-mealprep' ), $safe['cool_within_min'] ), ' ·' );
+			}
 			$rows[] = [
 				'batch_code'      => $codes[ $iid ] ?? '',
 				'seq'             => 1,
@@ -61,7 +69,8 @@ final class CookPackRecord {
 				'portions'        => (int) $t['portions'],
 				'target_c'        => $safe['target_c'],
 				'cooling'         => $safe['cooling'],
-				'typical'         => $safe['typical'],
+				'cool_within_min' => $safe['cool_within_min'],
+				'typical'         => $typical,
 				'storage'         => $safe['storage'],
 				'shelf_life_days' => $safe['shelf_life_days'],
 				'use_by'          => self::use_by( $date, $safe['shelf_life_days'] ),
@@ -157,6 +166,7 @@ final class CookPackRecord {
 			'portions'        => (int) $m['portions'],
 			'target_c'        => $m['target_c'],
 			'cooling'         => ! $no_cook,
+			'cool_within_min' => 0,
 			'typical'         => '',
 			'storage'         => 'chilled',
 			'shelf_life_days' => 0,

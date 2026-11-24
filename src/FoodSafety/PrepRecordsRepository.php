@@ -185,6 +185,7 @@ final class PrepRecordsRepository {
 				}
 			}
 			if ( ! empty( $row['cooling'] ) ) {
+				$limit  = self::cool_limit( $row, $settings );
 				$out    = self::minutes( (string) ( $fields['time_out'] ?? '' ) );
 				$cooled = self::minutes( (string) ( $fields['cooled_by'] ?? '' ) );
 				if ( null !== $out && null !== $cooled ) {
@@ -192,9 +193,9 @@ final class PrepRecordsRepository {
 					if ( $diff < 0 ) {
 						$diff += 24 * 60;
 					}
-					if ( $diff > (int) $settings['cool_within_min'] ) {
+					if ( $diff > $limit ) {
 						/* translators: 1: minutes taken, 2: minutes allowed */
-						$reasons[] = sprintf( __( 'Took %1$d minutes to refrigerate (limit %2$d)', 'fastnutrition-mealprep' ), $diff, (int) $settings['cool_within_min'] );
+						$reasons[] = sprintf( __( 'Took %1$d minutes to refrigerate (limit %2$d)', 'fastnutrition-mealprep' ), $diff, $limit );
 					}
 				}
 			}
@@ -203,6 +204,12 @@ final class PrepRecordsRepository {
 			'out_of_limit' => ! empty( $reasons ),
 			'reasons'      => $reasons,
 		];
+	}
+
+	/** The cooling window for a row: its own override when set, else the setting. */
+	public static function cool_limit( array $row, array $settings ): int {
+		$own = isset( $row['cool_within_min'] ) ? (int) $row['cool_within_min'] : 0;
+		return $own >= 10 ? $own : (int) $settings['cool_within_min'];
 	}
 
 	// --- Daily checks ----------------------------------------------------------

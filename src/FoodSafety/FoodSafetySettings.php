@@ -23,6 +23,7 @@ final class FoodSafetySettings {
 
 	public function register(): void {
 		add_action( 'admin_init', [ $this, 'handle_save' ] );
+		add_action( 'admin_init', [ $this, 'handle_seed' ] );
 		add_action( 'init', [ $this, 'ensure_cron' ] );
 		add_action( self::CRON_HOOK, [ PrepRecordsRepository::class, 'purge_expired' ] );
 	}
@@ -262,6 +263,21 @@ final class FoodSafetySettings {
 		exit;
 	}
 
+	/** Apply the name-based suggestions to the ingredients (blank ones, or all). */
+	public function handle_seed(): void {
+		if ( ! isset( $_POST['fn_seed_action'], $_POST['fn_food_safety_seed_nonce'] ) ) {
+			return;
+		}
+		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			return;
+		}
+		check_admin_referer( 'fn_food_safety_seed', 'fn_food_safety_seed_nonce' );
+		$action = sanitize_key( wp_unslash( (string) $_POST['fn_seed_action'] ) );
+		$n      = IngredientSafetySeeder::apply( 'overwrite' === $action );
+		wp_safe_redirect( admin_url( 'admin.php?page=' . self::PAGE_SLUG . '&seeded=' . (int) $n . '#fn-ingredient-values' ) );
+		exit;
+	}
+
 	// --- Render --------------------------------------------------------------
 
 	public function render(): void {
@@ -274,6 +290,10 @@ final class FoodSafetySettings {
 		echo '<div class="wrap"><h1>' . esc_html__( 'Food Safety Settings', 'fastnutrition-mealprep' ) . '</h1>';
 		if ( isset( $_GET['saved'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- display only.
 			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Settings saved.', 'fastnutrition-mealprep' ) . '</p></div>';
+		}
+		if ( isset( $_GET['seeded'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- display only.
+			$n = (int) $_GET['seeded']; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html( sprintf( /* translators: %d: ingredients */ _n( 'Suggested food-safety values applied to %d ingredient.', 'Suggested food-safety values applied to %d ingredients.', $n, 'fastnutrition-mealprep' ), $n ) ) . '</p></div>';
 		}
 		echo '<div style="background:#f0f6fc;border-left:4px solid #2271b1;padding:8px 12px;margin:12px 0;max-width:900px">';
 		echo '<p style="margin:0"><strong>' . esc_html__( 'What this page is for', 'fastnutrition-mealprep' ) . '</strong><br>';
@@ -338,7 +358,63 @@ final class FoodSafetySettings {
 		echo '</tbody></table>';
 
 		submit_button( __( 'Save food safety settings', 'fastnutrition-mealprep' ) );
-		echo '</form></div>';
+		echo '</form>';
+
+		$this->render_seed_section();
+		echo '</div>';
+	}
+
+	/**
+	 * The per-ingredient values worked out from each name, with one-click apply.
+	 */
+	private function render_seed_section(): void {
+		$rows     = IngredientSafetySeeder::preview();
+		$blank    = count( array_filter( $rows, static fn( array $r ): bool => $r['blank'] ) );
+		$settings = self::get();
+
+		echo '<h2 id="fn-ingredient-values" style="margin-top:32px">' . esc_html__( 'Ingredient food-safety values', 'fastnutrition-mealprep' ) . '</h2>';
+		echo '<p class="description" style="max-width:900px">' . esc_html__( 'Each ingredient carries its own cooking method, target core temperature, typical-cook reminder, cooling window, shelf life and batch code (the Food safety box on the ingredient). The table shows what the system suggests from the name — chicken roasts, steak is pan-cooked through, chilli and curry simmer, rice boils and must be chilled within the hour, greens steam, avocado and bought-in sweets are no-cook. Apply the suggestions, then correct any exceptions on the ingredient itself.', 'fastnutrition-mealprep' ) . '</p>';
+
+		echo '<form method="post" style="margin:10px 0 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">';
+		wp_nonce_field( 'fn_food_safety_seed', 'fn_food_safety_seed_nonce' );
+		printf(
+			'<button class="button button-primary" name="fn_seed_action" value="apply_blank" %s>%s</button>',
+			$blank > 0 ? '' : 'disabled',
+			esc_html( sprintf( /* translators: %d: ingredients without values */ __( 'Apply suggestions to the %d ingredients with no values', 'fastnutrition-mealprep' ), $blank ) )
+		);
+		printf(
+			'<button class="button" name="fn_seed_action" value="overwrite" onclick="return confirm(%s)">%s</button>',
+			esc_attr( wp_json_encode( __( 'Replace the food-safety values on every ingredient with the suggestions? Values you have set by hand will be overwritten.', 'fastnutrition-mealprep' ) ) ),
+			esc_html__( 'Overwrite all with suggestions', 'fastnutrition-mealprep' )
+		);
+		echo '</form>';
+
+		echo '<div style="overflow-x:auto"><table class="widefat striped" style="min-width:1000px"><thead><tr>';
+		foreach ( [ __( 'Ingredient', 'fastnutrition-mealprep' ), __( 'Type', 'fastnutrition-mealprep' ), __( 'Now', 'fastnutrition-mealprep' ), __( 'Suggested method', 'fastnutrition-mealprep' ), __( 'Target', 'fastnutrition-mealprep' ), __( 'Typical cook (reminder)', 'fastnutrition-mealprep' ), __( 'Chill within', 'fastnutrition-mealprep' ), __( 'Shelf life', 'fastnutrition-mealprep' ), __( 'Code', 'fastnutrition-mealprep' ) ] as $h ) {
+			echo '<th>' . esc_html( $h ) . '</th>';
+		}
+		echo '</tr></thead><tbody>';
+		foreach ( $rows as $r ) {
+			$s       = $r['suggested'];
+			$no_cook = 'no_cook' === ( $s['method'] ?? '' );
+			$current = $r['blank']
+				? '<em>' . esc_html__( 'defaults', 'fastnutrition-mealprep' ) . '</em>'
+				: esc_html( self::method_label( (string) ( $r['current']['method'] ?? '' ) ) ?: __( 'set', 'fastnutrition-mealprep' ) );
+			printf(
+				'<tr><td><a href="%s"><strong>%s</strong></a></td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td><small>%s</small></td><td>%s</td><td>%s</td><td style="font-family:monospace">%s</td></tr>',
+				esc_url( get_edit_post_link( $r['id'] ) ?: '#' ),
+				esc_html( $r['name'] ),
+				esc_html( ucfirst( str_replace( '_', ' ', $r['type'] ) ) ),
+				$current, // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped above.
+				esc_html( self::method_label( (string) ( $s['method'] ?? '' ) ) ),
+				esc_html( $no_cook ? '—' : ( '' !== (string) ( $s['target_c'] ?? '' ) ? (string) $s['target_c'] . ' °C' : (string) $settings['cook_core_c'] . ' °C' ) ),
+				esc_html( (string) ( $s['typical'] ?? '' ) ),
+				esc_html( $no_cook ? '—' : ( '' !== (string) ( $s['cool_within_min'] ?? '' ) ? (string) $s['cool_within_min'] . ' min' : (string) $settings['cool_within_min'] . ' min' ) ),
+				esc_html( ( '' !== (string) ( $s['shelf_life_days'] ?? '' ) ? (string) $s['shelf_life_days'] : (string) $settings['shelf_life_days'] ) . ' ' . __( 'days', 'fastnutrition-mealprep' ) ),
+				esc_html( (string) ( $s['short_code'] ?? '' ) )
+			);
+		}
+		echo '</tbody></table></div>';
 	}
 
 	private function number_row( string $key, string $label, $value, float $step, string $help ): void {

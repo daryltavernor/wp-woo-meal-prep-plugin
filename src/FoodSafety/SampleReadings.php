@@ -72,7 +72,7 @@ final class SampleReadings {
 
 		$packed_from = $time_out;
 		if ( ! empty( $row['cooling'] ) ) {
-			$limit  = (int) $settings['cool_within_min'];
+			$limit  = PrepRecordsRepository::cool_limit( $row, $settings );
 			$cool   = mt_rand( (int) $s['cool_min_min'], max( (int) $s['cool_min_min'], (int) $s['cool_min_max'] ) );
 			$cool   = min( $cool, max( 5, $limit - 5 ) );
 			$cooled = $time_out + $cool;
