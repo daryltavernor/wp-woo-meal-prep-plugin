@@ -174,7 +174,7 @@ final class IngredientSafety {
 	/** Whether an ingredient has any food-safety value set at all. */
 	public static function is_blank( int $ingredient_id ): bool {
 		foreach ( self::raw( $ingredient_id ) as $k => $v ) {
-			if ( 'storage' === $k ) {
+			if ( 'storage' === $k || 'suggested' === $k ) {
 				continue;
 			}
 			if ( '' !== (string) $v ) {
@@ -182,6 +182,23 @@ final class IngredientSafety {
 			}
 		}
 		return true;
+	}
+
+	/**
+	 * Whether the ingredient's values are blank or still the seeder's own
+	 * suggestion, i.e. nobody has edited them by hand. The seeder stamps the
+	 * values it writes; a save from the edit screen drops the stamp. Values
+	 * written before the stamp existed are recognised by their reminder text.
+	 */
+	public static function is_untouched( int $ingredient_id ): bool {
+		if ( self::is_blank( $ingredient_id ) ) {
+			return true;
+		}
+		$raw = self::raw( $ingredient_id );
+		if ( '1' === (string) ( $raw['suggested'] ?? '' ) ) {
+			return true;
+		}
+		return in_array( (string) ( $raw['typical'] ?? '' ), IngredientSafetySeeder::known_typicals(), true );
 	}
 
 	/**

@@ -369,7 +369,7 @@ final class FoodSafetySettings {
 	 */
 	private function render_seed_section(): void {
 		$rows     = IngredientSafetySeeder::preview();
-		$blank    = count( array_filter( $rows, static fn( array $r ): bool => $r['blank'] ) );
+		$blank    = count( array_filter( $rows, static fn( array $r ): bool => $r['untouched'] ) );
 		$settings = self::get();
 
 		echo '<h2 id="fn-ingredient-values" style="margin-top:32px">' . esc_html__( 'Ingredient food-safety values', 'fastnutrition-mealprep' ) . '</h2>';
@@ -380,8 +380,9 @@ final class FoodSafetySettings {
 		printf(
 			'<button class="button button-primary" name="fn_seed_action" value="apply_blank" %s>%s</button>',
 			$blank > 0 ? '' : 'disabled',
-			esc_html( sprintf( /* translators: %d: ingredients without values */ __( 'Apply suggestions to the %d ingredients with no values', 'fastnutrition-mealprep' ), $blank ) )
+			esc_html( sprintf( /* translators: %d: ingredients not edited by hand */ __( 'Apply suggestions to the %d ingredients not edited by hand', 'fastnutrition-mealprep' ), $blank ) )
 		);
+		echo '<span class="description">' . esc_html__( 'Blank ingredients and ones still holding an earlier suggestion. Anything you have set yourself is left alone.', 'fastnutrition-mealprep' ) . '</span>';
 		printf(
 			'<button class="button" name="fn_seed_action" value="overwrite" onclick="return confirm(%s)">%s</button>',
 			esc_attr( wp_json_encode( __( 'Replace the food-safety values on every ingredient with the suggestions? Values you have set by hand will be overwritten.', 'fastnutrition-mealprep' ) ) ),
@@ -397,9 +398,12 @@ final class FoodSafetySettings {
 		foreach ( $rows as $r ) {
 			$s       = $r['suggested'];
 			$no_cook = 'no_cook' === ( $s['method'] ?? '' );
-			$current = $r['blank']
-				? '<em>' . esc_html__( 'defaults', 'fastnutrition-mealprep' ) . '</em>'
-				: esc_html( self::method_label( (string) ( $r['current']['method'] ?? '' ) ) ?: __( 'set', 'fastnutrition-mealprep' ) );
+			if ( $r['blank'] ) {
+				$current = '<em>' . esc_html__( 'defaults', 'fastnutrition-mealprep' ) . '</em>';
+			} else {
+				$current = esc_html( self::method_label( (string) ( $r['current']['method'] ?? '' ) ) ?: __( 'set', 'fastnutrition-mealprep' ) );
+				$current .= $r['untouched'] ? '' : ' <strong>' . esc_html__( '(hand-edited)', 'fastnutrition-mealprep' ) . '</strong>';
+			}
 			printf(
 				'<tr><td><a href="%s"><strong>%s</strong></a></td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td><small>%s</small></td><td>%s</td><td>%s</td><td style="font-family:monospace">%s</td></tr>',
 				esc_url( get_edit_post_link( $r['id'] ) ?: '#' ),

@@ -232,9 +232,27 @@ final class IngredientSafetySeeder {
 	}
 
 	/**
+	 * Every reminder text a rule or fallback can write, so values applied
+	 * before the "suggested" stamp existed can still be told apart from hand
+	 * edits.
+	 *
+	 * @return string[]
+	 */
+	public static function known_typicals(): array {
+		$out = [];
+		foreach ( self::rules() as $rule ) {
+			$out[] = (string) ( $rule['values']['typical'] ?? '' );
+		}
+		foreach ( [ 'protein', 'carb', 'greens', 'set_meal', 'sweet', '' ] as $type ) {
+			$out[] = (string) ( self::fallback_for_type( $type )['typical'] ?? '' );
+		}
+		return array_values( array_unique( array_filter( $out, 'strlen' ) ) );
+	}
+
+	/**
 	 * Every published ingredient with its current and suggested values.
 	 *
-	 * @return array<int,array{id:int,name:string,type:string,blank:bool,current:array<string,mixed>,suggested:array<string,mixed>}>
+	 * @return array<int,array{id:int,name:string,type:string,blank:bool,untouched:bool,current:array<string,mixed>,suggested:array<string,mixed>}>
 	 */
 	public static function preview(): array {
 		$posts = get_posts(
@@ -258,6 +276,7 @@ final class IngredientSafetySeeder {
 				'name'      => (string) $p->post_title,
 				'type'      => $type,
 				'blank'     => IngredientSafety::is_blank( $id ),
+				'untouched' => IngredientSafety::is_untouched( $id ),
 				'current'   => IngredientSafety::raw( $id ),
 				'suggested' => self::suggest( $id, (string) $p->post_title, $type ),
 			];
@@ -266,16 +285,18 @@ final class IngredientSafetySeeder {
 	}
 
 	/**
-	 * Write the suggestions. With $overwrite false only ingredients that have
-	 * no values yet are touched. Returns the number updated.
+	 * Write the suggestions, stamped so a later apply can refresh them when the
+	 * rules improve. With $overwrite false only ingredients nobody has edited by
+	 * hand (blank, or still holding a suggestion) are touched. Returns the
+	 * number updated.
 	 */
 	public static function apply( bool $overwrite ): int {
 		$n = 0;
 		foreach ( self::preview() as $row ) {
-			if ( ! $overwrite && ! $row['blank'] ) {
+			if ( ! $overwrite && ! $row['untouched'] ) {
 				continue;
 			}
-			update_post_meta( $row['id'], IngredientSafety::META, $row['suggested'] );
+			update_post_meta( $row['id'], IngredientSafety::META, $row['suggested'] + [ 'suggested' => '1' ] );
 			$n++;
 		}
 		return $n;
