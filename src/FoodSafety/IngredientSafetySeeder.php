@@ -64,7 +64,24 @@ final class IngredientSafetySeeder {
 				],
 			],
 			[
-				'keywords' => [ 'chilli', 'chili', 'bolognese', 'curry', 'casserole', 'stew', 'ragu', 'mince', 'balti', 'korma', 'tikka masala' ],
+				// Assembled-cold set meals: the critical step is cooking the
+				// protein, then chilling it before it goes into the salad or wrap.
+				'keywords' => [ 'salad', 'wrap', 'sandwich', 'bagel' ],
+				'types'    => [ 'set_meal' ],
+				'values'   => $cooked + [
+					'method'  => 'oven',
+					'typical' => __( 'Cook the protein to ≥ 75 °C core, chill to ≤ 8 °C, then assemble cold and keep chilled', 'fastnutrition-mealprep' ),
+				],
+			],
+			[
+				'keywords' => [ 'casserole', 'hotpot', 'bake', 'lasagne', 'cottage pie', 'shepherd' ],
+				'values'   => $cooked + [
+					'method'  => 'oven',
+					'typical' => __( 'Oven 160 °C fan, 60–90 min covered; probe the centre ≥ 75 °C; cool in shallow trays', 'fastnutrition-mealprep' ),
+				],
+			],
+			[
+				'keywords' => [ 'chilli', 'chili', 'bolognese', 'curry', 'stew', 'ragu', 'mince', 'balti', 'korma', 'tikka masala', 'goulash' ],
 				'values'   => $cooked + [
 					'method'  => 'pan',
 					'typical' => __( 'Simmer 45–60 min, stir regularly, probe the centre of the pan ≥ 75 °C; cool in shallow trays', 'fastnutrition-mealprep' ),
@@ -155,7 +172,10 @@ final class IngredientSafetySeeder {
 				continue;
 			}
 			foreach ( $rule['keywords'] as $kw ) {
-				if ( false !== strpos( $haystack, $kw ) ) {
+				// Whole-word prefix match: "bean" matches "beans" and "potato"
+				// matches "potatoes", but "ragu" no longer matches "asparagus"
+				// and "cake" no longer matches "oatcake".
+				if ( preg_match( '/(?<![a-z])' . preg_quote( $kw, '/' ) . '/', $haystack ) ) {
 					$values = $rule['values'];
 					break 2;
 				}

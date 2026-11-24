@@ -252,6 +252,11 @@ final class IngredientSafety {
 	 * collide on a day are told apart with a digit by BatchCodes.
 	 */
 	public static function suggest_code( string $name ): string {
+		// A "(Bulk)" variant takes its standard sibling's code plus B, so the
+		// two stay visibly related and never collide (JCR / JCRB).
+		if ( preg_match( '/\(\s*bulk\s*\)/i', $name ) ) {
+			return substr( self::suggest_code( (string) preg_replace( '/\(\s*bulk\s*\)/i', '', $name ) ) . 'B', 0, 4 );
+		}
 		$words = preg_split( '/[^A-Z]+/', strtoupper( remove_accents( $name ) ), -1, PREG_SPLIT_NO_EMPTY ) ?: [];
 		if ( empty( $words ) ) {
 			return 'ITM';
