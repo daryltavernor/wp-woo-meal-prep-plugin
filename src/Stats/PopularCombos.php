@@ -38,18 +38,99 @@ final class PopularCombos {
 	/** Statuses that count as a sale — excludes prep/label-only, refunded, cancelled, on-hold, failed. */
 	private const COUNTED_STATUSES = [ 'processing', 'completed' ];
 
+	/** Transient that throttles the self-healing schedule check. */
+	private const HEAL_TRANSIENT = 'fn_popular_combos_heal';
+
+	/** Option holding details of the last completed recompute. */
+	public const OPTION_LAST_RUN = 'fn_popular_combos_last_run';
+
 	public function register(): void {
-		// Only the background worker callback — no per-request hooks.
 		add_action( self::HOOK, [ __CLASS__, 'recompute' ] );
+		// Keep the weekly schedule alive without relying on activation. Two
+		// things used to kill it: ensure_scheduled() treated a pending one-off
+		// "Recompute now" action as proof the weekly one existed, and Action
+		// Scheduler drops a recurrence when a run dies. Checked from admin
+		// requests at most once every six hours.
+		add_action( 'admin_init', [ __CLASS__, 'maybe_heal_schedule' ] );
 	}
 
-	/** Ensure the weekly recompute is scheduled (called from activation / upgrade, not per request). */
+	/** Ensure the weekly recompute is scheduled. Cheap and safe to call often. */
 	public static function ensure_scheduled(): void {
-		if ( ! function_exists( 'as_schedule_recurring_action' ) || ! function_exists( 'as_next_scheduled_action' ) ) {
+		if ( ! function_exists( 'as_schedule_recurring_action' ) ) {
 			return;
 		}
-		if ( false === as_next_scheduled_action( self::HOOK, [], self::GROUP ) ) {
+		if ( false === self::next_recurring_run() ) {
 			as_schedule_recurring_action( time() + HOUR_IN_SECONDS, WEEK_IN_SECONDS, self::HOOK, [], self::GROUP );
+		}
+	}
+
+	/**
+	 * Pending actions for the hook, split into the next recurring run and the
+	 * number of one-off runs waiting. as_next_scheduled_action() cannot tell
+	 * the two apart, which is how the weekly schedule went missing unnoticed.
+	 *
+	 * @return array{next_recurring:int|false,one_off:int}
+	 */
+	public static function pending(): array {
+		$out = [
+			'next_recurring' => false,
+			'one_off'        => 0,
+		];
+		if ( ! function_exists( 'as_get_scheduled_actions' ) ) {
+			return $out;
+		}
+		$actions = as_get_scheduled_actions(
+			[
+				'hook'     => self::HOOK,
+				'group'    => self::GROUP,
+				'status'   => 'pending',
+				'per_page' => 25,
+			],
+			OBJECT
+		);
+		foreach ( (array) $actions as $action ) {
+			if ( ! is_object( $action ) || ! method_exists( $action, 'get_schedule' ) ) {
+				continue;
+			}
+			$schedule = $action->get_schedule();
+			if ( ! $schedule || ! method_exists( $schedule, 'is_recurring' ) || ! $schedule->is_recurring() ) {
+				$out['one_off']++;
+				continue;
+			}
+			$date = method_exists( $schedule, 'get_date' ) ? $schedule->get_date() : null;
+			$ts   = $date instanceof \DateTimeInterface ? $date->getTimestamp() : time();
+			if ( false === $out['next_recurring'] || $ts < $out['next_recurring'] ) {
+				$out['next_recurring'] = $ts;
+			}
+		}
+		return $out;
+	}
+
+	/** Timestamp of the next pending weekly run, or false when the schedule is missing. */
+	public static function next_recurring_run() {
+		return self::pending()['next_recurring'];
+	}
+
+	/**
+	 * Self-healing check: re-create the weekly schedule if it has gone, and
+	 * queue a catch-up when the list is more than eight days old and no run is
+	 * due soon. Throttled so it costs one query every six hours, on admin
+	 * requests only.
+	 */
+	public static function maybe_heal_schedule(): void {
+		if ( wp_doing_ajax() || wp_doing_cron() || get_transient( self::HEAL_TRANSIENT ) ) {
+			return;
+		}
+		set_transient( self::HEAL_TRANSIENT, 1, 6 * HOUR_IN_SECONDS );
+		self::ensure_scheduled();
+
+		$data      = get_option( self::OPTION );
+		$generated = is_array( $data ) ? (int) ( $data['generated'] ?? 0 ) : 0;
+		$pending   = self::pending();
+		$stale     = $generated < time() - 8 * DAY_IN_SECONDS;
+		$due_soon  = false !== $pending['next_recurring'] && $pending['next_recurring'] <= time() + DAY_IN_SECONDS;
+		if ( $stale && ! $due_soon && 0 === $pending['one_off'] ) {
+			self::queue_recompute();
 		}
 	}
 
@@ -92,6 +173,7 @@ final class PopularCombos {
 		if ( ! function_exists( 'wc_get_orders' ) ) {
 			return;
 		}
+		$started = microtime( true );
 
 		$order_ids = wc_get_orders(
 			[
@@ -183,6 +265,16 @@ final class PopularCombos {
 				'window_days' => self::WINDOW_DAYS,
 				'combos'      => $combos,
 				'ingredients' => $ingredients,
+			],
+			false
+		);
+		update_option(
+			self::OPTION_LAST_RUN,
+			[
+				'finished' => time(),
+				'orders'   => is_array( $order_ids ) ? count( $order_ids ) : 0,
+				'seconds'  => round( microtime( true ) - $started, 1 ),
+				'context'  => wp_doing_cron() ? 'cron' : ( wp_doing_ajax() ? 'async' : ( is_admin() ? 'admin' : 'other' ) ),
 			],
 			false
 		);

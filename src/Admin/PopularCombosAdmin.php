@@ -33,8 +33,16 @@ final class PopularCombosAdmin {
 		if ( ! current_user_can( 'manage_woocommerce' ) ) {
 			return;
 		}
-		PopularCombos::queue_recompute();
-		wp_safe_redirect( add_query_arg( [ 'page' => self::PAGE_SLUG, 'fn_queued' => '1' ], admin_url( 'admin.php' ) ) );
+		// Run it here and now rather than queueing: the scan takes about a
+		// second, and a queued run only happens when WP-Cron gets round to it,
+		// which on some hosts is "eventually". Staff clicked because they want
+		// the list updated before they look at it.
+		if ( function_exists( 'set_time_limit' ) ) {
+			@set_time_limit( 120 ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+		}
+		PopularCombos::ensure_scheduled();
+		PopularCombos::recompute();
+		wp_safe_redirect( add_query_arg( [ 'page' => self::PAGE_SLUG, 'fn_done' => '1' ], admin_url( 'admin.php' ) ) );
 		exit;
 	}
 
@@ -49,8 +57,30 @@ final class PopularCombosAdmin {
 		echo '<div class="wrap">';
 		echo '<h1>' . esc_html__( 'Popular Combinations', 'fastnutrition-mealprep' ) . '</h1>';
 
-		if ( isset( $_GET['fn_queued'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Recompute queued — it runs in the background and the list updates shortly.', 'fastnutrition-mealprep' ) . '</p></div>';
+		if ( isset( $_GET['fn_done'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Recomputed from your recent orders.', 'fastnutrition-mealprep' ) . '</p></div>';
+		}
+
+		// Make sure the weekly schedule exists every time someone looks here.
+		PopularCombos::ensure_scheduled();
+		$pending  = PopularCombos::pending();
+		$last_run = get_option( PopularCombos::OPTION_LAST_RUN );
+		$last_run = is_array( $last_run ) ? $last_run : [];
+
+		// WP-Cron health: Action Scheduler's own runner is due every minute, so
+		// a runner that is a quarter of an hour late means background jobs on
+		// this site are not firing at all.
+		$runner_due = wp_next_scheduled( 'action_scheduler_run_queue' );
+		if ( $runner_due && $runner_due < time() - 15 * MINUTE_IN_SECONDS ) {
+			echo '<div class="notice notice-warning"><p><strong>' . esc_html__( 'Background jobs are running late.', 'fastnutrition-mealprep' ) . '</strong> ';
+			echo esc_html(
+				sprintf(
+					/* translators: %s: human-readable "time ago" */
+					__( 'The WooCommerce scheduled-actions runner was due %s ago and has not run, which usually means WP-Cron is blocked on this site (Tools → Cron Events shows the error). Until that is fixed the weekly recompute only runs when WP-Cron is triggered; the button below runs it immediately.', 'fastnutrition-mealprep' ),
+					human_time_diff( $runner_due )
+				)
+			);
+			echo '</p></div>';
 		}
 
 		$generated = (int) ( $data['generated'] ?? 0 );
@@ -58,12 +88,37 @@ final class PopularCombosAdmin {
 		if ( $generated > 0 ) {
 			printf(
 				/* translators: 1: window in days, 2: human-readable "time ago" */
-				esc_html__( 'Top combinations over the last %1$d days, last calculated %2$s ago. Updated automatically once a week.', 'fastnutrition-mealprep' ),
+				esc_html__( 'Top combinations over the last %1$d days, last calculated %2$s ago.', 'fastnutrition-mealprep' ),
 				(int) ( $data['window_days'] ?? PopularCombos::WINDOW_DAYS ),
 				esc_html( human_time_diff( $generated ) )
 			);
+			if ( ! empty( $last_run['context'] ) ) {
+				echo ' ' . esc_html(
+					sprintf(
+						/* translators: 1: how it ran (cron/admin), 2: seconds, 3: number of orders */
+						__( '(last run: %1$s, %2$ss over %3$d orders)', 'fastnutrition-mealprep' ),
+						'cron' === $last_run['context'] ? __( 'automatic', 'fastnutrition-mealprep' ) : __( 'manual', 'fastnutrition-mealprep' ),
+						(string) ( $last_run['seconds'] ?? '?' ),
+						(int) ( $last_run['orders'] ?? 0 )
+					)
+				);
+			}
 		} else {
 			esc_html_e( 'No stats yet — click "Recompute now" to build the first list from your recent orders.', 'fastnutrition-mealprep' );
+		}
+		echo '</p><p>';
+		if ( false !== $pending['next_recurring'] ) {
+			printf(
+				/* translators: 1: date and time, 2: human-readable "in x" */
+				esc_html__( 'Next automatic recompute: %1$s (in %2$s), as a WooCommerce scheduled action, then weekly.', 'fastnutrition-mealprep' ),
+				esc_html( wp_date( 'D j M, H:i', (int) $pending['next_recurring'] ) ),
+				esc_html( human_time_diff( (int) $pending['next_recurring'] ) )
+			);
+		} else {
+			esc_html_e( 'Next automatic recompute: not scheduled — it is re-created automatically the next time an admin page loads.', 'fastnutrition-mealprep' );
+		}
+		if ( $pending['one_off'] > 0 ) {
+			echo ' ' . esc_html( sprintf( /* translators: %d: count */ _n( '%d queued recompute is waiting for the background runner.', '%d queued recomputes are waiting for the background runner.', $pending['one_off'], 'fastnutrition-mealprep' ), $pending['one_off'] ) );
 		}
 		echo '</p>';
 
