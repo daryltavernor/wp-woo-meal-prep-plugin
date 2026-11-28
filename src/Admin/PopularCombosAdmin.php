@@ -67,11 +67,12 @@ final class PopularCombosAdmin {
 		$last_run = get_option( PopularCombos::OPTION_LAST_RUN );
 		$last_run = is_array( $last_run ) ? $last_run : [];
 
-		// WP-Cron health: Action Scheduler's own runner is due every minute, so
-		// a runner that is a quarter of an hour late means background jobs on
-		// this site are not firing at all.
+		// WP-Cron health: Action Scheduler's own runner is due every minute, but
+		// on a host where WordPress cannot spawn its own cron and a server cron
+		// triggers it hourly instead, an hour's lag is normal. Only a runner
+		// several hours late means background jobs have genuinely stalled.
 		$runner_due = wp_next_scheduled( 'action_scheduler_run_queue' );
-		if ( $runner_due && $runner_due < time() - 15 * MINUTE_IN_SECONDS ) {
+		if ( $runner_due && $runner_due < time() - 3 * HOUR_IN_SECONDS ) {
 			echo '<div class="notice notice-warning"><p><strong>' . esc_html__( 'Background jobs are running late.', 'fastnutrition-mealprep' ) . '</strong> ';
 			echo esc_html(
 				sprintf(
