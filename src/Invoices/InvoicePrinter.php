@@ -893,6 +893,10 @@ CSS;
 			$notes[] = $field;
 		}
 
+		foreach ( self::product_input_notes( $order ) as $field ) {
+			$notes[] = $field;
+		}
+
 		/**
 		 * Filter the notes printed on an invoice, in the box beside the totals.
 		 *
@@ -917,6 +921,63 @@ CSS;
 			];
 		}
 		return $clean;
+	}
+
+	/**
+	 * Answers typed into Product Input Fields for WooCommerce boxes on the
+	 * product page ("Any dislikes or special requests?" on the meal plans), as
+	 * label/text pairs for the notes box.
+	 *
+	 * That plugin stores each line's answers as hidden, serialised arrays
+	 * (`_alg_wc_pif_local` for per-product fields, `_alg_wc_pif_global` for
+	 * shop-wide ones), each entry carrying `title`, `type` and `_value`, so
+	 * they never surface through get_formatted_meta_data(). They are read
+	 * directly here. The label carries the product name when the order has
+	 * more than one line, so the kitchen knows which meal the request is for.
+	 *
+	 * @return array<int, array{label: string, text: string}>
+	 */
+	private static function product_input_notes( \WC_Order $order ): array {
+		$items     = $order->get_items();
+		$multiline = count( $items ) > 1;
+		$out       = [];
+		foreach ( $items as $item ) {
+			foreach ( [ '_alg_wc_pif_local', '_alg_wc_pif_global' ] as $key ) {
+				$fields = $item->get_meta( $key, true );
+				if ( ! is_array( $fields ) ) {
+					continue;
+				}
+				foreach ( $fields as $field ) {
+					if ( ! is_array( $field ) ) {
+						continue;
+					}
+					if ( 'file' === (string) ( $field['type'] ?? '' ) ) {
+						$value = is_array( $field['_value'] ?? null ) ? (string) ( $field['_value']['_display_name'] ?? '' ) : '';
+					} else {
+						$value = $field['_value'] ?? '';
+						if ( is_array( $value ) ) {
+							$value = implode( ', ', array_map( 'strval', $value ) );
+						}
+						$value = trim( (string) $value );
+					}
+					if ( '' === $value ) {
+						continue;
+					}
+					$title = trim( wp_strip_all_tags( (string) ( $field['title'] ?? '' ) ), " :\t\n" );
+					if ( '' === $title ) {
+						$title = __( 'Special requests', 'fastnutrition-mealprep' );
+					}
+					if ( $multiline ) {
+						$title .= ' — ' . trim( (string) $item->get_name() );
+					}
+					$out[] = [
+						'label' => $title,
+						'text'  => $value,
+					];
+				}
+			}
+		}
+		return $out;
 	}
 
 	/**
